@@ -17,7 +17,7 @@ const client = new Discord.Client({
 });
 const BaseAddress = "./ActiveBases.json";
 const RecoveryAddress = "./RecoveryBases.json"
-const DiscordToken = 'ODQ1MTU5MzkzNDk0NTY0OTA0.YKc6BQ.DM7TULY8QHqx96svmKoNb0o2EI4';
+const DiscordToken = JSON.parse(fs.readFileSync("./token.json")).token;
 const DiscordClientId = "845159393494564904";
 // const DiscordSupportServerId = "762867801575784448";
 const DEBUG = false;
