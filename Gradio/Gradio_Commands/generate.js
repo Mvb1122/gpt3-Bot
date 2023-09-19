@@ -1,0 +1,273 @@
+//Ignore ts(80001)
+const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
+const Gradio = require('../Gradio_Stuff.js')
+const fs = require('fs')
+const Index = require ('../../index.js');
+
+async function GetPromptsFromPlaintextUsingGPT(Plain) {
+    let messages = [
+        {
+            role: "system",
+            content: "Danbuuru tags are a descriptor for the content of an image. For example, some tags are: 1boy, 1girl, absurdres, red, black, and several others.\nUse thighhighs instead of thighhigh_socks\nYou can emphasize a tag by surrounding it in parenthesis, like (absurdres). Make sure to include (absurdres) in all lists of tags.\nFor example, an image of a woman with large breasts, long hair, wearing a white dress with earings, on a simple background, would have the following tags: 1girl, absurdres, ((mature_female)), large_breasts, brown hair, long hair, white dress, earings, simple background\nFor women, use 1girl, (mature_female) plus any other tags. For men, use 1boy, (mature_male) and any other tags.\nAny tag you can think of works as one, pretty much. Please write a set of tags which coorespond to the given text on its own line with no other text. Given text: " + Plain
+        }
+    ]
+
+    let response = (await Index.GetSafeChatGPTResponse(messages)).data.choices[0].message.content;
+    console.log("Created tags: " + response)
+    return response;
+}
+
+/**
+ * @param {String} str The string to count through.
+ * @param {String} char The character to look for.
+ * @returns The number of times that character shows up.
+ */
+function countCharacter(str, char) {
+    let count = 0;
+    for (let i = 0; i < str.length; i++) {
+        if (str[i] === char) {
+            count++;
+        }
+    }
+    return count;
+}
+
+module.exports = {
+	data: new SlashCommandBuilder()
+        .setName('generate')
+        .setDescription('Generates the specified image from the given prompts.')
+        .addStringOption(option => {
+            return option.setName("prompts")
+                .setDescription("The prompts.")
+                .setRequired(true)
+        })
+        .addStringOption(option => {
+            return option.setName("negativeprompt")
+                .setDescription("The negative prompts to use in addition to the preset ones.")
+                .setRequired(false)
+        })
+
+        .addIntegerOption(option => {
+            return option.setName("count")
+                .setDescription("The number of images to generate. If left blank, it just makes one image.")
+                .setRequired(false)
+                .setMaxValue(10)
+                .setMinValue(1)
+        })
+        .addIntegerOption(option => {
+            return option.setName("width")
+                .setDescription("The width of the image to generate. If left blank, it uses 512.")
+                .setRequired(false)
+        })
+        .addIntegerOption(option => {
+            return option.setName("height")
+                .setDescription("The height of the image to generate. If left blank, it uses 768.")
+                .setRequired(false)
+        })
+        .addIntegerOption(option => {
+            return option.setName("cfg")
+                .setDescription("The CFG scale of the image to generate. Higher values are more strict. If left blank, it uses 7.")
+                .setRequired(false)
+        })
+        .addBooleanOption(option => {
+            return option.setName("autotag")
+                .setDescription("Uses ChatGPT to remake your prompt in tags. Will do it anyway if you use less than two commas.")
+                .setRequired(false)
+        })
+        .addBooleanOption(option => {
+            return option.setName("ephemeral")
+                .setDescription("Makes it so only you can see these images, but they dissappear until the server syncs.")
+                .setRequired(false)
+        })
+
+        // Upscaling stuff.
+        .addNumberOption(option => {
+            return option.setName("scalefactor")
+                .setDescription("How much to upscale by.")
+                .setMinValue(1)
+                // .setMaxValue(1.4);
+        })
+        ,
+
+    /**
+     * Generates the message with the specified count.
+     * @param {CommandInteraction} interaction 
+     */
+    async execute(interaction) {
+        /** @type {Boolean} */
+        let IsMessageEphemeral = interaction.options.getBoolean("ephemeral") ?? false;
+
+        // Tell Discord that we're thinking right away to keep them from assuming we're offline. (Also tell them if we're being sneaky.)
+        await interaction.deferReply({ephemeral: IsMessageEphemeral});
+
+        /** @type {String} */
+        let prompts = interaction.options.getString("prompts");
+
+        
+        // If we were told not to autotag, don't autotag. If it wasn't defined, only autotag if it has less than two commas. If it was true, do it.
+        let autotag = false;
+        if (interaction.options.getBoolean("autotag") != undefined) {
+            autotag = interaction.options.getBoolean("autotag");
+        } else {
+            autotag = countCharacter(prompts, ",") < 2
+        }
+        let UseMessage = autotag;
+
+        // If this prompt doens't contain any tags, use the AI to make some.
+        let UsingGPTTags = false;
+        if (autotag) { 
+            prompts = (await GetPromptsFromPlaintextUsingGPT(prompts));
+            UsingGPTTags = true;
+            UseMessage = true;
+        }
+
+        let count = interaction.options.getInteger("count") ?? 1;
+        // count = Number.parseInt(count);
+        if (count <= 0) count = 1;
+        if (count > 1) UseMessage = true;
+
+        let height = interaction.options.getInteger("height") ?? 768;
+        let width = interaction.options.getInteger("width") ?? 512;
+        let cfg = interaction.options.getInteger("cfg") ?? 7;
+        const NegativePrompt = interaction.options.getString("negativeprompt") ?? "";
+        // height = Number.parseInt(height); width = Number.parseInt(width); cfg = Number.parseInt(cfg)
+
+        // If they ask for too many pixels, only let them generate one image at a time.
+        let settings = {
+            prompt: prompts.trim(),
+            negative_prompt: NegativePrompt,
+            height: height,
+            width: width,
+            cfg_scale: cfg,
+            save_images: true
+        }
+
+        let content = "Queued... ";
+        let scale = interaction.options.getNumber("scalefactor") ?? undefined;
+        if (Gradio.IsPixelCountAboveLimit(settings.width, settings.height)) {
+            content += "Your resolution was too big so I'm only making one image! "
+            settings.height *= 0.5; settings.width *= 0.5; // Scale res. to 2/3
+            scale = 2
+            count = 1;
+            UseMessage = true;
+        }
+
+        // Upscaling stuff.
+        // If no upscaling options have been passed, just instantly return the path to the already-existing image.
+        let PostProcess = async (path) => {
+            return new Promise(res => {
+                res(path);
+            });
+        }
+
+        if (scale != undefined) {
+            PostProcess = async (path, prompt) => {
+                let settings = {
+                    prompt: prompt,
+                    scale: interaction.options.getNumber("scalefactor") ?? scale
+                }
+
+                return new Promise(res => {
+                    try {
+                        Gradio.ImageToImageFromPath(path, settings)
+                            .then(e => res(e));
+                    } catch {
+                        res(path);
+                    }
+                })
+            }
+        }
+
+        if (Gradio.isConnected()) {
+            if (UsingGPTTags)
+                content += "Using ChatGPT tags: ```" + prompts + "```";
+
+            // If we're asked to make it secret, be secret.
+            if (IsMessageEphemeral) UseMessage = false;
+
+            // Ceil count at 10.
+            if (count > 10) {
+                count = 10;
+                content += "Also, because you asked for more than 10 images, I put it down to ten. "
+            } else 
+                if (count <= 0) count = 1;
+            
+            try {
+                // If we're generating more than 1 image, send the user a message letting them know how progress is going.
+                let generating = undefined;
+                // console.log("UseMessage: " + UseMessage)
+                if (UseMessage) generating = interaction.channel.send(content)
+
+                // Generate a bunch of seeds, first, I guess. 
+                let seeds = [];
+                for (let i = 0; i < count; i++) 
+                    seeds.push(Gradio.GenerateSeed());
+
+                // Generate each individual image.
+                    // Do this async so that way the generating server(s) run at full load.
+                let paths = []; let NumImagesGenerated = 0;
+                for (let i = 0; i < count; i++) {
+                    // As each image completes, update the counter.
+                    settings.seed = seeds[i]
+                    let thisImage = Gradio.PredictContent(settings, false)
+                    
+                    thisImage.then(async () => {
+                        console.log("Path: " + (await thisImage));
+                        if (UseMessage) {
+                            NumImagesGenerated++;
+                            generating = (await generating).edit(`${content.replace("Queued", "Generating") + (NumImagesGenerated)} image${(NumImagesGenerated > 1) ? "s" : ""} generated!`)
+                        }
+                    })
+
+                    // After the image has been drawn, post-process it.
+                    let ImagePlusPostProcess = new Promise(res => {
+                        thisImage.then(async () => {
+                            res(await PostProcess(await (thisImage)))
+                        })
+                    })
+                    paths.push(ImagePlusPostProcess);
+
+                    // Wait for a second between submitting each image in order to avoid hogging the system, I guess.
+                        // It also fixes an issue where the seed would get overwritten.
+                    await new Promise(res => setTimeout(res, 1000));
+                }
+
+                // Send the images and then remove the message saying that we were generating.
+                Promise.all(paths).then(async (e) => {
+                    // Ensure that all of the paths are valid.
+                    for (let i = 0; i < paths.length; i++) paths[i] = await paths[i];
+                    
+                    interaction.editReply({"content": `Generated! Tags:\n\`\`\`${prompts}\`\`\``, files: paths})
+                        .then(async () => {
+                            if (generating != undefined && (await generating).deletable)
+                                (await generating).delete();
+                            
+                            // Also, because images are saved on the generating server, we can delete them off of the bot's server.
+                            function DeleteFiles() {
+                                paths.forEach(path => {
+                                    fs.unlink(path, e => {if (e) console.log(e)})
+                                });
+                            }
+                            
+                            // Just because I'm weird, DM Micah all ephemeral images.
+                                // Where channel is null, it takes place in a DM.
+                                // ! For whatever reason, logging the channel makes it work.
+                            console.log(interaction.channel)
+                            if (IsMessageEphemeral || interaction.channel == null) {
+                                const { client } = require('../../index.js');
+                                await client.users.fetch('303011705598902273', false).then(async (user) => {
+                                    console.log("Sending Micah Ephemeral images!");
+                                    user.send({content: `Ephemeral image${(paths.length > 1) ? "s" : ""}`, files: paths})
+                                        .then(()=> {DeleteFiles();})
+                                });
+                            } else DeleteFiles();
+
+                        })
+                })
+            } catch (e) {
+                console.log(e);
+                interaction.editReply("Unable to connect!");
+            }
+        } else interaction.editReply("Unable to connect!");
+    },
+};
