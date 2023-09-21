@@ -1,4 +1,5 @@
 const { default: StableDiffusionApi } = require("a1111-webui-api");
+const API = require("a1111-webui-api");
 const { Message } = require("discord.js");
 const fs = require('fs');
 const NegativePrompt = 'lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, bad feet, bad pussy';
@@ -74,11 +75,19 @@ const sharp = require('sharp')
  * @param {{prompt: String, scale: Number}} Settings Settings for upscaling.
  */
 async function ImageToImageFromPath(ImagePath, Settings) {
-    return new Promise(async (resolve, reject) => {
-        const Image = sharp(ImagePath)
-        let meta = Image.metadata();
+    const Image = await sharp(ImagePath)
+    return ImageToImageFromSharp(Image, Settings);
+}
 
-        // Settings.Image = Image;
+/**
+ * 
+ * @param {sharp.Sharp} Image The path to the image.
+ * @param {{prompt: String, scale: Number}} Settings Settings for upscaling.
+ */
+async function ImageToImageFromSharp(Image, Settings) {
+    return new Promise(async (resolve, reject) => {
+        let meta = await Image.metadata();
+
         Settings.init_images = [Image];
         Settings.resize_mode = 0;
         if (Settings.negative_prompt == undefined)
@@ -86,22 +95,30 @@ async function ImageToImageFromPath(ImagePath, Settings) {
         Settings.save_images = true;
         
         Settings.sampler_name = "DDIM"; Settings.steps = 35;
-        Settings.height = (await meta).height * Settings.scale;
-        Settings.width = (await meta).width * Settings.scale;
+
+        if (Settings.scale == undefined) Settings.scale = 1;
+
+        if (Settings.width == undefined || Settings.height == undefined) {
+            Settings.height = (await meta).height * Settings.scale;
+            Settings.width = (await meta).width * Settings.scale;
+        }
 
         let scale = (Settings.scale).toString();
-        delete Settings.scale;
+        const prompt = `${Settings.prompt}`;
 
         try {
             FetchApp().img2img(Settings)
                 .then(async e => {
-                    const path = ImagePath.replace(".png", `-${scale}x.png`);
+                    const path = `${prompt.substring(0, 100)}-${scale}x.png`;
                     await (e.image.toFile(path))
                     resolve(path)
                 })
         } catch (e) {
             reject(e);
         }
+    });
+}
+
     })
 }
 
@@ -137,8 +154,9 @@ async function PredictContentDefault(Input) {
     })
 }
 
+const PixelCountLimit = 600000;
 function IsPixelCountAboveLimit(Height, Width) {
-    return (Height * Width) > 600000
+    return (Height * Width) > PixelCountLimit
 }
 
 function GenerateSeed() {
@@ -177,6 +195,8 @@ async function PredictContent(Input, MakeSeed = true) {
                 Input.negative_prompt = NegativePrompt + (Input.negative_prompt ?? "");
             }
 
+            // If there's \n characters in the prompt, replace them with commas.
+            Input.prompt.replaceAll("\n", ", ")
             // Get image result from generator server.
             const result = FetchApp().txt2img(Input);
     
@@ -190,13 +210,13 @@ async function PredictContent(Input, MakeSeed = true) {
                         console.log("Image written to " + Path + "!")
                         res(Path);
                     } catch (error) {
-                        reject(e)
+                        reject(error)
                     }
                 })
         } catch (e) {
             reject(e)
         }
-    })
+    });
 }
 
 
@@ -221,4 +241,4 @@ async function PredictWithMessage(Input, DiscordMessage) {
 }
 */
 
-module.exports = { ConnectTo, PredictContent, isConnected: IsConnected, GenerateSeed, IsPixelCountAboveLimit, FetchApp, DisconnectFrom, GetServers, ImageToImageFromPath, ConnectToPreset }
+module.exports = { ConnectTo, PredictContent, isConnected: IsConnected, GenerateSeed, IsPixelCountAboveLimit, FetchApp, DisconnectFrom, GetServers, ImageToImageFromPath, ImageToImageFromSharp, ConnectToPreset, GetTagsFromImage, PredictContentDefault, PixelCountLimit }
