@@ -126,3 +126,4 @@ dist
 .yarn/install-state.gz
 .pnp.*
 token.json
+Images/*.png
