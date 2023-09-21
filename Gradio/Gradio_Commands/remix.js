@@ -27,6 +27,7 @@ module.exports = {
                 .setRequired(false)
         })
 
+        /*
         .addIntegerOption(option => {
             return option.setName("count")
                 .setDescription("The number of images to generate. If left blank, it just makes one image.")
@@ -34,6 +35,8 @@ module.exports = {
                 .setMaxValue(10)
                 .setMinValue(1)
         })
+        */
+
         .addIntegerOption(option => {
             return option.setName("width")
                 .setDescription("The width of the image to generate. If left blank, it uses 512.")
@@ -131,7 +134,7 @@ module.exports = {
                 UseMessage = true;
             }
     
-            let count = interaction.options.getInteger("count") ?? 1;
+            let count = 1; // interaction.options.getInteger("count") ?? 1;
             // count = Number.parseInt(count);
             if (count <= 0) count = 1;
             if (count > 1) UseMessage = true;

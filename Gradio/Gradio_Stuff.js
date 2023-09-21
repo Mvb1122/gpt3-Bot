@@ -75,7 +75,7 @@ const sharp = require('sharp')
  * @param {{prompt: String, scale: Number}} Settings Settings for upscaling.
  */
 async function ImageToImageFromPath(ImagePath, Settings) {
-    const Image = await sharp(ImagePath)
+    const Image = sharp(ImagePath)
     return ImageToImageFromSharp(Image, Settings);
 }
 
@@ -84,7 +84,10 @@ async function ImageToImageFromPath(ImagePath, Settings) {
  * @param {sharp.Sharp} Image The path to the image.
  * @param {{prompt: String, scale: Number}} Settings Settings for upscaling.
  */
-async function ImageToImageFromSharp(Image, Settings) {
+async function ImageToImageFromSharp(Image, Settings, MakeSeed = true) {
+    if (MakeSeed)
+        Settings.seed = GenerateSeed();
+
     return new Promise(async (resolve, reject) => {
         let meta = await Image.metadata();
 
