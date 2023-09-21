@@ -65,6 +65,7 @@ async function EVAL(parameters, message) {
   try {
     if (DEBUG)
       console.log(`\nEvaluating: ${parameters.CODE}\n`);
+
     SendMessage(message, "Evaluating: ```js\n" + parameters.CODE + "```")
     try {
       response.response = await eval(parameters.CODE);
@@ -610,6 +611,12 @@ function NewMessage(Role, Content, User) {
 }
 
 const { encode } = require("gpt-3-encoder");
+
+/**
+ * Converts message strings into json. 
+ * @param {String | [{role: String, content: String, name: String}]} InputMessages The inputted messages.
+ * @returns {[{role: String, content: String, name: String}]} The messages in proper format.
+ */
 function ConvertToMessageJSON(InputMessages) {
   // Support old and new format by keeping this.
   if (typeof InputMessages != String) return InputMessages;
@@ -658,8 +665,10 @@ function ConvertToMessageJSON(InputMessages) {
     messages.push(content);
   });
 
-  console.log("Messages:");
-  console.log(messages);
+  if (DEBUG) {
+    console.log("Messages:");
+    console.log(messages);
+  }
 
   return messages;
 }
@@ -891,7 +900,7 @@ async function SummarizeConvo(messages, DiscordMessage) {
 async function RequestChatGPT(InputMessages, DiscordMessage) {
   return new Promise(async (resolve, reject) => {
     let messages = ConvertToMessageJSON(InputMessages);
-  
+
     // console.log(messages);
     // return "Bot in Dev mode...";
     const gptResponse = await GetSafeChatGPTResponse(messages, DiscordMessage);
@@ -918,6 +927,7 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
         }
   
         let returnedFromFunction = await (await func(JSON.parse(newMessage.function_call.arguments), DiscordMessage));
+
         messages.push({
           role: "function",
           name: newMessage.function_call.name,
@@ -938,13 +948,17 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
           // Just in case, check if this message is also a function call.
           return await ProcessFunctionCall(functionMessage);
         }
-      } else if (!newMessage.role != "system") {
+      } /* else if (!newMessage.role != "system") {
         ReturnedMessages += `\nAI: ${newMessage.content}`
         return;
       } else {
         ReturnedMessages += newMessage.content;
         return;
-      }
+      } */
+      else {
+        messages.push(newMessage)
+        return;
+      } 
     }
     await ProcessFunctionCall(newMessage);
   
@@ -992,7 +1006,6 @@ let fetchUserBase = (id) => {
 const DiscordMessageLengthLimit = 1900;
 async function SendMessage(Message, Content) {
   return new Promise(async res => {
-    message.channel
     if (DEBUG)
       console.log("Message content: " + Content)
     if (Content.length >= 20000) return Message.channel.send("More than 10 messages would be sent! Thus, I've decided to cut it short. Also, the AI is probably gonna crash immediately right now, LOL.")
@@ -1122,7 +1135,7 @@ client.on('messageCreate',
         const Messages = NewMessage("system", fetchUserBase(message.author.id))
           .concat(NewMessage("user", message.content.substring(5), authorname));
 
-        let result = await RequestChatGPT(Messages);
+        let result = await RequestChatGPT(Messages, message);
         SendMessage(message, result[result.length - 1].content)
       }
     }
@@ -1230,71 +1243,74 @@ client.on("interactionCreate",
   })
 
 async function AskChatGPTAndSendResponse(content, message) {
-  let requestOut = (await RequestChatGPT(content, message));
-  // console.log("RequestOut: " + requestOut + "\n~~~");
-  let startIndex = 0; // requestOut.lastIndexOf("AI:");
-  /* Parse commands.
-  const Commands = [EVAL];
-  const CommandNames = [];
-  const returnHeader = "Returned Value: ";
-  Commands.forEach(command => {
-    CommandNames.push(command.name);
-  });
-
-  // Look for the last command call, if it's not already been run.
-  try {
-    // Only run the found command if it's in the last message.
-    if (requestOut.substring(startIndex).includes("[COMMAND=")) {
-      let commandStart = requestOut.lastIndexOf("[COMMAND=");
-      let commandEnd = requestOut.lastIndexOf("]");
-
-      let command = requestOut.substring(commandStart + 1, commandEnd);
-      
-      // If the command is valid, send the parameters to the actual function.
-      let elements = command.split(", ");
-      let parameters = {};
-      elements.forEach(element => {
-        let elementParts = [];
-        elementParts[0] = element.slice(0, element.indexOf("="));
-        elementParts[1] = element.slice(element.indexOf("=") + 1)
-        
-        // Remove quotes on the ends of the parameter if they're there.
-        if (elementParts[1].endsWith("\"") && elementParts[1].startsWith("\"")) elementParts[1] = elementParts[1].slice(1, -1);
-        
-        parameters[elementParts[0].trim()] = elementParts[1].trim();
+  let requestOut = RequestChatGPT(content, message)
+    .then(e => {
+      console.log(e);
+      // console.log("RequestOut: " + requestOut + "\n~~~");
+      let startIndex = 0; // requestOut.lastIndexOf("AI:");
+      /* Parse commands.
+      const Commands = [EVAL];
+      const CommandNames = [];
+      const returnHeader = "Returned Value: ";
+      Commands.forEach(command => {
+        CommandNames.push(command.name);
       });
-
-      console.log("Parameters: ");
-      console.log(parameters);
-      
-      if (CommandNames.indexOf(parameters.COMMAND) != -1) {
-        console.log(`Evaluating: ${CommandNames[CommandNames.indexOf(parameters.COMMAND)]}!`);
-        let value = await Commands[CommandNames.indexOf(parameters.COMMAND)](parameters);
-
-        try {
-          // Stringify JSON data so it can be properly accessed.
-          value = JSON.stringify(value);
-        } catch { ; }
-
-        // Pass the returned value back to the AI.
-        requestOut = (await RequestChatGPT(`${requestOut}\n${returnHeader}${value}`)).toString();
+    
+      // Look for the last command call, if it's not already been run.
+      try {
+        // Only run the found command if it's in the last message.
+        if (requestOut.substring(startIndex).includes("[COMMAND=")) {
+          let commandStart = requestOut.lastIndexOf("[COMMAND=");
+          let commandEnd = requestOut.lastIndexOf("]");
+    
+          let command = requestOut.substring(commandStart + 1, commandEnd);
+          
+          // If the command is valid, send the parameters to the actual function.
+          let elements = command.split(", ");
+          let parameters = {};
+          elements.forEach(element => {
+            let elementParts = [];
+            elementParts[0] = element.slice(0, element.indexOf("="));
+            elementParts[1] = element.slice(element.indexOf("=") + 1)
+            
+            // Remove quotes on the ends of the parameter if they're there.
+            if (elementParts[1].endsWith("\"") && elementParts[1].startsWith("\"")) elementParts[1] = elementParts[1].slice(1, -1);
+            
+            parameters[elementParts[0].trim()] = elementParts[1].trim();
+          });
+    
+          console.log("Parameters: ");
+          console.log(parameters);
+          
+          if (CommandNames.indexOf(parameters.COMMAND) != -1) {
+            console.log(`Evaluating: ${CommandNames[CommandNames.indexOf(parameters.COMMAND)]}!`);
+            let value = await Commands[CommandNames.indexOf(parameters.COMMAND)](parameters);
+    
+            try {
+              // Stringify JSON data so it can be properly accessed.
+              value = JSON.stringify(value);
+            } catch { ; }
+    
+            // Pass the returned value back to the AI.
+            requestOut = (await RequestChatGPT(`${requestOut}\n${returnHeader}${value}`)).toString();
+          }
+        }
+      } catch (e) {
+        // Do nothing.
       }
-    }
-  } catch (e) {
-    // Do nothing.
-  }
-  */
-  // Only send the last part, the AI's actual response, back to the user.
-  let actualResponse = requestOut[requestOut.length - 1].content;; // requestOut.substring(startIndex + 3);
-  if (actualResponse.trim() != "")
-    SendMessage(message, actualResponse.trim());
-  // fs.writeFile('./base.json', JSON.stringify({string: requestOut}), () => {console.log("File written.")});
-  bases[GetBaseIdFromChannel(message.channel)] = requestOut;
-
-  // Update bases.
-  fs.writeFile("./ActiveBases.json", JSON.stringify(bases), () => {
-    console.log("Active bases updated!");
-  });
+      */
+      // Only send the last part, the AI's actual response, back to the user.
+      let actualResponse = requestOut[requestOut.length - 1].content;; // requestOut.substring(startIndex + 3);
+      if (actualResponse.trim() != "")
+        SendMessage(message, actualResponse.trim());
+      // fs.writeFile('./base.json', JSON.stringify({string: requestOut}), () => {console.log("File written.")});
+      bases[GetBaseIdFromChannel(message.channel)] = requestOut;
+    
+      // Update bases.
+      fs.writeFile("./ActiveBases.json", JSON.stringify(bases), () => {
+        console.log("Active bases updated!");
+      });
+    })
 }
 //#endregion
 //#endregion
