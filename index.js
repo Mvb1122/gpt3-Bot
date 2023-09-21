@@ -1282,6 +1282,16 @@ for (let i = 0; i < 3; i++) {
 */
 //#endregion
 
+//#region Gradio Tag Generation Stuff
+/*
+  // Make an image and then try to get its tags.
+const debugImagePath = `./Images/1girl, absurdres, thighhighs_1156489048.png`
+let val = Gradio.GetTagsFromImage(debugImagePath)
+  .then(async val => {
+    console.log(val);
+  })
+*/
+//#endregion
 // Gradio.ConnectTo("192.168.1.57")
 // console.log(Gradio.PredictContent("1girl, absuredres, black thighhighs, school uniform, miniskirt, zettai ryouiki, black_hair, full_body, red necktie"));
 //#endregion
