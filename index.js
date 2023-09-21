@@ -545,11 +545,14 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
   return new Promise(async (resolve, reject) => {
     let messages = ConvertToMessageJSON(InputMessages);
 
-    // console.log(messages);
-    // return "Bot in Dev mode...";
+    // First things first, ask the AI for its thaughts.
     const gptResponse = await GetSafeChatGPTResponse(messages, DiscordMessage);
+
+    /**
+     * @type {{role: String, content: String, name: String}}}
+     */
     let newMessage = (await gptResponse).data.choices[0].message;
-    messages.push(newMessage);
+    // messages.push(newMessage);
     let ReturnedMessages = InputMessages;
     // If the message has a function call, run it.
     async function ProcessFunctionCall(newMessage) {
@@ -600,7 +603,6 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
         return;
       } */
       else {
-        messages.push(newMessage)
         return;
       } 
     }
@@ -646,9 +648,18 @@ let fetchUserBase = (id) => {
   }
 }
 
-// Splits up the response into 1900 character blocks and sends each of them.
+
 const DiscordMessageLengthLimit = 1900;
+/**
+ * Splits up the response into 1900 character blocks and sends each of them.
+ * @param {Discord.Message} Message The message to send in the channel of.
+ * @param {String} Content The content to be sent.
+ * @returns {String} A promise which resolves when the message is complete.
+ */
 async function SendMessage(Message, Content) {
+  if (Content.trim() == "") {
+    return Message.channel.send("[Empty Message]")
+  }
   return new Promise(async res => {
     if (DEBUG)
       console.log("Message content: " + Content)
@@ -888,8 +899,8 @@ client.on("interactionCreate",
 
 async function AskChatGPTAndSendResponse(content, message) {
   let requestOut = RequestChatGPT(content, message)
-    .then(e => {
-      console.log(e);
+    .then(Convo => {
+      console.log(Convo);
       // console.log("RequestOut: " + requestOut + "\n~~~");
       let startIndex = 0; // requestOut.lastIndexOf("AI:");
       /* Parse commands.
@@ -944,7 +955,7 @@ async function AskChatGPTAndSendResponse(content, message) {
       }
       */
       // Only send the last part, the AI's actual response, back to the user.
-      let actualResponse = requestOut[requestOut.length - 1].content;; // requestOut.substring(startIndex + 3);
+      let actualResponse = Convo[Convo.length - 1].content; // requestOut.substring(startIndex + 3);
       if (actualResponse.trim() != "")
         SendMessage(message, actualResponse.trim());
       // fs.writeFile('./base.json', JSON.stringify({string: requestOut}), () => {console.log("File written.")});
