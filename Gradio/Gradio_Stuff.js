@@ -119,6 +119,23 @@ async function ImageToImageFromSharp(Image, Settings) {
     });
 }
 
+/**
+ * Gets the tags that coorespond with an image using DeepBooru.
+ * @param {String} path The path to the image.
+ * @returns {Promise<API.StableDiffusionResult>}
+ */
+function GetTagsFromImage(path) {
+    // Load image. 
+    return new Promise(async (resolve, reject) => {
+        try {
+            let ImageSharp = await new sharp(path)
+            FetchApp().interrogate(ImageSharp, "deepdanbooru")
+                .then(async val => {
+                    resolve(await val.response.data.caption);
+                })
+        } catch (error) {
+            reject(error)
+        }
     })
 }
 
