@@ -598,8 +598,26 @@ function GetFunctionFromStart(message) {
 //#endregion
 
 //#region ChatGPT Methods
+  // Types: System, User Function
+  /**
+   * Creates a message object from the content.
+   * @param {String} Role System || User || Function || Assistant <- For AI only, will be appended automatically.
+   * @param {String} Content 
+   * @returns {[{role: String, content: String}]}
+   */
+function NewMessage(Role, Content, User) {
+  return [{
+    role: Role.toLowerCase(),
+    name: User,
+    content: Content
+  }]
+}
+
 const { encode } = require("gpt-3-encoder");
-function ConvertPlaintextToMessageJSON(InputMessages) {
+function ConvertToMessageJSON(InputMessages) {
+  // Support old and new format by keeping this.
+  if (typeof InputMessages != String) return InputMessages;
+
   let messages = [];
 
   InputMessages.split("\n").forEach(message => {
@@ -653,7 +671,7 @@ function ConvertPlaintextToMessageJSON(InputMessages) {
 //#region GetSafeChatGPTResponse
 /**
  * Gets the AI's response, without risk of crashing.
- * @param {*[]} messages The messages that are already in this conversation. 
+ * @param {[{role: String, content: String, name: String}]} messages The messages that are already in this conversation. 
  * @param {Discord.Message?} DiscordMessage The Discord message asking for this response.
  * @param {Number} numReps How many times this function has been called already.
  * @returns {Promise<openai.CreateChatCompletionResponse>} An object representing the AI's response, or the failure message.
@@ -671,8 +689,7 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
       }
     
       // Check that the messages aren't too-too long.
-      let AllMessageText = "";
-      messages.forEach(message => AllMessageText += message.content);
+      let AllMessageText = GetAllMessageText(messages);
       if (encode(AllMessageText).length >= 4096) {
         // If there's more than 4096 tokens here, complain.
         DiscordMessage.channel.send("(Your conversation is getting too long! I'm cropping it down.)");
@@ -806,6 +823,16 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
   //#endregion
 }
 
+/**
+ * @param {[{content: string}]} messages 
+ * @returns {String}
+ */
+function GetAllMessageText(messages) {
+  let AllMessageText = "";
+  messages.forEach(message => AllMessageText += message.content);
+  return AllMessageText;
+}
+
 //#region GetSafeChatGPTResponse Demo/Debug code.
 /*
 GetSafeChatGPTResponse([{ role: "user", content: "Can you hear me?" }], null).then(e => { 
@@ -861,91 +888,92 @@ async function SummarizeConvo(messages, DiscordMessage) {
 //#region RequestChatGPT
 /**
  * Gets the AI's next message.
- * @param {*} InputMessages The messages in this conversation, in plaintext.
+ * @param {String} InputMessages The messages in this conversation, in Object with the last message in string.
  * @param {Discord.Message} DiscordMessage The Discord Message calling this request.
- * @returns {Boolean} The complete conversation, including a new response from the AI.
+ * @returns {Promise<[{role: String, content: String, name: String}]>} The complete conversation, including a new response from the AI.
  */
 async function RequestChatGPT(InputMessages, DiscordMessage) {
-  let messages = ConvertPlaintextToMessageJSON(InputMessages);
-
-  // console.log(messages);
-  // return "Bot in Dev mode...";
-
-  const gptResponse = await GetSafeChatGPTResponse(messages, DiscordMessage);
-  let newMessage = (await gptResponse).data.choices[0].message;
-  messages.push(newMessage);
-  let ReturnedMessages = InputMessages;
-  // If the message has a function call, run it.
-  async function ProcessFunctionCall(newMessage) {
-    if (newMessage.function_call != null) {
-      // Find function.
-      console.log("looking for " + JSON.stringify(newMessage.function_call))
-      let func;
-      for (let i = 0; i < functions.length; i++) {
-        if (functions[i].name == newMessage.function_call.name) {
-          func = functions[i];
-          break;
+  return new Promise(async (resolve, reject) => {
+    let messages = ConvertToMessageJSON(InputMessages);
+  
+    // console.log(messages);
+    // return "Bot in Dev mode...";
+    const gptResponse = await GetSafeChatGPTResponse(messages, DiscordMessage);
+    let newMessage = (await gptResponse).data.choices[0].message;
+    messages.push(newMessage);
+    let ReturnedMessages = InputMessages;
+    // If the message has a function call, run it.
+    async function ProcessFunctionCall(newMessage) {
+      if (newMessage.function_call != null) {
+        // Find function.
+        console.log("looking for " + JSON.stringify(newMessage.function_call))
+        let func;
+        for (let i = 0; i < functions.length; i++) {
+          if (functions[i].name == newMessage.function_call.name) {
+            func = functions[i];
+            break;
+          }
         }
+  
+        if (DEBUG) {
+          console.log(func);
+          console.log(`Running ${func.name} with parameters:`)
+          console.log(newMessage.function_call.arguments);
+        }
+  
+        let returnedFromFunction = await (await func(JSON.parse(newMessage.function_call.arguments), DiscordMessage));
+        messages.push({
+          role: "function",
+          name: newMessage.function_call.name,
+          content: returnedFromFunction
+        })
+        /*
+        console.log("Returned from function:");
+        console.log(returnedFromFunction);
+        */
+        ReturnedMessages += `\n${newMessage.function_call.name}: ${returnedFromFunction}`;
+  
+        // Push the data to the AI if it's not clearing the memory.
+        if (func.name != "ClearAll" && func.name != "Recover") {
+          const functionCallResponse = await GetSafeChatGPTResponse(messages, DiscordMessage);
+          const functionMessage = (await functionCallResponse).data.choices[0].message
+          // ReturnedMessages += `\nAI: ${functionMessage.content}`;
+  
+          // Just in case, check if this message is also a function call.
+          return await ProcessFunctionCall(functionMessage);
+        }
+      } else if (!newMessage.role != "system") {
+        ReturnedMessages += `\nAI: ${newMessage.content}`
+        return;
+      } else {
+        ReturnedMessages += newMessage.content;
+        return;
       }
-
-      if (DEBUG) {
-        console.log(func);
-        console.log(`Running ${func.name} with parameters:`)
-        console.log(newMessage.function_call.arguments);
-      }
-
-      let returnedFromFunction = await (await func(JSON.parse(newMessage.function_call.arguments), DiscordMessage));
-      messages.push({
-        role: "function",
-        name: newMessage.function_call.name,
-        content: returnedFromFunction
-      })
-      /*
-      console.log("Returned from function:");
-      console.log(returnedFromFunction);
-      */
-      ReturnedMessages += `\n${newMessage.function_call.name}: ${returnedFromFunction}`;
-
-      // Push the data to the AI if it's not clearing the memory.
-      if (func.name != "ClearAll" && func.name != "Recover") {
-        const functionCallResponse = await GetSafeChatGPTResponse(messages, DiscordMessage);
-        const functionMessage = (await functionCallResponse).data.choices[0].message
-        // ReturnedMessages += `\nAI: ${functionMessage.content}`;
-
-        // Just in case, check if this message is also a function call.
-        return await ProcessFunctionCall(functionMessage);
-      }
-    } else if (!newMessage.role != "system") {
-      ReturnedMessages += `\nAI: ${newMessage.content}`
-      return;
-    } else {
-      ReturnedMessages += newMessage.content;
-      return;
     }
-  }
-  await ProcessFunctionCall(newMessage);
-
-  /*
-  console.log("Returned message:");
-  console.log(newMessage);
-  */
-
-  // console.log("Returned Messages: ```" + ReturnedMessages + "```"
-  let wasClearAllCalled = ReturnedMessages.includes("ClearAll: undefined") || ReturnedMessages.includes("Recover: { \"sucessful\": true }") /* false;
-  for (let i = 0; i < messages.length; i++) {
-    if (messages[i].function_call != null && messages[i].function_call == "ClearAll") {
-      wasClearAllCalled = true;
-      break;
+    await ProcessFunctionCall(newMessage);
+  
+    /*
+    console.log("Returned message:");
+    console.log(newMessage);
+    */
+  
+    // console.log("Returned Messages: ```" + ReturnedMessages + "```"
+    let wasClearAllCalled = ReturnedMessages.includes("ClearAll: undefined") || ReturnedMessages.includes("Recover: { \"sucessful\": true }") /* false;
+    for (let i = 0; i < messages.length; i++) {
+      if (messages[i].function_call != null && messages[i].function_call == "ClearAll") {
+        wasClearAllCalled = true;
+        break;
+      }
     }
-  }
-  */
-
-  // Summarize convo if needed (do async)
-  SummarizeConvo(messages, DiscordMessage);
-
-  if (!wasClearAllCalled)
-    return ReturnedMessages;
-  else return "";
+    */
+  
+    // Summarize convo if needed (do async)
+    SummarizeConvo(messages, DiscordMessage);
+  
+    if (!wasClearAllCalled)
+      resolve(messages);
+    else resolve([]);
+  })
 }
 //#endregion
 //#endregion
@@ -1089,10 +1117,11 @@ client.on('messageCreate',
       if (message.content.length >= 1000) {
         message.channel.send("Your message is too long.");
       } else {
-        await RequestChatGPT((fetchUserBase(message.author.id) + `\n${authorname}: ` + message.content.substring(5)).trim(), message).then(function (result) {
-          const formattedContent = result.replace(" AI:", "\nAI:").replace(` ${authorname}:`, `\n${authorname}:`).replace(fetchUserBase(message.author.id), "");
-          SendMessage(message, formattedContent)
-        });
+        const Messages = NewMessage("system", fetchUserBase(message.author.id))
+          .concat(NewMessage("user", message.content.substring(5), authorname));
+
+        let result = await RequestChatGPT(Messages);
+        SendMessage(message, result[result.length - 1].content)
       }
     }
     //#region Deprecated Direct Code
@@ -1160,12 +1189,14 @@ client.on('messageCreate',
 
     if (/* message.channel.id === '1077725073378644008' && */ message.author.bot === false) {
       // If the base is empty, use the first user's base.
-      /** @type {string} */
+      /**
+       * @type {[{content, role, name}]}
+       */
       let base = bases[GetBaseIdFromChannel(message.channel)];
-      if (base == "" || base == undefined) base = fetchUserBase(message.author.id);
+      if (base == "" || base == undefined) base = NewMessage("system", fetchUserBase(message.author.id));
 
-      const content = base + `\n${authorname}: ` + message.content.trim();
-      await AskChatGPTAndSendResponse(content, message);
+      base = base.concat(NewMessage("user", message.content.trim())); // `\n${authorname}: ` + message.content.trim();
+      await AskChatGPTAndSendResponse(base, message);
     }
   });
 
@@ -1192,9 +1223,9 @@ client.on("interactionCreate",
   })
 
 async function AskChatGPTAndSendResponse(content, message) {
-  let requestOut = (await RequestChatGPT(content, message)).toString();
+  let requestOut = (await RequestChatGPT(content, message));
   // console.log("RequestOut: " + requestOut + "\n~~~");
-  let startIndex = requestOut.lastIndexOf("AI:");
+  let startIndex = 0; // requestOut.lastIndexOf("AI:");
   /* Parse commands.
   const Commands = [EVAL];
   const CommandNames = [];
@@ -1247,7 +1278,7 @@ async function AskChatGPTAndSendResponse(content, message) {
   }
   */
   // Only send the last part, the AI's actual response, back to the user.
-  let actualResponse = requestOut.substring(startIndex + 3);
+  let actualResponse = requestOut[requestOut.length - 1].content;; // requestOut.substring(startIndex + 3);
   if (actualResponse.trim() != "")
     SendMessage(message, actualResponse.trim());
   // fs.writeFile('./base.json', JSON.stringify({string: requestOut}), () => {console.log("File written.")});
