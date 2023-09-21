@@ -542,11 +542,7 @@ const FunctionList = [
 
 function GetFunctions(messages) {
   // Convert messages to all content.
-  let AllContent = "";
-  messages.forEach(message => {
-    AllContent += message.content;
-  });
-  AllContent = AllContent.toLowerCase();
+  let AllContent = GetAllMessageText(messages).toLowerCase();
 
   // Figure out which functions to include based off of their keywords.
   let ApplicableFunctions = [];
@@ -554,10 +550,10 @@ function GetFunctions(messages) {
   if (!AllContent.includes("what functions")) {
     FunctionLoop:
     for (let i = 0; i < FunctionList.length; i++) {
-      const FunctionKeywords = Keywords[i].split(",");
+      const FunctionKeywords = Keywords[i].toLowerCase().split(",");
       for (let j = 0; j < FunctionKeywords.length; j++) {
         // If all of the messages contained the function's keyword, include it.
-        if (AllContent.includes(FunctionKeywords[j].toLowerCase().trim())) {
+        if (AllContent.includes(FunctionKeywords[j].trim())) {
           ApplicableFunctions.push(FunctionList[i]);
           continue FunctionLoop;
         }
@@ -996,6 +992,7 @@ let fetchUserBase = (id) => {
 const DiscordMessageLengthLimit = 1900;
 async function SendMessage(Message, Content) {
   return new Promise(async res => {
+    message.channel
     if (DEBUG)
       console.log("Message content: " + Content)
     if (Content.length >= 20000) return Message.channel.send("More than 10 messages would be sent! Thus, I've decided to cut it short. Also, the AI is probably gonna crash immediately right now, LOL.")
@@ -1111,7 +1108,12 @@ client.on('messageCreate',
    */
   async message => {
     const member = message.member;
-    let authorname = member.nickname ?? message.author.username;
+    let authorname = "";
+    try {
+      authorname = member.nickname ?? message.author.username;
+    } catch (e) {
+      message.reply("Something went wrong! Please tell Micah to fix this error:\n```" + e + "```");
+    }
 
     if (message.content.startsWith("gpt3")) {
       if (message.content.length >= 1000) {
@@ -1217,7 +1219,12 @@ client.on("interactionCreate",
       /** @type {Discord.SlashCommandBuilder} */
       let data = module.data;
       if (data.name == name) {
-        module.execute(AttachDataToObject(interaction));
+        try {
+          return module.execute(AttachDataToObject(interaction));
+        } catch (error) {
+          if (interaction.replied) interaction.editReply("Something went wrong!")
+          else interaction.reply("Something went wrong!");
+        }
       }
     }
   })
