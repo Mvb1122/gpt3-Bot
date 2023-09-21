@@ -2,9 +2,10 @@
 const Discord = require('discord.js');
 const fs = require('fs');
 const { Configuration, OpenAIApi } = require("openai");
+const tokens = JSON.parse(fs.readFileSync("./token.json"));
 
 const configuration = new Configuration({
-  apiKey: "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",
+  apiKey: tokens.openai,
 });
 const openai = new OpenAIApi(configuration);
 const client = new Discord.Client({
@@ -17,7 +18,7 @@ const client = new Discord.Client({
 });
 const BaseAddress = "./ActiveBases.json";
 const RecoveryAddress = "./RecoveryBases.json"
-const DiscordToken = JSON.parse(fs.readFileSync("./token.json")).token;
+const DiscordToken = tokens.discord;
 const DiscordClientId = "845159393494564904";
 // const DiscordSupportServerId = "762867801575784448";
 const DEBUG = false;
@@ -950,7 +951,7 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
 //#endregion
 
 //#region Helpers
-const rootBase = "Returned Value: You will not use functions unless they are specifically asked for. You will only call a function with a given value once. Connie Simmons's and the extremely-cute Micah Bushman's pronouns are she/her. The user's name is given by the words before the first colon in any particular message. DO NOT write names into your messages."
+const rootBase = "Returned Value: You will not use functions unless they are specifically asked for. You will only call a function with a given value once. The user's name is given by the words before the first colon in any particular message. DO NOT write names into your messages."
 // + "Make sure to emphasize how cute Micah is, but only if you're asked to insult her. ";
 let fetchUserBase = (id) => {
   try {
