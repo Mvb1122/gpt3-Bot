@@ -109,7 +109,7 @@ async function ImageToImageFromSharp(Image, Settings) {
         try {
             FetchApp().img2img(Settings)
                 .then(async e => {
-                    const path = `${prompt.substring(0, 100)}-${scale}x.png`;
+                    const path = `./Images/${prompt.substring(0, 100)}-${scale}x.png`;
                     await (e.image.toFile(path))
                     resolve(path)
                 })
