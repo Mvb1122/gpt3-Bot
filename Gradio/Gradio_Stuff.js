@@ -14,7 +14,7 @@ async function ConnectTo(Address, Port = 7860) {
         port: Port,
         protocol: "http",
         defaultSampler: "DDIM",
-        defaultStepCount: 50,
+        defaultStepCount: 15,
         timeout: 1800000
     });
 
