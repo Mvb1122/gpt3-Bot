@@ -127,3 +127,6 @@ dist
 .pnp.*
 token.json
 Images/*.png
+ActiveBases.json
+RecoveryBases.json
+Thumbs.db
