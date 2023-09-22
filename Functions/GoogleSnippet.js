@@ -2,6 +2,7 @@ const Discord = require('discord.js')
 const SerpApi = require('google-search-results-nodejs');
 const { escape } = require("querystring");
 let SnippetCache = {}; // { ${query}: {result} }
+const {SendMessage, DEBUG} = require('../index')
 
 module.exports = {
     keywords: "Google, search, look up",

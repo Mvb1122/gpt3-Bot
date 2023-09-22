@@ -1,4 +1,5 @@
 const Discord = require('discord.js')
+const {SendMessage, DEBUG} = require('../index')
 
 module.exports = {
     keywords: "Wikipedia, search, look up",

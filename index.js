@@ -90,7 +90,7 @@ function IsChannelMemory(channel) {
 async function ClearAll(parameters, DiscordMessage = null) {
   // Clear the AI's memory for the specified channel. 
   let Base = bases[GetBaseIdFromChannel(DiscordMessage.channel)];
-  bases[GetBaseIdFromChannel(DiscordMessage.channel)] = "";
+  bases[GetBaseIdFromChannel(DiscordMessage.channel)] = [];
   // Write file to recovery file.
   // Come up with a RecoveryID.
   let RecoveryId = -1;
@@ -129,11 +129,11 @@ async function Recover(parameters, DiscordMessage = null) {
       DiscordMessage.channel.send("Invalid recoveryID!")
     return JSON.stringify({ sucessful: false, reason: "Invalid Recovery ID!" });
   }
-  if (parameters.Overwrite == undefined) bases[GetBaseIdFromChannel(DiscordMessage.channel)] = "";
+  if (parameters.Overwrite == undefined) bases[GetBaseIdFromChannel(DiscordMessage.channel)] = [];
   bases[GetBaseIdFromChannel(DiscordMessage.channel)] += RecoveryBases[parameters.RecoveryID];
   return JSON.stringify({ sucessful: true });
 }
-// #endregion
+//#endregion
 //#endregion
 
 //#region Function Handlers
@@ -341,18 +341,28 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
       let AllMessageText = GetAllMessageText(messages);
       if (encode(AllMessageText).length >= 4096) {
         // If there's more than 4096 tokens here, complain.
-        DiscordMessage.channel.send("(Your conversation is getting too long! I'm cropping it down.)");
+        // DiscordMessage.channel.send(`(Your conversation is getting too long! Please use \`clear all\` soon! Number of tokens: ${encode(AllMessageText).length})`);
     
         // Crop down to ~1000 tokens in length. (Start from the end so that stuff at the start is lost first.)
+        /*
         let CroppedMessages = []; let NumTokens = 0;
         for (let i = messages.length; i >= 0; i--) {
           let message = messages[i];
-          if (encode(message.content).length + NumTokens <= 1100) {
+          try {
+            if (encode(message.content).length + NumTokens <= 1100)
+              CroppedMessages.push(message);
+
+          } catch {
+            // If something goes wrong, the message is probably important.
             CroppedMessages.push(message);
           }
         }
     
         requestData.messages = CroppedMessages;
+        */
+
+        // ! Just use a larger model.
+        requestData.model = "gpt-3.5-turbo-16k"
       }
     
       // Attach functions.
@@ -561,7 +571,7 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
         console.log("looking for " + JSON.stringify(newMessage.function_call))
         let func;
         for (let i = 0; i < functions.length; i++) {
-          if (functions[i].name == newMessage.function_call.name) {
+          if (FunctionList[i].name == newMessage.function_call.name) {
             func = functions[i];
             break;
           }
@@ -573,7 +583,7 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
           console.log(newMessage.function_call.arguments);
         }
   
-        let returnedFromFunction = await (await func(JSON.parse(newMessage.function_call.arguments), DiscordMessage));
+        let returnedFromFunction = await (func(JSON.parse(newMessage.function_call.arguments), DiscordMessage));
 
         messages.push({
           role: "function",
@@ -603,6 +613,7 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
         return;
       } */
       else {
+        messages.push(newMessage)
         return;
       } 
     }
@@ -760,7 +771,9 @@ module.exports = {
   GetSafeChatGPTResponse,
   global,
   RequestChatGPT,
-  client
+  client,
+  SendMessage,
+  DEBUG
 }
 
 const cmt = require('./CreateMemoryThread.js')
@@ -822,11 +835,11 @@ client.on('messageCreate',
     // if (message.channel.name != "gpt-with-memory") return;
     if (message.content.toLowerCase().startsWith("g!togglememory")) {
       if (!IsChannelMemory(message.channel)) {
-        bases[GetBaseIdFromChannel(message.channel)] = "";
+        bases[GetBaseIdFromChannel(message.channel)] = [];
         return message.channel.send("Memory enabled! I'm now watching this channel!");
       } else {
         ClearAll({}, message);
-        bases[GetBaseIdFromChannel(message.channel)] = null;
+        bases[GetBaseIdFromChannel(message.channel)] = undefined;
         return message.channel.send("No longer watching this channel! Feel free to speak without my gaze upon your writings.")
       }
     }
@@ -959,7 +972,7 @@ async function AskChatGPTAndSendResponse(content, message) {
       if (actualResponse.trim() != "")
         SendMessage(message, actualResponse.trim());
       // fs.writeFile('./base.json', JSON.stringify({string: requestOut}), () => {console.log("File written.")});
-      bases[GetBaseIdFromChannel(message.channel)] = requestOut;
+      bases[GetBaseIdFromChannel(message.channel)] = Convo;
     
       // Update bases.
       fs.writeFile("./ActiveBases.json", JSON.stringify(bases), () => {

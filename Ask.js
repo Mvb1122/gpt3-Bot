@@ -3,6 +3,7 @@ const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
 const Index = require ('./index.js');
 
 
+
 module.exports = {
 	data: new SlashCommandBuilder()
         .setName('ask')
@@ -22,7 +23,7 @@ module.exports = {
         // TODO: Make this work.
         await RequestChatGPT((fetchUserBase(message.author.id) + `\n${authorname}: ` + message.content.substring(5)).trim(), message).then(function (result) {
             const formattedContent = result.replace(" AI:", "\nAI:").replace(` ${authorname}:`, `\n${authorname}:`).replace(fetchUserBase(message.author.id), "");
-            SendMessage(message, formattedContent)
+            Index.SendMessage(message, formattedContent)
           });
     },
 };

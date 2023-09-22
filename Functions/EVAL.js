@@ -1,3 +1,5 @@
+const {SendMessage, DEBUG} = require('../index')
+
 const IllegalCommands = ['fs', 'console.log', 'process.exit(']
 module.exports = {
     keywords: "EVAL, Evaluate, Calculate, Program",
