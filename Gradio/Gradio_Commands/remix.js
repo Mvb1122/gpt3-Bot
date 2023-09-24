@@ -262,6 +262,8 @@ module.exports = {
                         // Ensure that all of the paths are valid.
                         for (let i = 0; i < GeneratedImagesPaths.length; i++) GeneratedImagesPaths[i] = await GeneratedImagesPaths[i];
                         
+                        // Also send the original image.
+                        GeneratedImagesPaths.push(UserImagePath);
 
                         interaction.editReply({"content": `Generated! Tags:\n\`\`\`${prompts}\`\`\``, files: GeneratedImagesPaths})
                             .then(async () => {
