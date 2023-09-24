@@ -41,6 +41,7 @@ module.exports = {
             return option.setName("cfg")
                 .setDescription("The CFG scale of the image to generate. Higher values are more strict. If left blank, it uses 7.")
                 .setRequired(false)
+                .setMinValue(0);
         })
         .addBooleanOption(option => {
             return option.setName("autotag")
