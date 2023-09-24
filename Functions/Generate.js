@@ -68,7 +68,7 @@ module.exports = {
             }).then(() => {
               // Delete images after they're sent.
               for (let i = 0; i < images.length; i++) {
-                fs.unlink(images);
+                fs.unlink(images[i], (e) => {if (e) console.log(e)});
               }
             })
 
