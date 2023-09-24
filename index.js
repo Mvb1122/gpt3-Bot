@@ -339,27 +339,28 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
     
       // Check that the messages aren't too-too long.
       let AllMessageText = GetAllMessageText(messages);
-      if (encode(AllMessageText).length >= 4096) {
+      const tokencount = encode(AllMessageText).length;
+      if (tokencount >= 8192) {
         // If there's more than 4096 tokens here, complain.
         // DiscordMessage.channel.send(`(Your conversation is getting too long! Please use \`clear all\` soon! Number of tokens: ${encode(AllMessageText).length})`);
     
-        // Crop down to ~1000 tokens in length. (Start from the end so that stuff at the start is lost first.)
-        /*
-        let CroppedMessages = []; let NumTokens = 0;
-        for (let i = messages.length; i >= 0; i--) {
-          let message = messages[i];
-          try {
-            if (encode(message.content).length + NumTokens <= 1100)
+        // If more than 10,000 tokens, crop down to like 8000. (Start from the end so that stuff at the start is lost first.)
+        if (tokencount > 10000 && messages.length > 10) {
+          let CroppedMessages = []; let NumTokens = 0;
+          for (let i = messages.length; i >= 0; i--) {
+            let message = messages[i];
+            try {
+              if (encode(message.content).length + NumTokens <= 8000 || message.role == "user")
+                CroppedMessages.push(message);
+  
+            } catch {
+              // If something goes wrong, the message is probably important.
               CroppedMessages.push(message);
-
-          } catch {
-            // If something goes wrong, the message is probably important.
-            CroppedMessages.push(message);
+            }
           }
+      
+          requestData.messages = CroppedMessages;
         }
-    
-        requestData.messages = CroppedMessages;
-        */
 
         // ! Just use a larger model.
         requestData.model = "gpt-3.5-turbo-16k"
@@ -829,7 +830,6 @@ client.on('messageCreate',
       let base = fetchUserBase(message.author.id)
       message.reply(`Your current base is:\n> ${base.replace(rootBase, "")}`);
     }
-
 
     /* All Commands below here are only allowed in the memory mode! */
     // if (message.channel.name != "gpt-with-memory") return;
