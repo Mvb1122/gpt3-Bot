@@ -1,3 +1,5 @@
+const tokens = require('../token');
+
 function ToFahrenheit(tempInK) {
     return 9 / 5 * (tempInK - 273) + 32
 }
@@ -22,7 +24,7 @@ module.exports = {
 
     async execute(parameters, message) {
       let town = parameters.town;
-      let apiKey = "101d9b88089c209d67d9ae493ba1f4c7";
+      let apiKey = tokens.GetToken("openweathermap");
       let response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${town}&appid=${apiKey}`);
     
       let jsonifiedOutput = await response.json();

@@ -2,10 +2,10 @@
 const Discord = require('discord.js');
 const fs = require('fs');
 const { Configuration, OpenAIApi } = require("openai");
-const tokens = JSON.parse(fs.readFileSync("./token.json"));
+const tokens = require('./token');
 
 const configuration = new Configuration({
-  apiKey: tokens.openai,
+  apiKey: tokens.GetToken("openai"),
 });
 const openai = new OpenAIApi(configuration);
 const client = new Discord.Client({
@@ -18,7 +18,7 @@ const client = new Discord.Client({
 });
 const BaseAddress = "./ActiveBases.json";
 const RecoveryAddress = "./RecoveryBases.json"
-const DiscordToken = tokens.discord;
+const DiscordToken = tokens.GetToken("discord");
 const DiscordClientId = "845159393494564904";
 const Helpers = require('./Helpers.js')
 // const DiscordSupportServerId = "762867801575784448";
@@ -846,7 +846,7 @@ client.once('ready', () => {
   client.user.setActivity("gpt3");
   console.log("Ready.")
 
-  let commands = ["./CreateMemoryThread.js"];
+  let commands = ["./CreateMemoryThread.js", "./Ask.js"];
 
   // Auto add all files in the Gradio_Commmands directory.
   const GradioPath = "./Gradio/Gradio_Commands/";
@@ -909,7 +909,9 @@ module.exports = {
   RequestChatGPT,
   client,
   SendMessage,
-  DEBUG
+  DEBUG,
+  NewMessage,
+  fetchUserBase
 }
 
 const cmt = require('./CreateMemoryThread.js')

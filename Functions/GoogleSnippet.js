@@ -3,6 +3,7 @@ const SerpApi = require('google-search-results-nodejs');
 const { escape } = require("querystring");
 let SnippetCache = {}; // { ${query}: {result} }
 const {SendMessage, DEBUG} = require('../index')
+const tokens = require('../token');
 
 module.exports = {
     keywords: "Google, search, look up",
@@ -41,7 +42,7 @@ module.exports = {
           res(SnippetCache[parameters.Query]);
         }
         
-        const search = new SerpApi.GoogleSearch("b223b0bed74d870bfde889d09b854b8b47a20808fabea83207399e80d42bfd56");
+        const search = new SerpApi.GoogleSearch(tokens.GetToken("serpapi"));
     
         if (DiscordMessage != null) {
           let end = "";
