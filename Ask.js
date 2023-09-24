@@ -20,10 +20,20 @@ module.exports = {
      */
     async execute(interaction) {
         interaction.deferReply();
-        // TODO: Make this work.
-        await RequestChatGPT((fetchUserBase(message.author.id) + `\n${authorname}: ` + message.content.substring(5)).trim(), message).then(function (result) {
-            const formattedContent = result.replace(" AI:", "\nAI:").replace(` ${authorname}:`, `\n${authorname}:`).replace(fetchUserBase(message.author.id), "");
-            Index.SendMessage(message, formattedContent)
-          });
+        const username = interaction.member.nickname ?? interaction.member.displayName;
+        let messages = Index.NewMessage("system", Index.fetchUserBase(interaction.member.id))
+            .concat(Index.NewMessage("user", interaction.options.getString("question"), username))
+        
+        await Index.RequestChatGPT(messages, interaction)
+            .then(val => {
+                const Content = `${username}: ${interaction.options.getString("question")}\nAI: ${val[val.length - 1].content}`;
+                try {
+                    interaction.editReply(Content);
+                } catch (e) {
+                    // If the message is too long, just say, look below for your answer and then SendMessage it.
+                    interaction.editReply("See message below.");
+                    Index.SendMessage(interaction, Content)
+                }
+            })
     },
 };
