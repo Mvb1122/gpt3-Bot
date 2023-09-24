@@ -171,7 +171,7 @@ async function PredictContentDefault(Input) {
         width: 512,
         cfg_scale: 7,
         save_images: true,
-    })
+    }, true)
 }
 
 const PixelCountLimit = 600000;
@@ -185,10 +185,10 @@ function GenerateSeed() {
 }
 
 /**
- * Predicts an image and then returns the result.
+ * Predicts an image and then returns the path or error.
  * @param {StableDiffusionApi.Txt2ImgOptions} Input The settings for generation.
  * @param {Boolean} MakeSeed Whether or not to generate a seed.
- * @returns {Promise} A promise which resolves to the result.
+ * @returns {Promise<String>} A promise which resolves to the path or error.
  */
 async function PredictContent(Input, MakeSeed = true) {
     if (MakeSeed)

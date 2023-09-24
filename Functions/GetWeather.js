@@ -21,24 +21,24 @@ module.exports = {
     },
 
     async execute(parameters, message) {
-        let town = parameters.town;
-        let apiKey = "101d9b88089c209d67d9ae493ba1f4c7";
-        let response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${town}&appid=${apiKey}`);
-      
-        let jsonifiedOutput = await response.json();
-      
-      
-        // Convert all Temp variables to Fahrenheit.
-        if (jsonifiedOutput.main) {
-          jsonifiedOutput.main.temp = ToFahrenheit(jsonifiedOutput.main.temp);
-          jsonifiedOutput.main.feels_like = ToFahrenheit(jsonifiedOutput.main.feels_like);
-          jsonifiedOutput.main.temp_min = ToFahrenheit(jsonifiedOutput.main.temp_min);
-          jsonifiedOutput.main.temp_max = ToFahrenheit(jsonifiedOutput.main.temp_max);
-        }
-      
-        let output = JSON.stringify(jsonifiedOutput)
-        message.channel.send("Getting weather at " + town);
-        // message.channel.send("Weather: ```" + output + "```");
-        return output;
+      let town = parameters.town;
+      let apiKey = "101d9b88089c209d67d9ae493ba1f4c7";
+      let response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${town}&appid=${apiKey}`);
+    
+      let jsonifiedOutput = await response.json();
+    
+    
+      // Convert all Temp variables to Fahrenheit.
+      if (jsonifiedOutput.main) {
+        jsonifiedOutput.main.temp = ToFahrenheit(jsonifiedOutput.main.temp);
+        jsonifiedOutput.main.feels_like = ToFahrenheit(jsonifiedOutput.main.feels_like);
+        jsonifiedOutput.main.temp_min = ToFahrenheit(jsonifiedOutput.main.temp_min);
+        jsonifiedOutput.main.temp_max = ToFahrenheit(jsonifiedOutput.main.temp_max);
       }
+    
+      let output = JSON.stringify(jsonifiedOutput)
+      message.channel.send("Getting weather at " + town);
+      // message.channel.send("Weather: ```" + output + "```");
+      return output;
+    }
 }

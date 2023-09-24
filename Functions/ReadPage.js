@@ -47,7 +47,7 @@ module.exports = {
           const StartLength = encode(text).length;
           console.log(`File Length: ${StartLength}`)
 
-          if (DiscordMessage != null) {
+          if (DiscordMessage != null && StartLength > 1000) {
             let Cost = (StartLength * 0.000003);
             Cost = Cost.toFixed(2);
             DiscordMessage.channel.send("Just if you were curious... I had to pay $" + Cost + " to get the AI to read this page...")
@@ -71,7 +71,7 @@ module.exports = {
           if (StartLength < 10000) {
             return JSON.stringify({sucessful: true, text: text});
           } else {
-            DiscordMessage.channel.send("That page is too long! The AI would crash with that much text!")
+            DiscordMessage.channel.send("That page is too long! The AI would crash with that much text! (The page was not actually read.)")
             return JSON.stringify({ sucessful: false, reason: "Page is too long." })
           }
         } else {
