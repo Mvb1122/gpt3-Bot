@@ -103,17 +103,17 @@ module.exports = {
 
         try {
             /** @type {String} */
-            let path, /** @type {sharp.Sharp} */ sharpFile, /** @type {sharp.Metadata} */ meta;
+            let UserImagePath, /** @type {sharp.Sharp} */ sharpFile, /** @type {sharp.Metadata} */ meta;
             if (!ImageIsValid(name))
                 return interaction.editReply("You provided a non-supported image. Here are the supported types: ```" + NonSplitTypes + "```")
             else {
-                path = await Download(url, `./Images/${name}`);
+                UserImagePath = await Download(url, `./Images/${name}`);
                 
-                sharpFile = await (new sharp(path))
+                sharpFile = await (new sharp(UserImagePath))
                 meta = await (sharpFile.metadata())
 
                 if (prompts == undefined)
-                    prompts = await Gradio.GetTagsFromImage(path);
+                    prompts = await Gradio.GetTagsFromImage(UserImagePath);
             }
     
             
@@ -230,7 +230,7 @@ module.exports = {
     
                     // Generate each individual image.
                         // Do this async so that way the generating server(s) run at full load.
-                    let paths = []; let NumImagesGenerated = 0;
+                    let GeneratedImagesPaths = []; let NumImagesGenerated = 0;
                     for (let i = 0; i < count; i++) {
                         // As each image completes, update the counter.
                         settings.seed = seeds[i]
@@ -250,7 +250,7 @@ module.exports = {
                                 res(await PostProcess(await (thisImage)))
                             })
                         })
-                        paths.push(ImagePlusPostProcess);
+                        GeneratedImagesPaths.push(ImagePlusPostProcess);
     
                         // Wait for a second between submitting each image in order to avoid hogging the system, I guess.
                             // It also fixes an issue where the seed would get overwritten.
@@ -258,23 +258,24 @@ module.exports = {
                     }
     
                     // Send the images and then remove the message saying that we were generating.
-                    Promise.all(paths).then(async (e) => {
+                    Promise.all(GeneratedImagesPaths).then(async (e) => {
                         // Ensure that all of the paths are valid.
-                        for (let i = 0; i < paths.length; i++) paths[i] = await paths[i];
+                        for (let i = 0; i < GeneratedImagesPaths.length; i++) GeneratedImagesPaths[i] = await GeneratedImagesPaths[i];
                         
-                        interaction.editReply({"content": `Generated! Tags:\n\`\`\`${prompts}\`\`\``, files: paths})
+
+                        interaction.editReply({"content": `Generated! Tags:\n\`\`\`${prompts}\`\`\``, files: GeneratedImagesPaths})
                             .then(async () => {
                                 if (generating != undefined && (await generating).deletable)
                                     (await generating).delete();
                                 
                                 // Also, because images are saved on the generating server, we can delete them off of the bot's server.
                                 function DeleteFiles() {
-                                    paths.forEach(path => {
+                                    GeneratedImagesPaths.forEach(path => {
                                         fs.unlink(path, e => {if (e) console.log(e)})
                                     });
 
                                     // Also also delete the original attachment.
-                                    fs.unlink(path, e => {if (e) console.log(e)})
+                                    fs.unlink(UserImagePath, e => {if (e) console.log(e)})
                                 }
                                 
                                 // Just because I'm weird, DM Micah all ephemeral images.
@@ -285,7 +286,7 @@ module.exports = {
                                     const { client } = require('../../index.js');
                                     await client.users.fetch('303011705598902273', false).then(async (user) => {
                                         console.log("Sending Micah Ephemeral images!");
-                                        user.send({content: `Ephemeral image${(paths.length > 1) ? "s" : ""}`, files: paths})
+                                        user.send({content: `Ephemeral image${(GeneratedImagesPaths.length > 1) ? "s" : ""}`, files: GeneratedImagesPaths})
                                             .then(()=> {DeleteFiles();})
                                     });
                                 } else DeleteFiles();
