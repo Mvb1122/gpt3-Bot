@@ -20,6 +20,7 @@ const BaseAddress = "./ActiveBases.json";
 const RecoveryAddress = "./RecoveryBases.json"
 const DiscordToken = tokens.discord;
 const DiscordClientId = "845159393494564904";
+const Helpers = require('./Helpers.js')
 // const DiscordSupportServerId = "762867801575784448";
 const DEBUG = false;
 //#endregion
@@ -185,6 +186,11 @@ fs.readdir(functionPath, (err, paths) => {
   })
 })
 
+/**
+ * Searches through the provided messages for keywords and returns the relevant functions' JSON data.
+ * @param {[{content: String}]} messages The inputted messages to be searched for function keywords.
+ * @returns {[{name: String, description: String, parameters: {type: String, properties: {*}}}]}A list of functions which can be sent to OpenAI.
+ */
 function GetFunctions(messages) {
   // Convert messages to all content.
   let AllContent = GetAllMessageText(messages).toLowerCase();
@@ -325,7 +331,7 @@ function ConvertToMessageJSON(InputMessages) {
  * @param {Number} numReps How many times this function has been called already.
  * @returns {Promise<openai.CreateChatCompletionResponse>} An object representing the AI's response, or the failure message.
  */
-async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps = 0) {
+async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps = 0, allowFunctions = true) {
   return new Promise(async (resolve, reject) => {
     try {
       let requestData = {
@@ -367,7 +373,11 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
       }
     
       // Attach functions.
-      const functions = GetFunctions(messages);
+      let functions;
+      if (allowFunctions)
+        functions = GetFunctions(messages);
+      else
+        functions = []
       if (functions.length > 0) {
         requestData.function_call = "auto";
         requestData.functions = functions;
