@@ -51,32 +51,22 @@ async function GetPromptsFromPlaintextUsingGPT(Plain) {
     let messages = [
         {
             role: "system",
-            content: "Danbuuru tags are a descriptor for the content of an image. For example, some tags are: 1boy, 1girl, absurdres, red, black, and several others.\nUse thighhighs instead of thighhigh_socks\nYou can emphasize a tag by surrounding it in parenthesis, like (absurdres). Make sure to include (absurdres) in all lists of tags.\nFor example, an image of a woman with large breasts, long hair, wearing a white dress with earings, on a simple background, would have the following tags: 1girl, absurdres, ((mature_female)), large_breasts, brown hair, long hair, white dress, earings, simple background\nFor women, use 1girl, (mature_female) plus any other tags. For men, use 1boy, (mature_male) and any other tags.\nAny tag you can think of works as one, pretty much. Please write a set of tags which coorespond to the given text on one line, seperated by commas, and with no other text. Given text: " + Plain
+            content: "Danbuuru tags are a descriptor for the content of an image. For example, some tags are: 1boy, 1girl, absurdres, red, black, and several others.\nUse thighhighs instead of thighhigh_socks\nYou can emphasize a tag by surrounding it in parenthesis, like (absurdres). Make sure to include (absurdres) in all lists of tags.\nFor example, an image of a woman with large breasts, long hair, wearing a white dress with earings, on a simple background, would have the following tags: 1girl, absurdres, ((mature_female)), large_breasts, brown hair, long hair, white dress, earings, simple background\nFor women, use 1girl, (mature_female) plus any other tags. For men, use 1boy, (mature_male) and any other tags.\nAny tag you can think of works as one, pretty much.\nBe creative when writing tag lists! Please write a set of tags which coorespond to the given text on one line, seperated by commas, and with no other text. Given text: " + Plain
         }
     ]
 
+    const ResponseFromGPT = (await Index.GetSafeChatGPTResponse(messages, null, null, false)).data.choices[0];
     /**
      * @type {String}
      */
-    let response = (await Index.GetSafeChatGPTResponse(messages)).data.choices[0].message.content;
+    let response = ResponseFromGPT.message.content;
+
+    console.log(ResponseFromGPT);
     
     return response.replaceAll("\n", ", ");
 }
 
-/**
- * @param {String} str The string to count through.
- * @param {String} char The character to look for.
- * @returns The number of times that character shows up.
- */
-function countCharacter(str, char) {
-    let count = 0;
-    for (let i = 0; i < str.length; i++) {
-        if (str[i] === char) {
-            count++;
-        }
-    }
-    return count;
-}
+const {countCharacter} = require("../Helpers.js")
 
 module.exports = {
     ImageIsValid, Download, countCharacter, GetPromptsFromPlaintextUsingGPT,
