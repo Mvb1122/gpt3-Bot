@@ -660,6 +660,99 @@ let fetchUserBase = (id) => {
   }
 }
 
+/**
+ * Looks for markdown tables in a string.
+ * @param {String} string Content of message.
+ * @returns {[String | Discord.EmbedBuilder]}
+ */
+function ParseMessage(string) {
+  const LineCounts = Helpers.CountCharactersInSections(string, "|", "\n");
+  /**
+   * @type {[[[String]]]}
+   */
+  let TableSets = [[]];
+  const Lines = string.split("\n")
+  let tableIndex = 0;
+
+  // If multiple lines contain the same number of "|" characters, cut those lines out and convert them to a table embed.
+  if (LineCounts[0] >= 2) TableSets[0] = LineCounts[0];
+  else {
+    TableSets[0] = Lines[0];
+    tableIndex = 1; TableSets[1] = [];
+  }
+
+  for (let i = 1; i < LineCounts.length; i++) {
+    let ContentOnThisLine = Lines[i].split("|")
+    ContentOnThisLine = ContentOnThisLine.slice(1, ContentOnThisLine.length - 1)
+    
+    if (ContentOnThisLine.length > 0) {
+      TableSets[tableIndex].push(ContentOnThisLine)
+    } else {
+      TableSets.push(Lines[i]);
+      tableIndex += 2;
+      TableSets[tableIndex] = [];
+    }
+    /*Old Code
+    (LineCounts[i] == LineCounts[i - 1] && LineCounts[i] >= 2)
+    {
+      TableSets[tableIndex].push(ContentOnThisLine); 
+    } else if (LineCounts[i] == LineCounts[i + 1]){
+      TableSets[tableIndex] = [ContentOnThisLine]
+    } else if (LineCounts[i] == 0 && TableSets[tableIndex] != []) {
+      // Remove the table from the currentText.
+      let TableText = "";
+      TableSets[tableIndex]
+
+      currentText = currentText.replace(TableText, "[Table Embed]");
+
+      // Move on.
+      tableIndex++;
+      tableStartIndex = i + 1;
+    }*/
+  }
+
+  // console.log(TableSets)
+
+  // Construct an embed for each embed as needed, if needed.
+  for (let i = 0; i < TableSets.length; i++) {
+    if ((typeof TableSets[i]).toString() != "string" && TableSets[i].length > 1) {
+      const table = TableSets[i];
+      let ThisEmbed = new Discord.EmbedBuilder();
+      // console.log(`${i}: ${typeof TableSets[i]}`)
+      for (let j = 0; j < table[0].length; j++) {
+        let column = [];
+        for (let k = 0; k < table.length; k++)
+          column.push(table[k][j])
+
+        // Now that we have the column, we can add a field for it.
+        ThisEmbed.addFields({
+          name: column[0],
+          value: column.slice(1).toString().replaceAll(",", "\n"),
+          inline: true
+        })
+      }
+
+      TableSets[i] = ThisEmbed;
+    }
+  }
+  
+  if (DEBUG)
+    console.log(TableSets)
+
+  return TableSets;
+}
+
+/* !DEBUG: g!test function.
+  if (message.content == "g!test")
+  SendMessage(message, 'Sure! Here is the copied text:\n' +
+  '\n' +
+  '|h1|h2|\n' +
+  '|c1|c2|\n' +
+  '|c3|c4|'
+  )
+*/
+
+// ParseTables("Hello.\n|head1|head2|\n|cont1|cont2|\n|cont3|cont4|\nHello.\n|head1|head2|\n|cont1|cont2|\n|cont3|cont4|");
 
 const DiscordMessageLengthLimit = 1900;
 /**
@@ -668,22 +761,54 @@ const DiscordMessageLengthLimit = 1900;
  * @param {String} Content The content to be sent.
  * @returns {String} A promise which resolves when the message is complete.
  */
-async function SendMessage(Message, Content) {
-  if (Content.trim() == "") {
+async function SendMessage(Message, StringContent) {
+  if (StringContent.trim() == "") {
     return Message.channel.send("[Empty Message]")
   }
-  return new Promise(async res => {
+
+  async function SendString(part) {
     if (DEBUG)
-      console.log("Message content: " + Content)
-    if (Content.length >= 20000) return Message.channel.send("More than 10 messages would be sent! Thus, I've decided to cut it short. Also, the AI is probably gonna crash immediately right now, LOL.")
-    if (Content.length >= DiscordMessageLengthLimit) {
+      console.log("Message content: " + part)
+    if (part.length >= 20000) return Message.channel.send("More than 10 messages would be sent! Thus, I've decided to cut it short. Also, the AI is probably gonna crash immediately right now, LOL.")
+    if (part.length >= DiscordMessageLengthLimit) {
       do {
-        const SplitPoint = Content.length > DiscordMessageLengthLimit ? DiscordMessageLengthLimit : Content.length;
-        const chunk = Content.substring(0, SplitPoint);
-        Content = Content.substring(SplitPoint);
+        const SplitPoint = part.length > DiscordMessageLengthLimit ? DiscordMessageLengthLimit : Content.length;
+        const chunk = part.substring(0, SplitPoint);
+        part = part.substring(SplitPoint);
         await Message.channel.send(chunk)
-      } while (Content.length > 0)
-    } else Message.channel.send(Content);
+      } while (part.length > 0)
+    } else Message.channel.send(part);
+  }
+
+  return new Promise(async res => {
+    // If the input message contains a markdown table, send it as an embed.
+    // [Content, Embed] = ParseTables(Content)
+    let Content = ParseMessage(StringContent);
+
+    // First, merge all empty lines into the one previous to it.
+    for (let i = 1; i < Content.length; i++)
+      if (Content[i] == "" || Content[i] == [])
+      {
+        // Only actually retain the text if the previous chunk was also a string.
+        if ((typeof Content[i - 1]).toString() == "string") {
+          Content[i - 1] += "\n";
+        }
+        Content.splice(i, 1);
+        i--;
+      }
+
+    for (let i = 0; i < Content.length; i++) {
+      if ((typeof Content[i]).toString() == "string")
+      {
+        if (Content[i].trim() == "") continue;
+        await SendString(Content[i]);
+      }
+      else {
+        await Message.channel.send({
+          embeds: [Content[i]]
+        });
+      }
+    }
 
     res()
   })
