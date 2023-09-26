@@ -938,8 +938,12 @@ client.on('messageCreate',
       if (message.content.length >= 1000) {
         message.channel.send("Your message is too long.");
       } else {
+        let Text = message.content.substring(5);
+        message.attachments.forEach(attachment => {
+          Text += ` ${attachment.url}`;
+        })
         const Messages = NewMessage("system", fetchUserBase(message.author.id))
-          .concat(NewMessage("user", message.content.substring(5), authorname));
+          .concat(NewMessage("user", Text, authorname));
 
         let result = await RequestChatGPT(Messages, message);
         SendMessage(message, result[result.length - 1].content)
@@ -1012,11 +1016,17 @@ client.on('messageCreate',
       /**
        * @type {[{content, role, name}]}
        */
-      let base = bases[GetBaseIdFromChannel(message.channel)];
-      if (base == "" || base == undefined) base = NewMessage("system", fetchUserBase(message.author.id));
+      let messages = bases[GetBaseIdFromChannel(message.channel)];
+      if (messages == "" || messages == undefined) messages = NewMessage("system", fetchUserBase(message.author.id));
 
-      base = base.concat(NewMessage("user", message.content.trim())); // `\n${authorname}: ` + message.content.trim();
-      await AskChatGPTAndSendResponse(base, message);
+      let Text = message.content;
+      message.attachments.forEach(attachment => {
+        Text += ` ${attachment.url}`;
+      })
+      
+      messages = messages.concat(NewMessage("user", Text, authorname));
+      // base = base.concat(NewMessage("user", message.content.trim())); // `\n${authorname}: ` + message.content.trim();
+      await AskChatGPTAndSendResponse(messages, message);
     }
   });
 
@@ -1128,7 +1138,7 @@ const Gradio = require('./Gradio/Gradio_Stuff.js');
 2: Server Only
 3: Main PC Both GPUs + Server
 */
-Gradio.ConnectToPreset(1);
+// Gradio.ConnectToPreset(1);
 
 //#region Gradio Demo generate.
 /*
