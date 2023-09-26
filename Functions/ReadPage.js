@@ -9,7 +9,7 @@ module.exports = {
     json: 
     {
       "name": "ReadPage",
-      "description": "Gets the text of a webpage.",
+      "description": "Gets the text of a webpage. Make sure to only submit plain text-form links.",
       //  When text is on one line, followed by a link in brackets, the text on the line is the text of the link. Ex:\nHello [example.com]\n The above is a link to example.com
       "parameters": {
         "type": "object",
@@ -47,7 +47,7 @@ module.exports = {
           const StartLength = encode(text).length;
           console.log(`File Length: ${StartLength}`)
 
-          if (DiscordMessage != null && StartLength > 1000) {
+          if (DiscordMessage != null && StartLength > 1000 && StartLength < 10000) {
             let Cost = (StartLength * 0.000003);
             Cost = Cost.toFixed(2);
             DiscordMessage.channel.send("Just if you were curious... I had to pay $" + Cost + " to get the AI to read this page...")
