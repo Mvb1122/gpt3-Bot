@@ -12,6 +12,11 @@ module.exports = {
             return option.setName("question")
                 .setDescription("The question.")
                 .setRequired(true)
+        })
+        .addAttachmentOption(option => {
+            return option.setName("text")
+                .setDescription("If you want the AI to read something, send it here. You must mention in your prompt to use it.")
+                .setRequired(false)
         }),
 
     /**
@@ -21,12 +26,19 @@ module.exports = {
     async execute(interaction) {
         interaction.deferReply();
         const username = interaction.member.nickname ?? interaction.member.displayName;
+        let UserQuestion = interaction.options.getString("question");
+
+        // If the user has sent a text document, attach it to our prompt so that ReadPage can be used.
+        if (interaction.options.getAttachment("text") != undefined) {
+            UserQuestion += ` ${interaction.options.getAttachment("image").url}`
+        }
+
         let messages = Index.NewMessage("system", Index.fetchUserBase(interaction.member.id))
-            .concat(Index.NewMessage("user", interaction.options.getString("question"), username))
+            .concat(Index.NewMessage("user", UserQuestion, username))
         
         await Index.RequestChatGPT(messages, interaction)
             .then(val => {
-                const Content = `${username}: ${interaction.options.getString("question")}\nAI: ${val[val.length - 1].content}`;
+                const Content = `${username}: ${UserQuestion}\nAI: ${val[val.length - 1].content}`;
                 try {
                     interaction.editReply(Content);
                 } catch (e) {
