@@ -931,7 +931,8 @@ client.on('messageCreate',
     try {
       authorname = member.nickname ?? message.author.username;
     } catch (e) {
-      message.reply("Something went wrong! Please tell Micah to fix this error:\n```" + e + "```");
+      if (DEBUG)
+        message.reply("Something went wrong! Please tell Micah to fix this error:\n```" + e + "```");
     }
 
     if (message.content.startsWith("gpt3")) {
