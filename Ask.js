@@ -40,7 +40,7 @@ module.exports = {
         interaction.member.id
         // If the user has sent a text document, attach it to our prompt so that ReadPage can be used.
         if (interaction.options.getAttachment("text") != undefined) {
-            UserQuestion += ` ${interaction.options.getAttachment("image").url}`
+            UserQuestion += ` ${interaction.options.getAttachment("text").url}`
         }
 
         let messages = Index.NewMessage("system", Index.fetchUserBase(interaction.member.id))
