@@ -20,7 +20,7 @@ module.exports = {
      */
     async execute(interaction) {
         // Only allow me to use this.
-        if (interaction.member.id != "303011705598902273") return interaction.reply("You aren't allowed to use this!");
+        if ((interaction.member != undefined && interaction.member.id != "303011705598902273") || (interaction.user != undefined && interaction.user.id != "303011705598902273")) return interaction.reply("You aren't allowed to use this!");
 
         let number = interaction.options.getInteger("preset");
 

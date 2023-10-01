@@ -1,4 +1,5 @@
 let LastMessageText = "", LastMessageNumber = "-1"
+const tokens = require('../token.js')
 
 module.exports = {
     keywords: "text me, text, SMS",
@@ -56,38 +57,14 @@ module.exports = {
         method: 'POST',
         url: 'https://clicksend.p.rapidapi.com/sms/send',
         headers: {
-          Authorization: 'Basic bWljYWhidXNobWFuLnNjaG9vbEBnbWFpbC5jb206MzgzNURBRDQtQzE1MC04ODkwLTYzMjctRjM1OURCQzVDQzU0',
+          Authorization: tokens.GetToken("clicksendauthorization"),
           'Content-type': 'application/json',
-          'X-RapidAPI-Key': 'a0def1928cmsh4e141db23767bc4p1d70cdjsn4f09e49fb88c',
+          'X-RapidAPI-Key': tokens.GetToken("x-rapidapi-key"),
           'X-RapidAPI-Host': 'clicksend.p.rapidapi.com'
         },
         body: body
       };
       const url = 'https://rest.clicksend.com/v3/sms/send';
-      /*
-      let options = {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          Authorization: 'Basic bWljYWhidXNobWFuLnNjaG9vbEBnbWFpbC5jb206MzgzNURBRDQtQzE1MC04ODkwLTYzMjctRjM1OURCQzVDQzU0',
-          'Content-Type': 'application/json',
-          'X-RapidAPI-Key': 'a0def1928cmsh4e141db23767bc4p1d70cdjsn4f09e49fb88c',
-          'X-RapidAPI-Host': 'clicksend.p.rapidapi.com'
-        },
-        body: {
-          messages: [
-            {
-              source: 'mashape',
-              from: 'Test',
-              body: 'This is a test',
-              to: '5053136413',
-              schedule: '1452244637',
-              custom_string: 'this is a test'
-            }
-          ]
-        }
-      };
-      */
     
       try {
         const response = await fetch(url, options);

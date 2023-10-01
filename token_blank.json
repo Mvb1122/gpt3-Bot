@@ -2,5 +2,7 @@
     "discord": "",
     "openai": "",
     "openweathermap": "",
-    "serpapi": ""
+    "serpapi": "",
+    "clicksendauthorization": "Basic YOURCODEHERE",
+    "x-rapidapi-key": ""
 }

@@ -133,8 +133,9 @@ async function ClearAll(parameters = {}, DiscordMessage = null) {
 
 /**
  * Recovers the specified conversation.
- * @param {*} parameters - { RecoveryID: 12345678, Overwrite: true = true }
+ * @param {{RecoveryID: Number, Overwrite: Boolean}} parameters - { RecoveryID: 12345678, Overwrite: true = true }
  * @param {Discord.Message} DiscordMessage 
+ * @returns {{sucessful: Boolean, reason: String}}
  */
 async function Recover(parameters, DiscordMessage = null) {
   if (parameters.RecoveryID == undefined || RecoveryBases[parameters.RecoveryID] == undefined) {
@@ -185,6 +186,7 @@ const FunctionList = [
 const functionPath = "./Functions/";
 // Import all functions on boot. 
 fs.readdir(functionPath, (err, paths) => {
+  let commands = ""
   paths.forEach(file => {
     /**
      * @type {{keywords: String, json: String, execute: Function}}
@@ -194,8 +196,11 @@ fs.readdir(functionPath, (err, paths) => {
     Keywords.push(f.keywords);
     FunctionList.push(f.json);
 
-    console.log(`Added ${f.json.name}!`)
+    // console.log(`Added ${f.json.name}!`)
+    commands += f.json.name + " "
   })
+
+  console.log(`Added ${paths.length} commands! ${commands.trim()}`)
 })
 
 /**
@@ -691,6 +696,10 @@ function fetchRootBase(){return rootBase;}
  * @returns {[String | Discord.EmbedBuilder]}
  */
 function ParseMessage(string) {
+  // Before we do anything, to save flops, if we don't have any "|" in the message, just return it like that.
+  if (string.indexOf("|") == -1) return [string];
+
+
   const LineCounts = Helpers.CountCharactersInSections(string, "|", "\n");
   /**
    * @type {[[[String]]]}
@@ -708,9 +717,9 @@ function ParseMessage(string) {
 
   for (let i = 1; i < LineCounts.length; i++) {
     let ContentOnThisLine = Lines[i].split("|")
-    ContentOnThisLine = ContentOnThisLine.slice(1, ContentOnThisLine.length - 1)
     
     if (ContentOnThisLine.length > 0) {
+      ContentOnThisLine = ContentOnThisLine.slice(1, ContentOnThisLine.length - 1)
       TableSets[tableIndex].push(ContentOnThisLine)
     } else {
       TableSets.push(Lines[i]);
@@ -797,7 +806,7 @@ async function SendMessage(Message, StringContent) {
     if (part.length >= 20000) return Message.channel.send("More than 10 messages would be sent! Thus, I've decided to cut it short. Also, the AI is probably gonna crash immediately right now, LOL.")
     if (part.length >= DiscordMessageLengthLimit) {
       do {
-        const SplitPoint = part.length > DiscordMessageLengthLimit ? DiscordMessageLengthLimit : Content.length;
+        const SplitPoint = part.length > DiscordMessageLengthLimit ? DiscordMessageLengthLimit : part.length;
         const chunk = part.substring(0, SplitPoint);
         part = part.substring(SplitPoint);
         await Message.channel.send(chunk)
@@ -810,23 +819,25 @@ async function SendMessage(Message, StringContent) {
     // [Content, Embed] = ParseTables(Content)
     let Content = ParseMessage(StringContent);
 
-    // First, merge all empty lines into the one previous to it.
+    // First, merge all string lines into the one previous to it.
     for (let i = 1; i < Content.length; i++)
-      if (Content[i] == "" || Content[i] == [])
+      if ((typeof Content[i]).toString() == "string")
       {
-        // Only actually retain the text if the previous chunk was also a string.
+        // Retain the text if the previous chunk was also a string.
         if ((typeof Content[i - 1]).toString() == "string") {
-          Content[i - 1] += "\n";
+          Content[i - 1] += "\n" + Content[i];
+          Content.splice(i, 1);
+          i--;
         }
-        Content.splice(i, 1);
-        i--;
       }
 
+    console.log("=====================")
+    console.log(Content)
     for (let i = 0; i < Content.length; i++) {
       if ((typeof Content[i]).toString() == "string")
       {
         if (Content[i].trim() == "") continue;
-        await SendString(Content[i]);
+        else await SendString(Content[i]);
       }
       else {
         await Message.channel.send({
