@@ -25,9 +25,19 @@ module.exports = {
      */
     async execute(interaction) {
         interaction.deferReply();
-        const username = interaction.member.nickname ?? interaction.member.displayName;
+        if (interaction.member == null) interaction.member = interaction.user;
+        let username;
+        try {
+            username = interaction.member.nickname ?? interaction.member.username
+        } catch {
+            try {
+                username = interaction.member.displayName
+            } catch {
+                username = "User";
+            }
+        }
         let UserQuestion = interaction.options.getString("question");
-
+        interaction.member.id
         // If the user has sent a text document, attach it to our prompt so that ReadPage can be used.
         if (interaction.options.getAttachment("text") != undefined) {
             UserQuestion += ` ${interaction.options.getAttachment("image").url}`
@@ -39,9 +49,9 @@ module.exports = {
         await Index.RequestChatGPT(messages, interaction)
             .then(val => {
                 const Content = `${username}: ${UserQuestion}\nAI: ${val[val.length - 1].content}`;
-                try {
-                    interaction.editReply(Content);
-                } catch (e) {
+                if (Content.length <= 2000) {
+                    interaction.editReply(Content)
+                } else {
                     // If the message is too long, just say, look below for your answer and then SendMessage it.
                     interaction.editReply("See message below.");
                     Index.SendMessage(interaction, Content)
