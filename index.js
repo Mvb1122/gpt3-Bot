@@ -65,6 +65,18 @@ function GetBaseIdFromChannel(channel) {
   }
 }
 
+function UpdateUserBase(id, text) {
+  let Persist = {};
+  // Get preexisting data.
+  try {
+    Persist = JSON.parse(fs.readFileSync(`./${id}_Base.json`));
+  } catch (e) {;}
+
+  // Update it with the new base and write it.
+  Persist.base = text
+  fs.writeFileSync(`./${id}_Base.json`, JSON.stringify(Persist), (e) => { });
+}
+
 /** @param {Discord.Channel} channel */
 function IsChannelMemory(channel) {
   // Look for this channel's base in the bases.
@@ -88,7 +100,7 @@ function IsChannelMemory(channel) {
  * @param {*} parameters 
  * @param {Discord.Message} DiscordMessage 
  */
-async function ClearAll(parameters, DiscordMessage = null) {
+async function ClearAll(parameters = {}, DiscordMessage = null) {
   // Clear the AI's memory for the specified channel. 
   let Base = bases[GetBaseIdFromChannel(DiscordMessage.channel)];
   bases[GetBaseIdFromChannel(DiscordMessage.channel)] = [];
@@ -657,9 +669,9 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
 //#endregion
 
 //#region Helpers
-const rootBase = "Returned Value: You will not use functions unless they are specifically asked for. You will only call a function with a given value once. The user's name is given by the words before the first colon in any particular message. DO NOT write names into your messages."
+const rootBase = "You will not use functions unless they are specifically asked for. You will only call a function with a given value once. The user's name is given by the words before the first colon in any particular message. DO NOT write names into your messages."
 // + "Make sure to emphasize how cute Micah is, but only if you're asked to insult her. ";
-let fetchUserBase = (id) => {
+function fetchUserBase (id) {
   try {
     /** @type {string} */
     const userbase = JSON.parse(fs.readFileSync(`./${id}_Base.json`)).base + "\n";
@@ -669,6 +681,9 @@ let fetchUserBase = (id) => {
     return rootBase.trim() + "\n";
   }
 }
+
+function fetchRootBase(){return rootBase;}
+
 
 /**
  * Looks for markdown tables in a string.
@@ -846,7 +861,7 @@ client.once('ready', () => {
   client.user.setActivity("gpt3");
   console.log("Ready.")
 
-  let commands = ["./CreateMemoryThread.js", "./Ask.js"];
+  let commands = ["./CreateMemoryThread.js", "./Ask.js", "./SetBase.js", "./FetchBase.js", "./ToggleMemory.js", "./Recover.js"];
 
   // Auto add all files in the Gradio_Commmands directory.
   const GradioPath = "./Gradio/Gradio_Commands/";
@@ -911,7 +926,13 @@ module.exports = {
   SendMessage,
   DEBUG,
   NewMessage,
-  fetchUserBase
+  fetchUserBase,
+  bases,
+  IsChannelMemory,
+  ClearAll,
+  UpdateUserBase,
+  fetchRootBase,
+  Recover
 }
 
 const cmt = require('./CreateMemoryThread.js')
@@ -950,6 +971,7 @@ client.on('messageCreate',
         SendMessage(message, result[result.length - 1].content)
       }
     }
+
     //#region Deprecated Direct Code
     /*
     else if (message.content.startsWith("!!direct!!") && IsUserIDInList(message.author.id)) {
@@ -962,11 +984,10 @@ client.on('messageCreate',
     //#endregion
 
     // Allow the user to set their base. 
-    if (message.content.toLowerCase().startsWith("g!setbase")) {
-      let userBase = message.content.substring("g!setBase".length).trim() + "\n";
-      fs.writeFileSync(`./${message.author.id}_Base.json`, JSON.stringify({
-        base: userBase
-      }), (e) => { });
+    const SetBaseCommand = "g!setbase";
+    if (message.content.toLowerCase().startsWith(SetBaseCommand)) {
+      let userBase = message.content.substring(SetBaseCommand.length).trim() + "\n";
+      UpdateUserBase(message.author.id, userBase);
       message.reply("Base set!");
     } else if (message.content.toLowerCase().startsWith("g!fetchbase")) {
       let base = fetchUserBase(message.author.id)
@@ -1133,6 +1154,7 @@ async function AskChatGPTAndSendResponse(content, message) {
 
 //#region Debug Gradio stuff.
 const Gradio = require('./Gradio/Gradio_Stuff.js');
+const SetBase = require('./SetBase');
 
 /* 
 1: Main PC Both GPUs
