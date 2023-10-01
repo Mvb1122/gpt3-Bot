@@ -1,4 +1,4 @@
-[![DevSkim](https://github.com/Mvb1122/gpt3-Bot/actions/workflows/devskim.yml/badge.svg)](https://github.com/Mvb1122/gpt3-Bot/actions/workflows/devskim.yml)
+[![DevSkim](https://github.com/Mvb1122/gpt3-Bot/actions/workflows/devskim.yml/badge.svg)](https://github.com/Mvb1122/gpt3-Bot/actions/workflows/devskim.yml) [![CodeQL](https://github.com/Mvb1122/gpt3-Bot/actions/workflows/codeql.yml/badge.svg)](https://github.com/Mvb1122/gpt3-Bot/actions/workflows/codeql.yml)
 # gpt3-Bot
 A discord bot that allows access to ChatGPT and other misc AIs. Also, if you do find an issue, please open a pull request, I guess.
 
