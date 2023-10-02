@@ -185,6 +185,7 @@ module.exports = {
                 });
             }
     
+            /* Disable Upscaling! Render at full res because it's already limit-scaled.
             if (scale != undefined) {
                 PostProcess = async (path, prompt) => {
                     let settings = {
@@ -202,6 +203,7 @@ module.exports = {
                     })
                 }
             }
+            */
     
             if (Gradio.isConnected()) {
                 if (UsingGPTTags)
