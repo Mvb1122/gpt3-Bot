@@ -98,12 +98,14 @@ module.exports = {
 
         // Download the image.
         const attachment = interaction.options.getAttachment("image")
-        const name = attachment.name
+        // Name images randomly to keep from overwring same requests or whatever.
+        const name = /* Math.floor(Math.random() * 10000) + */ attachment.name;
         const url = attachment.url
 
         try {
-            /** @type {String} */
-            let UserImagePath, /** @type {sharp.Sharp} */ sharpFile, /** @type {sharp.Metadata} */ meta;
+            /** @type {String} */ let UserImagePath, 
+            /** @type {sharp.Sharp} */ sharpFile, 
+            /** @type {sharp.Metadata} */ meta;
             if (!ImageIsValid(name))
                 return interaction.editReply("You provided a non-supported image. Here are the supported types: ```" + NonSplitTypes + "```")
             else {
@@ -264,10 +266,15 @@ module.exports = {
                         // Ensure that all of the paths are valid.
                         for (let i = 0; i < GeneratedImagesPaths.length; i++) GeneratedImagesPaths[i] = await GeneratedImagesPaths[i];
                         
-                        // Also send the original image.
-                        GeneratedImagesPaths.push(UserImagePath);
+                        // Also send the original image, if it's still around.
+                        let MessageContent = `Generated! Tags:\n\`\`\`${prompts}\`\`\``;
+                        if (fs.existsSync(UserImagePath))
+                            GeneratedImagesPaths.push(UserImagePath);
+                        else {
+                            MessageContent += "Also, because you requested multiple remixes of the same image, go back and find the image the last time I sent it."
+                        }
 
-                        interaction.editReply({"content": `Generated! Tags:\n\`\`\`${prompts}\`\`\``, files: GeneratedImagesPaths})
+                        interaction.editReply({"content": MessageContent, files: GeneratedImagesPaths})
                             .then(async () => {
                                 if (generating != undefined && (await generating).deletable)
                                     (await generating).delete();
@@ -278,8 +285,9 @@ module.exports = {
                                         fs.unlink(path, e => {if (e) console.log(e)})
                                     });
 
-                                    // Also also delete the original attachment.
-                                    fs.unlink(UserImagePath, e => {if (e) console.log(e)})
+                                    // Also try to delete the original attachment.
+                                    if (fs.existsSync(UserImagePath))
+                                        fs.unlink(UserImagePath, e => {if (e) console.log(e)})
                                 }
                                 
                                 // Just because I'm weird, DM Micah all ephemeral images.
