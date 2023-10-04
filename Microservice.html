@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Microservice testing</title>
+        <style>
+            body {
+                background-color: bisque;
+            }
+        </style>
+        <script>
+            async function Submit() {
+                const text = document.getElementById("Text").value;
+
+                const url = 'http://192.168.1.3:7243';
+
+                const data = JSON.stringify({
+                    role: "system",
+                    content: text
+                });
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: data,
+                });
+
+                // const json = await response.json();
+                document.getElementById("response").innerText = await response.text();
+            }
+        </script>
+    </head>
+    <body>
+        <input type="text" name="Text Demo" id="Text" placeholder="input text here">
+        <button onclick="Submit()">Submit</button>
+        <br>
+        <h1 id="response"></h1>
+    </body>
+</html>

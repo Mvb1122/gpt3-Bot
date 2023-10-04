@@ -265,8 +265,9 @@ function GetFunctionFromStart(message) {
   // Types: System, User Function
   /**
    * Creates a message object from the content.
-   * @param {String} Role System || User || Function || Assistant <- For AI only, will be appended automatically.
+   * @param {"System" | "User" | "Function" | "Assistant"} Role System || User || Function || Assistant <- For AI only, will be appended automatically.
    * @param {String} Content 
+   * @param {String | undefined} User
    * @returns {[{role: String, content: String}]}
    */
 function NewMessage(Role, Content, User) {
@@ -1197,4 +1198,49 @@ let val = Gradio.GetTagsFromImage(debugImagePath)
 //#endregion
 // Gradio.ConnectTo("192.168.1.57")
 // console.log(Gradio.PredictContent("1girl, absuredres, black thighhighs, school uniform, miniskirt, zettai ryouiki, black_hair, full_body, red necktie"));
+//#endregion
+
+//#region Chat AI Microservice for the web.
+const http = require('http');
+const MicroserviceHTML = fs.readFileSync("./Microservice.html");
+/**
+ * Parses the request.
+ * @param {http.IncomingMessage} req The request to the server.
+ * @param {http.ServerResponse} res The response back.
+ */
+async function listener(req, res) {
+  res.setHeader("content-type", "application/json")
+  if (req.method == "POST") {
+    // Get the request's data.
+    let binary_data = [];
+    req.on('data', function(chunk) {
+      binary_data.push(chunk);
+    });
+  
+    // Once the request is done with, ask the AI the question.
+    req.on('end', () => {
+      const data = JSON.parse(Buffer.concat(binary_data));
+
+      // Ask the AI.
+      const messages = NewMessage(data.role, data.content, undefined);
+      GetSafeChatGPTResponse(messages, null, 0, false)
+        .then(response => {
+          res.end(JSON.stringify(response.data.choices[0].message));
+        })
+
+    })
+  } else {
+    // If this wasn't a post request, just send back the demo page.
+    res.setHeader("content-type", "text/html")
+    return res.end(MicroserviceHTML);
+  }
+
+}
+
+
+const host = "192.168.1.3", port = "7243"
+const server = http.createServer(listener);
+server.listen(port, host, () => {
+  console.log(`Server is running on http://${host}:${port}`);
+});
 //#endregion
