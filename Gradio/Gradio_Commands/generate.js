@@ -137,7 +137,7 @@ module.exports = {
 
         // Upscaling stuff.
         // If no upscaling options have been passed, just instantly return the path to the already-existing image.
-        let PostProcess = async (path) => {
+        let PostProcess = async (path, prompt) => {
             return new Promise(res => {
                 res(path);
             });
@@ -205,7 +205,7 @@ module.exports = {
                     // After the image has been drawn, post-process it.
                     let ImagePlusPostProcess = new Promise(res => {
                         thisImage.then(async () => {
-                            res(await PostProcess(await (thisImage)))
+                            res(await PostProcess(await (thisImage), prompt))
                         })
                     })
                     paths.push(ImagePlusPostProcess);
