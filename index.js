@@ -746,7 +746,7 @@ function ParseMessage(string) {
     }*/
   }
 
-  // console.log(TableSets)
+  console.log(TableSets)
 
   // Construct an embed for each embed as needed, if needed.
   for (let i = 0; i < TableSets.length; i++) {
@@ -802,19 +802,28 @@ async function SendMessage(Message, StringContent) {
   }
 
   async function SendString(part) {
-    if (DEBUG)
-      console.log("Message content: " + part)
-    if (part.length >= 20000) return Message.channel.send("More than 10 messages would be sent! Thus, I've decided to cut it short. Also, the AI is probably gonna crash immediately right now, LOL.")
-    if (part.length >= DiscordMessageLengthLimit) {
-      do {
-        const SplitPoint = part.length > DiscordMessageLengthLimit ? DiscordMessageLengthLimit : part.length;
-        const chunk = part.substring(0, SplitPoint);
-        part = part.substring(SplitPoint);
-        await Message.channel.send(chunk)
-      } while (part.length > 0)
-    } else Message.channel.send(part);
+    return new Promise(async resolve => {
+      if (DEBUG)
+        console.log("Message content: " + part)
+      if (part.length >= 20000) return Message.channel.send("More than 10 messages would be sent! Thus, I've decided to cut it short. Also, the AI is probably gonna crash immediately right now, LOL.")
+      if (part.length >= DiscordMessageLengthLimit) {
+        do {
+          const SplitPoint = part.length > DiscordMessageLengthLimit ? DiscordMessageLengthLimit : part.length;
+          const chunk = part.substring(0, SplitPoint);
+          part = part.substring(SplitPoint);
+          await Message.channel.send(chunk)
+        } while (part.length > 0)
+      } else Message.channel.send(part);
+
+      resolve();
+    })
   }
 
+  // For the moment, just send the message as a string because I need to find time to patch the ParseMessage thing.
+  return SendString(StringContent);
+
+  // TODO: Fix the below functionality.
+  /*
   return new Promise(async res => {
     // If the input message contains a markdown table, send it as an embed.
     // [Content, Embed] = ParseTables(Content)
@@ -835,6 +844,8 @@ async function SendMessage(Message, StringContent) {
     console.log("=====================")
     console.log(Content)
     for (let i = 0; i < Content.length; i++) {
+      console.log(`Type: ${typeof Content[i]}`);
+      console.log(Content[i])
       if ((typeof Content[i]).toString() == "string")
       {
         if (Content[i].trim() == "") continue;
@@ -849,6 +860,7 @@ async function SendMessage(Message, StringContent) {
 
     res()
   })
+  */
 }
 
 /**
