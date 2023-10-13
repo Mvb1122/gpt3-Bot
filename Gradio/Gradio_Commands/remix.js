@@ -165,6 +165,10 @@ module.exports = {
             const NegativePrompt = interaction.options.getString("negativeprompt") ?? "";
             // height = Number.parseInt(height); width = Number.parseInt(width); cfg = Number.parseInt(cfg)
     
+            // Sanatize prompt input.
+            prompts = prompts.replace(/[/\\?%*:|"<>]/g, '-')
+            NegativePrompt = NegativePrompt.replace(/[/\\?%*:|"<>]/g, '-')
+
             // If they ask for too many pixels, only let them generate one image at a time.
             let settings = {
                 prompt: prompts.trim(),

@@ -115,7 +115,10 @@ module.exports = {
         const NegativePrompt = interaction.options.getString("negativeprompt") ?? "";
         // height = Number.parseInt(height); width = Number.parseInt(width); cfg = Number.parseInt(cfg)
 
-        // If they ask for too many pixels, only let them generate one image at a time.
+        // Sanatize prompt input.
+        prompts = prompts.replace(/[/\\?%*:|"<>]/g, '-')
+        NegativePrompt = NegativePrompt.replace(/[/\\?%*:|"<>]/g, '-')
+        
         let settings = {
             prompt: prompts.trim(),
             negative_prompt: NegativePrompt,
@@ -124,8 +127,10 @@ module.exports = {
             cfg_scale: cfg,
             save_images: true
         }
-
+        
         let content = "Queued... ";
+        
+        // If they ask for too many pixels, only let them generate one image at a time.
         let scale = interaction.options.getNumber("scalefactor") ?? undefined;
         if (Gradio.IsPixelCountAboveLimit(settings.width, settings.height)) {
             content += "Your resolution was too big so I'm only making one image! "
