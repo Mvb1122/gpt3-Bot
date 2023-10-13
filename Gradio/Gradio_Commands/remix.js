@@ -162,7 +162,7 @@ module.exports = {
             }
 
             let cfg = interaction.options.getInteger("cfg") ?? 7;
-            const NegativePrompt = interaction.options.getString("negativeprompt") ?? "";
+            let NegativePrompt = interaction.options.getString("negativeprompt") ?? "";
             // height = Number.parseInt(height); width = Number.parseInt(width); cfg = Number.parseInt(cfg)
     
             // Sanatize prompt input.
