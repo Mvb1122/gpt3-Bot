@@ -85,16 +85,19 @@ async function ImageToImageFromPath(ImagePath, Settings) {
  * @param {{prompt: String, scale: Number}} Settings Settings for upscaling.
  */
 async function ImageToImageFromSharp(Image, Settings, MakeSeed = true) {
-    if (MakeSeed)
-        Settings.seed = GenerateSeed();
-
+    
     return new Promise(async (resolve, reject) => {
         let meta = await Image.metadata();
+        
+        if (MakeSeed || Settings.seed == undefined)
+            Settings.seed = GenerateSeed();
 
         Settings.init_images = [Image];
+
         Settings.resize_mode = 0;
         if (Settings.negative_prompt == undefined)
             Settings.negative_prompt = NegativePrompt;
+        
         Settings.save_images = true;
         
         Settings.sampler_name = "DDIM"; Settings.steps = 35;
@@ -112,7 +115,8 @@ async function ImageToImageFromSharp(Image, Settings, MakeSeed = true) {
         try {
             FetchApp().img2img(Settings)
                 .then(async e => {
-                    const path = `./Images/${prompt.substring(0, 100)}-${scale}x.png`;
+                    // Include the seed to prevent sending back the same image.
+                    const path = `./Images/${prompt.substring(0, 100)}_${Settings.seed}-${scale}x.png`;
                     await (e.image.toFile(path))
                     resolve(path)
                 })

@@ -125,8 +125,10 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Custom ignore
 token.json
-Images/*.png
+Images/*
 ActiveBases.json
 RecoveryBases.json
 Thumbs.db

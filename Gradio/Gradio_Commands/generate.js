@@ -153,7 +153,7 @@ module.exports = {
                 return new Promise(res => {
                     try {
                         Gradio.ImageToImageFromPath(path, settings)
-                            .then(e => res(e));
+                            .then(upscaledPath => res(upscaledPath));
                     } catch {
                         res(path);
                     }
@@ -204,8 +204,8 @@ module.exports = {
 
                     // After the image has been drawn, post-process it.
                     let ImagePlusPostProcess = new Promise(res => {
-                        thisImage.then(async () => {
-                            res(await PostProcess(await (thisImage), settings.prompt))
+                        thisImage.then(async (image) => {
+                            res(await PostProcess(image, settings.prompt))
                         })
                     })
                     paths.push(ImagePlusPostProcess);
