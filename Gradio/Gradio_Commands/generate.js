@@ -205,7 +205,7 @@ module.exports = {
                     // After the image has been drawn, post-process it.
                     let ImagePlusPostProcess = new Promise(res => {
                         thisImage.then(async () => {
-                            res(await PostProcess(await (thisImage), prompt))
+                            res(await PostProcess(await (thisImage), settings.prompt))
                         })
                     })
                     paths.push(ImagePlusPostProcess);
