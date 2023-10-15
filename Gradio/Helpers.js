@@ -41,6 +41,37 @@ function Download(url, outputPath) {
     })
 }
 
+const Keywords = [
+    {
+        keyword: "Micah",
+        content: " Also, remember that Micah is a girl who wears thighhighs all the time. She also has the tags long_hair, and black_hair, and red_eyes. Sometimes she wears a serafuku. In casual scenerios, she should be drawn wearing casual clothes, so basically just draw a sweater or something, it's up to you."
+    }
+]
+
+/**
+ * @param {String} Plain The plaintext input.
+ * @returns {{role: string;content: string;}[]} The message for the AI. 
+ */
+function GetMessageForGPTTalkingAboutTags(Plain) {
+    let Messages = [
+        {
+            role: "system",
+            content: "Danbuuru tags are a descriptor for the content of an image. For example, some tags are: 1boy, 1girl, absurdres, red, black, and several others.\nUse thighhighs instead of thighhigh_socks\nYou can emphasize a tag by surrounding it in parenthesis, like (absurdres). Make sure to include (absurdres) in all lists of tags.\nFor example, an image of a woman with large breasts, long hair, wearing a white dress with earings, on a simple background, would have the following tags: 1girl, absurdres, ((mature_female)), large_breasts, brown hair, long hair, white dress, earings, simple background\nFor women, use 1girl, (mature_female) plus any other tags. For men, use 1boy, (mature_male) and any other tags.\nAny tag you can think of works as one, pretty much.\nBe creative when writing tag lists! Please write a set of tags which coorespond to the given text on one line, seperated by commas, and with no other text. Given text: " + Plain + "\nRemember to be creative! "
+        }
+    ]
+
+    Keywords.forEach(keyword => {
+        if (Plain.toLowerCase().includes(keyword.keyword))
+            Messages[0].content += keyword.content
+    })
+
+    // Call me hitler but I don't like child porn.
+    if (Plain.includes("child") && Plain.includes("penis")) 
+        Messages[0].content = Messages[0].content.replaceAll("penis", "a fluffy cat") + " Please do not draw anything NSFW with children! In your tag list, please keep it safe."
+
+    return Messages;
+}
+
 /**
  * Uses the Index's provided ChatGPT methods to summarize an image using a special prompt.
  * @param {String} Plain The plain text to tagify.
@@ -48,12 +79,7 @@ function Download(url, outputPath) {
  * @see {Index.GetSafeChatGPTResponse}
  */
 async function GetPromptsFromPlaintextUsingGPT(Plain) {
-    let messages = [
-        {
-            role: "system",
-            content: "Danbuuru tags are a descriptor for the content of an image. For example, some tags are: 1boy, 1girl, absurdres, red, black, and several others.\nUse thighhighs instead of thighhigh_socks\nYou can emphasize a tag by surrounding it in parenthesis, like (absurdres). Make sure to include (absurdres) in all lists of tags.\nFor example, an image of a woman with large breasts, long hair, wearing a white dress with earings, on a simple background, would have the following tags: 1girl, absurdres, ((mature_female)), large_breasts, brown hair, long hair, white dress, earings, simple background\nFor women, use 1girl, (mature_female) plus any other tags. For men, use 1boy, (mature_male) and any other tags.\nAny tag you can think of works as one, pretty much.\nBe creative when writing tag lists! Please write a set of tags which coorespond to the given text on one line, seperated by commas, and with no other text. Given text: " + Plain
-        }
-    ]
+    let messages = GetMessageForGPTTalkingAboutTags(Plain)
 
     const ResponseFromGPT = (await Index.GetSafeChatGPTResponse(messages, null, null, false)).data.choices[0];
     /**
