@@ -116,8 +116,9 @@ module.exports = {
         // height = Number.parseInt(height); width = Number.parseInt(width); cfg = Number.parseInt(cfg)
 
         // Sanatize prompt input.
-        prompts = prompts.replace(/[/\\?%*:|"<>]/g, '-')
-        NegativePrompt = NegativePrompt.replace(/[/\\?%*:|"<>]/g, '-')
+        // prompts = prompts.replace(/[/\\?%*:|"<>]/g, '-')
+        // NegativePrompt = NegativePrompt.replace(/[/\\?%*:|"<>]/g, '-')
+        // ^ No longer needed because it'll be filtered at the file writing stage.
         
         let settings = {
             prompt: prompts.trim(),

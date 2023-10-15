@@ -166,8 +166,9 @@ module.exports = {
             // height = Number.parseInt(height); width = Number.parseInt(width); cfg = Number.parseInt(cfg)
     
             // Sanatize prompt input.
-            prompts = prompts.replace(/[/\\?%*:|"<>]/g, '-')
-            NegativePrompt = NegativePrompt.replace(/[/\\?%*:|"<>]/g, '-')
+            // prompts = prompts.replace(/[/\\?%*:|"<>]/g, '-')
+            // NegativePrompt = NegativePrompt.replace(/[/\\?%*:|"<>]/g, '-')
+            // ^ No longer needed because it'll be filtered at the file writing stage.
 
             // If they ask for too many pixels, only let them generate one image at a time.
             let settings = {

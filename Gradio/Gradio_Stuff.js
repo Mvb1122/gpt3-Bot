@@ -85,13 +85,12 @@ async function ImageToImageFromPath(ImagePath, Settings) {
  * @param {{prompt: String, scale: Number}} Settings Settings for upscaling.
  */
 async function ImageToImageFromSharp(Image, Settings, MakeSeed = true) {
-    
     return new Promise(async (resolve, reject) => {
         let meta = await Image.metadata();
         
         if (MakeSeed || Settings.seed == undefined)
-            Settings.seed = GenerateSeed();
-
+        Settings.seed = GenerateSeed();
+    
         Settings.init_images = [Image];
 
         Settings.resize_mode = 0;
@@ -117,6 +116,8 @@ async function ImageToImageFromSharp(Image, Settings, MakeSeed = true) {
                 .then(async e => {
                     // Include the seed to prevent sending back the same image.
                     const path = `./Images/${prompt.substring(0, 100)}_${Settings.seed}-${scale}x.png`;
+                    // Sanatize path.
+                    path = path.replace(/[/\\?%*:|"<>]/g, '-')
                     await (e.image.toFile(path))
                     resolve(path)
                 })
@@ -226,6 +227,9 @@ async function PredictContent(Input, MakeSeed = true) {
     
             const end = `_${Input.seed}.png`;
             const Path = `./Images/${Input.prompt.replace(/[/\\?%*:|"<>]/g, '_').substring(0, 100)}${end}`;
+            
+            // Sanatize path.
+            Path = Path.replace(/[/\\?%*:|"<>]/g, '-')
     
             result
                 .then(async () => {
