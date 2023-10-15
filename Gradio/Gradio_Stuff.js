@@ -115,9 +115,9 @@ async function ImageToImageFromSharp(Image, Settings, MakeSeed = true) {
             FetchApp().img2img(Settings)
                 .then(async e => {
                     // Include the seed to prevent sending back the same image.
-                    const path = `./Images/${prompt.substring(0, 100)}_${Settings.seed}-${scale}x.png`;
-                    // Sanatize path.
-                    path = path.replace(/[/\\?%*:|"<>]/g, '-')
+                    const path = `./Images/${prompt.substring(0, 100)}_${Settings.seed}-${scale}x.png`
+                        // Sanatize path!
+                        .replace(/[/\\?%*:|"<>]/g, '-')
                     await (e.image.toFile(path))
                     resolve(path)
                 })
@@ -226,10 +226,10 @@ async function PredictContent(Input, MakeSeed = true) {
             const result = FetchApp().txt2img(Input);
     
             const end = `_${Input.seed}.png`;
-            const Path = `./Images/${Input.prompt.replace(/[/\\?%*:|"<>]/g, '_').substring(0, 100)}${end}`;
+            const Path = `./Images/${Input.prompt.replace(/[/\\?%*:|"<>]/g, '_').substring(0, 100)}${end}`
+                // Sanatize path!
+                .replace(/[/\\?%*:|"<>]/g, '-')
             
-            // Sanatize path.
-            Path = Path.replace(/[/\\?%*:|"<>]/g, '-')
     
             result
                 .then(async () => {

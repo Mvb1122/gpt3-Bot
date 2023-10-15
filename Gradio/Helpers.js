@@ -44,7 +44,7 @@ function Download(url, outputPath) {
 const Keywords = [
     {
         keyword: "Micah",
-        content: " Also, remember that Micah is a girl who wears thighhighs all the time. She also has the tags long_hair, and black_hair, and red_eyes. Sometimes she wears a serafuku. In casual scenerios, she should be drawn wearing casual clothes, so basically just draw a sweater or something, it's up to you."
+        content: " Also, remember that Micah is a girl who wears thighhighs all the time. She also has the tags long_hair, and black_hair, and red_eyes. Sometimes she wears a serafuku. In casual scenerios, she should be drawn wearing casual clothes, so basically just draw a sweater or something, it's up to you. If specific clothing (eg; a swimsuit or a suit) is asked for, use that instead of a serafuku or a sweater."
     }
 ]
 
@@ -61,7 +61,7 @@ function GetMessageForGPTTalkingAboutTags(Plain) {
     ]
 
     Keywords.forEach(keyword => {
-        if (Plain.toLowerCase().includes(keyword.keyword))
+        if (Plain.toLowerCase().includes(keyword.keyword.toLowerCase()))
             Messages[0].content += keyword.content
     })
 
