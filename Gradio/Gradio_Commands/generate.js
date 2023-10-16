@@ -1,5 +1,5 @@
 //Ignore ts(80001)
-const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
+const { SlashCommandBuilder, CommandInteraction, Message } = require('discord.js');
 const Gradio = require('../Gradio_Stuff.js')
 const fs = require('fs')
 
@@ -61,6 +61,13 @@ module.exports = {
                 .setMinValue(1)
                 // .setMaxValue(1.4);
         })
+
+        // Notification stuff.
+        .addBooleanOption(option => {
+            return option.setName("notify")
+            .setDescription("Pings you when it's done generating.")
+            .setRequired(false)
+        })
         ,
 
     /**
@@ -70,7 +77,7 @@ module.exports = {
     async execute(interaction) {
         /** @type {Boolean} */
         let IsMessageEphemeral = interaction.options.getBoolean("ephemeral") ?? false;
-
+        
         // Tell Discord that we're thinking right away to keep them from assuming we're offline. (Also tell them if we're being sneaky.)
         await interaction.deferReply({ephemeral: IsMessageEphemeral});
 
@@ -251,6 +258,24 @@ module.exports = {
                                 });
                             } else DeleteFiles();
 
+                            // If the user wants to be notified, notify them.
+                            let Notify = interaction.options.getBoolean("notify") ?? false
+                            if (Notify) {
+                                const userId = interaction.user.id;
+                                /**
+                                 * @type {Message}
+                                 */
+                                let notify = interaction.channel.send(`<@${userId}> Your images are done generating!`)
+                                    
+                                notify.then(() => {
+                                        // After 10 seconds, delete the ping. 
+                                        setTimeout(async () => {
+                                            notify = await notify;
+                                            if (notify.deletable)
+                                                notify.delete();
+                                        }, 10000)
+                                    })
+                            }
                         })
                 })
             } catch (e) {

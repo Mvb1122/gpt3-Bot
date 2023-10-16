@@ -310,6 +310,18 @@ module.exports = {
                                     });
                                 } else DeleteFiles();
     
+                                // If the user wants to be notified, notify them.
+                                let Notify = interaction.options.getBoolean("notify") ?? false
+                                if (Notify) {
+                                    const userId = interaction.user.id;
+                                    interaction.channel.send(`<@${userId}> Your images are done generating!`)
+                                        .then(message => {
+                                            // After 10 seconds, delete the ping. 
+                                            setTimeout((message) => {
+                                                message.delete();
+                                            }, 10000)
+                                        })
+                                }
                             })
                     })
                 } catch (e) {
