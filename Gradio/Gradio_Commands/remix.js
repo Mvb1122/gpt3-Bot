@@ -152,9 +152,11 @@ module.exports = {
                 const count = height * width;
 
                 // How much larger/smaller is it than our default? Scale to it.
-                // console.log(`BEFORE Height: ${height} Width: ${width}, Count: ${height * width}`)
-                const scalar = Math.sqrt(Gradio.PixelCountLimit / count);
-                // console.log(`Scalar ${scalar}`);
+                    // For speed, scale to 80% of the pixelcountlimit.
+                const scalar = Math.sqrt( 
+                    (Gradio.PixelCountLimit * 0.8) / count 
+                );
+
                 height *= scalar;
                 width *= scalar;
 
