@@ -176,7 +176,7 @@ module.exports = {
 
         if (Gradio.isConnected()) {
             if (UsingGPTTags)
-                content += "Using ChatGPT tags: ```" + prompts + "```";
+                content += "Using ChatGPT tags: ```" + prompts + "```\nOriginal Prompt: ```" + interaction.options.getString("prompts") + "```";
 
             // If we're asked to make it secret, be secret.
             if (IsMessageEphemeral) UseMessage = false;
