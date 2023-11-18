@@ -13,7 +13,7 @@
     "@gradio/client": "^0.3.1",
     "a1111-webui-api": "^1.0.0",
     "dictionary-en-us": "^3.0.0",
-    "discord.js": "^14.11.0",
+    "discord.js": "^14.14.1",
     "google-search-results-nodejs": "^2.1.0",
     "gpt-3-encoder": "^1.1.4",
     "html-to-text": "^9.0.5",
