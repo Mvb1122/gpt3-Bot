@@ -59,7 +59,7 @@ module.exports = {
             return option.setName("scalefactor")
                 .setDescription("How much to upscale by.")
                 .setMinValue(1)
-                // .setMaxValue(1.4);
+                .setMaxValue(2);
         })
 
         // Notification stuff.

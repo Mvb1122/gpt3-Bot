@@ -68,7 +68,7 @@ module.exports = {
             return option.setName("scalefactor")
                 .setDescription("How much to upscale by.")
                 .setMinValue(1)
-                // .setMaxValue(1.4);
+                .setMaxValue(2);
         })
         ,
 
@@ -275,6 +275,9 @@ module.exports = {
                         
                         // Also send the original image, if it's still around.
                         let MessageContent = `Generated! Tags:\n\`\`\`${prompts}\`\`\``;
+                        if (UsingGPTTags)
+                            MessageContent += "\nOriginal Prompt: ```" + interaction.options.getString("prompts") + "```";
+
                         if (fs.existsSync(UserImagePath))
                             GeneratedImagesPaths.push(UserImagePath);
                         else {
