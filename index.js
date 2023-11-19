@@ -1232,14 +1232,14 @@ async function listener(req, res) {
     // Once the request is done with, ask the AI the question.
     req.on('end', () => {
       const data = JSON.parse(Buffer.concat(binary_data));
-
+      console.log(`Web request message: ${data.role} says ${data.content}`);
       // Ask the AI.
       const messages = NewMessage(data.role, data.content, undefined);
       GetSafeChatGPTResponse(messages, null, 0, false)
         .then(response => {
+          console.log(`Response: ${response.data.choices[0].message.content}`)
           res.end(JSON.stringify(response.data.choices[0].message));
         })
-
     })
   } else {
     // If this wasn't a post request, just send back the demo page.
