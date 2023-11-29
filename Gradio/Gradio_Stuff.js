@@ -112,7 +112,7 @@ async function ImageToImageFromSharp(Image, Settings, MakeSeed = true) {
         const prompt = `${Settings.prompt}`;
 
         try {
-            FetchApp().img2img(Settings)
+            (await FetchApp()).img2img(Settings)
                 .then(async e => {
                     // Include the seed to prevent sending back the same image.
                     const path = "./Images/" + `${prompt.substring(0, 100)}_${Settings.seed}-${scale}x.png`
@@ -136,8 +136,9 @@ function GetTagsFromImage(path) {
     // Load image. 
     return new Promise(async (resolve, reject) => {
         try {
+            const App = await FetchApp();
             let ImageSharp = await new sharp(path)
-            FetchApp().interrogate(ImageSharp, "deepdanbooru")
+            App.interrogate(ImageSharp, "deepdanbooru")
                 .then(async val => {
                     resolve(await val.response.data.caption);
                 })
@@ -149,18 +150,30 @@ function GetTagsFromImage(path) {
 
 // Returns a random generator, that isn't the last one we used.
 let LastIndex = -1;
-function FetchApp() {
-    let index = Math.floor(Math.random() * apps.length)
-    if (index == LastIndex && apps.length > 1) return FetchApp();
+/**
+ * 
+ * @returns {Promise<StableDiffusionApi>}
+ */
+async function FetchApp() {
+    return new Promise(async (resolve) => {
+        let index = Math.floor(Math.random() * apps.length)
+        if (index == LastIndex && apps.length > 1) resolve(await FetchApp());
 
-    LastIndex = index;
-    return apps[index];
+        // If this server has more than four jobs and we can reroll, reroll.
+        if (apps.length > 1 && (await apps[index].getProgress()).state.job_count >= 4) {
+            resolve(await FetchApp())
+        } else {
+            LastIndex = index;
+            resolve(apps[index]);
+        }
+    })
+    
 }
 
 async function IsConnected() {
     if (apps.length > 0) {
         try {
-            await FetchApp().waitForReady()
+            await (await FetchApp()).waitForReady()
             return true;
         } catch (e) {
             return false;
@@ -223,7 +236,7 @@ async function PredictContent(Input, MakeSeed = true) {
             // If there's \n characters in the prompt, replace them with commas.
             Input.prompt.replaceAll("\n", ", ")
             // Get image result from generator server.
-            const result = FetchApp().txt2img(Input);
+            const result = (await FetchApp()).txt2img(Input);
     
             const end = `_${Input.seed}.png`;
             const Path = "./Images/" + `${Input.prompt.replace(/[/\\?%*:|"<>]/g, '_').substring(0, 100)}${end}`
