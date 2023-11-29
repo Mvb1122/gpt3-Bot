@@ -26,13 +26,14 @@ module.exports = {
         const attachment = interaction.options.getAttachment("image")
         const name = attachment.name
         const url = attachment.url
+        let path = `./Images/${name}`;
 
         if (!ImageIsValid(name))
             return interaction.editReply("You provided a non-supported image. Here are the supported types: ```" + NonSplitTypes + "```")
 
         try {
             // Download image.
-            let path = await Download(url, `./Images/${name}`);
+            path = await Download(url, path);
             let tags = await Gradio.GetTagsFromImage(path);
             interaction.editReply({content: "Tags:\n```" + tags + "```", files: [path]})
                 .then(() => {
@@ -40,6 +41,7 @@ module.exports = {
                 })
         } catch (e) {
             interaction.editReply("Something went wrong! You probably provided an invalid image. Error: ```" + e.name + "```");
+            console.log(e);
             fs.unlink(path, (e) => {if(e)console.log(e)});
         }
     },
