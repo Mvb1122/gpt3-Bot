@@ -885,7 +885,7 @@ client.once('ready', () => {
   client.user.setActivity("gpt3");
   console.log("Ready.")
 
-  let commands = ["./CreateMemoryThread.js", "./Ask.js", "./SetBase.js", "./FetchBase.js", "./ToggleMemory.js", "./Recover.js"];
+  let commands = ["./CreateMemoryThread.js", "./Ask.js", "./SetBase.js", "./FetchBase.js", "./ToggleMemory.js", "./Recover.js", "./Clear.js"];
 
   // Auto add all files in the Gradio_Commmands directory.
   const GradioPath = "./Gradio/Gradio_Commands/";
