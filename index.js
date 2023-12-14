@@ -65,17 +65,58 @@ function GetBaseIdFromChannel(channel) {
   }
 }
 
+function FetchUserBaseJSON(id) {
+  let basic = {
+    base: "",
+    persona: ""
+  }
+
+  if (fs.existsSync(`./${id}_Base.json`)) {
+    basic = JSON.parse(fs.readFileSync(`./${id}_Base.json`));
+  }
+
+  return basic;
+}
+
 function UpdateUserBase(id, text) {
-  let Persist = {};
   // Get preexisting data.
-  try {
-    Persist = JSON.parse(fs.readFileSync(`./${id}_Base.json`));
-  } catch (e) {;}
+  let Persist = FetchUserBaseJSON(id);
 
   // Update it with the new base and write it.
   Persist.base = text
-  fs.writeFileSync(`./${id}_Base.json`, JSON.stringify(Persist), (e) => { });
+  fs.writeFile(`./${id}_Base.json`, JSON.stringify(Persist), (e) => { });
+  return;
 }
+
+function UpdateUserPersona(id, text, Nickname = undefined) {
+  // Get preexisting data.
+  let Persist = FetchUserBaseJSON(id);
+
+  // Update it with the new base and write it.
+  Persist.persona = text
+
+  // Put it onto the Persona array immediately.
+  PersonaArray[Nickname != undefined ? Nickname : id] = text;
+
+  // Return a promise which resolves after the file has been written *and* after the full arrays have been updated.
+  return new Promise(res => {
+    fs.writeFile(`./${id}_Base.json`, JSON.stringify(Persist), (e) => {
+      UpdatePersonaArray().then(res);
+    });
+  })
+}
+
+function FetchUserPersona(Search) {
+  if (PersonaArray[Search] != undefined)
+    return PersonaArray[Search];
+  else {
+    // Assume that they don't have a base.
+    return "";
+  }
+}
+
+// Loaded after boot.
+let PersonaArray = {};
 
 /** @param {Discord.Channel} channel */
 function IsChannelMemory(channel) {
@@ -885,7 +926,7 @@ client.once('ready', () => {
   client.user.setActivity("gpt3");
   console.log("Ready.")
 
-  let commands = ["./CreateMemoryThread.js", "./Ask.js", "./SetBase.js", "./FetchBase.js", "./ToggleMemory.js", "./Recover.js", "./Clear.js"];
+  let commands = ["./CreateMemoryThread.js", "./Ask.js", "./SetBase.js", "./FetchBase.js", "./ToggleMemory.js", "./Recover.js", "./Clear.js", "./FetchPersona.js", "./SetPersona.js"];
 
   // Auto add all files in the Gradio_Commmands directory.
   const GradioPath = "./Gradio/Gradio_Commands/";
@@ -932,6 +973,9 @@ client.once('ready', () => {
     }
   })();
   //#endregion
+  //#endregion
+  //#region Load PersonaArray on boot.
+  UpdatePersonaArray();
 })
 
 // { "ChannelNum": "base stuff here"}
@@ -956,10 +1000,51 @@ module.exports = {
   ClearAll,
   UpdateUserBase,
   fetchRootBase,
-  Recover
+  Recover,
+  FetchUserPersona,
+  UpdateUserPersona,
+  PersonaArray
 }
 
 const cmt = require('./CreateMemoryThread.js')
+
+async function UpdatePersonaArray() {
+  return new Promise((resolve) => {
+    fs.readdirSync("./").forEach(file => {
+      if (file.includes("_Base.json")) {
+        fs.readFile(`./${file}`, (err, data) => {
+          const json = JSON.parse(data);
+          const userID = file.substring(0, file.indexOf("_"));
+          PersonaArray[userID] = json.persona;
+  
+          // Get user's guilds
+          const guilds = client.guilds.cache.forEach(async (guild) => {
+            const isMember = await guild.members.fetch(userID).then(() => true).catch(() => false);
+            if (isMember) {
+              const userOnGuild = guild.members.cache.get(userID);
+              const nick = userOnGuild.nickname;
+              if (nick != undefined) {
+                PersonaArray[nick] = json.persona;
+              }
+  
+  
+              // Also do username.
+              PersonaArray[userOnGuild.user.globalName] = json.persona;
+            }
+          });
+        });
+      }
+    });
+  
+    /*
+    setTimeout(() => {
+      console.log(PersonaArray);
+      console.log(FetchUserPersona());
+    }, 3000);
+    */
+    resolve();
+  })
+}
 
 async function CreateMemoryThread(message) {
   return await cmt.CreateMemoryThread(AttachDataToObject(message));
@@ -1184,8 +1269,9 @@ const SetBase = require('./SetBase');
 1: Main PC Both GPUs
 2: Server Only
 3: Main PC Both GPUs + Server
+4: Main PC Main
 */
-Gradio.ConnectToPreset(2);
+Gradio.ConnectToPreset(4);
 
 //#region Gradio Demo generate.
 /*

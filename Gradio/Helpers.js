@@ -41,18 +41,11 @@ function Download(url, outputPath) {
     })
 }
 
-const Keywords = [
-    {
-        keyword: "Micah",
-        content: " Also, remember that Micah is a girl who wears thighhighs all the time. She also has the tags long_hair, and black_hair, and red_eyes. Sometimes she wears a serafuku. In casual scenerios, she should be drawn wearing casual clothes, so basically just draw a sweater or something, it's up to you. If specific clothing (eg; a swimsuit or a suit) is asked for, use that instead of a serafuku or a sweater."
-    }
-]
-
 /**
  * @param {String} Plain The plaintext input.
  * @returns {{role: string;content: string;}[]} The message for the AI. 
  */
-function GetMessageForGPTTalkingAboutTags(Plain) {
+function GetMessageForGPTTalkingAboutTags(Plain, id = undefined) {
     let Messages = [
         {
             role: "system",
@@ -60,10 +53,17 @@ function GetMessageForGPTTalkingAboutTags(Plain) {
         }
     ]
 
-    Keywords.forEach(keyword => {
-        if (Plain.toLowerCase().includes(keyword.keyword.toLowerCase()))
-            Messages[0].content += keyword.content
+    const LowerCasePlain = Plain.toLowerCase();
+    Object.keys(Index.PersonaArray).forEach(key => {
+        if (LowerCasePlain.includes(key.toLowerCase()) || key == id) {
+            Messages[0].content += ` ${Index.PersonaArray[key]}`
+        }
     })
+
+    // If they say "me," add them in.
+    if (id != undefined && Index.PersonaArray[id] != undefined && !Messages[0].content.includes(Index.PersonaArray[id]) && LowerCasePlain.includes("me")) {
+        Messages[0].content += ` ${Index.PersonaArray[id]}`
+    }
 
     // Call me hitler but I don't like child porn.
     if (Plain.includes("child") && Plain.includes("penis")) 
@@ -78,8 +78,8 @@ function GetMessageForGPTTalkingAboutTags(Plain) {
  * @returns {String} A peice of text saying what tags represent the passed string.
  * @see {Index.GetSafeChatGPTResponse}
  */
-async function GetPromptsFromPlaintextUsingGPT(Plain) {
-    let messages = GetMessageForGPTTalkingAboutTags(Plain)
+async function GetPromptsFromPlaintextUsingGPT(Plain, id = undefined) {
+    let messages = GetMessageForGPTTalkingAboutTags(Plain, id)
 
     const ResponseFromGPT = (await Index.GetSafeChatGPTResponse(messages, null, null, false)).data.choices[0];
     /**

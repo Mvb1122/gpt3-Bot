@@ -28,7 +28,7 @@ module.exports = {
   /**
    * Code run when the module is executed.
    * @param {{content: String, count: Number}} parameters Parameters from AI.
-   * @param {Discord.Message} DiscordMessage 
+   * @param {Discord.CommandInteraction} DiscordMessage 
    */
   async execute(parameters, DiscordMessage) {
     if (parameters.content == undefined) {
@@ -42,7 +42,7 @@ module.exports = {
 
     // Get tags.
     new Promise((resolve) => {
-      GetTags(parameters.content).then(async tags => {
+      GetTags(parameters.content, DiscordMessage.user.id).then(async tags => {
         let generating = await (DiscordMessage.channel.send(`Generating ${parameters.count} image${(parameters.count > 1) ? "s" : ""}` + "... Tags: ```" + tags + "```"));
 
         /**

@@ -106,7 +106,7 @@ module.exports = {
         // If this prompt doens't contain any tags, use the AI to make some.
         let UsingGPTTags = false;
         if (autotag) { 
-            prompts = (await GetPromptsFromPlaintextUsingGPT(prompts));
+            prompts = (await GetPromptsFromPlaintextUsingGPT(prompts, interaction.user.id));
             UsingGPTTags = true;
             UseMessage = true;
         }
