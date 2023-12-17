@@ -1271,7 +1271,7 @@ const SetBase = require('./SetBase');
 3: Main PC Both GPUs + Server
 4: Main PC Main
 */
-Gradio.ConnectToPreset(4);
+Gradio.ConnectToPreset(2);
 
 //#region Gradio Demo generate.
 /*
@@ -1284,7 +1284,7 @@ for (let i = 0; i < 3; i++) {
 */
 //#endregion
 
-//#region Gradio Tag Generation Stuff
+//#region Gradio Tag Generation Debug Stuff
 /*
   // Make an image and then try to get its tags.
 const debugImagePath = `./Images/1girl, absurdres, thighhighs_1156489048.png`

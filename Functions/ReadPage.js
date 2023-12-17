@@ -37,7 +37,11 @@ module.exports = {
             DiscordMessage.channel.send(`Fetching <${parameters.url}>!`)
 
           // Download page.
-          await Download(parameters.url, path);
+          try {
+            await Download(parameters.url, path);
+          } catch (e) {
+            fs.writeFileSync(path, `Error: ${e}`)
+          }
           const page = fs.readFileSync(path).toString();
 
           // Parse to just text.
