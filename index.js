@@ -437,6 +437,7 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
         functions = GetFunctions(messages);
       else
         functions = []
+      
       if (functions.length > 0) {
         requestData.function_call = "auto";
         requestData.functions = functions;
@@ -653,13 +654,24 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
           console.log(newMessage.function_call.arguments);
         }
   
-        let returnedFromFunction = await (func(JSON.parse(newMessage.function_call.arguments), DiscordMessage));
-
-        messages.push({
-          role: "function",
-          name: newMessage.function_call.name,
-          content: returnedFromFunction
-        })
+        let params = {}, returnedFromFunction;
+        try {
+          params = JSON.parse(newMessage.function_call.arguments);
+          returnedFromFunction = await (func(params, DiscordMessage));
+  
+          messages.push({
+            role: "function",
+            name: newMessage.function_call.name,
+            content: returnedFromFunction
+          })
+        } catch (error) {
+          returnedFromFunction = "{\"successful\": false, \"reason\":\"Invalid JSON passed! Please retry.\"}";
+          messages.push({
+            role: "function",
+            name: newMessage.function_call.name,
+            content: returnedFromFunction
+          })
+        }
         /*
         console.log("Returned from function:");
         console.log(returnedFromFunction);

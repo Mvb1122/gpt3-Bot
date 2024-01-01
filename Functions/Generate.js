@@ -42,7 +42,7 @@ module.exports = {
 
     // Get tags.
     new Promise((resolve) => {
-      GetTags(parameters.content, DiscordMessage.user.id).then(async tags => {
+      GetTags(parameters.content, DiscordMessage.user != null ? DiscordMessage.user.id : undefined).then(async tags => {
         let generating = await (DiscordMessage.channel.send(`Generating ${parameters.count} image${(parameters.count > 1) ? "s" : ""}` + "... Tags: ```" + tags + "```"));
 
         /**

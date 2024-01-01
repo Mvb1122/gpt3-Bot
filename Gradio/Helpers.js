@@ -55,15 +55,22 @@ function GetMessageForGPTTalkingAboutTags(Plain, id = undefined) {
 
     const LowerCasePlain = Plain.toLowerCase();
     Object.keys(Index.PersonaArray).forEach(key => {
-        if (LowerCasePlain.includes(key.toLowerCase()) || key == id) {
+        if (LowerCasePlain.includes(key.toLowerCase())) {
             Messages[0].content += ` ${Index.PersonaArray[key]}`
+            if (Index.DEBUG)
+                console.log(`Including ${key}`)
         }
     })
 
     // If they say "me," add them in.
     if (id != undefined && Index.PersonaArray[id] != undefined && !Messages[0].content.includes(Index.PersonaArray[id]) && LowerCasePlain.includes("me")) {
         Messages[0].content += ` ${Index.PersonaArray[id]}`
+        if (Index.DEBUG)
+            console.log("Including user's own persona.")
     }
+
+    if (Index.DEBUG)
+        console.log(Messages[0]);
 
     // Call me hitler but I don't like child porn.
     if (Plain.includes("child") && Plain.includes("penis")) 
