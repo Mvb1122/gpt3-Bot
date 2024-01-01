@@ -24,7 +24,7 @@ module.exports = {
      * @param {CommandInteraction} interaction 
      */
     async execute(interaction) {
-        interaction.deferReply();
+        await interaction.deferReply();
         if (interaction.member == null) interaction.member = interaction.user;
         let username;
         try {
