@@ -1354,3 +1354,11 @@ server.listen(port, host, () => {
   console.log(`Server is running on http://${host}:${port}`);
 });
 //#endregion
+
+// If we're not in debug mode, ignore all errors. 
+if (!DEBUG) {
+  process.on('uncaughtException', function(err) {
+    console.log('Caught exception: ');
+    console.log(err);
+  });
+}
