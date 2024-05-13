@@ -13,6 +13,8 @@
     "@gradio/client": "^0.3.1",
     "@xenova/transformers": "^2.17.1",
     "a1111-webui-api": "^1.0.0",
+    "canvas": "^2.11.2",
+    "color": "^4.2.3",
     "dictionary-en-us": "^3.0.0",
     "discord.js": "^14.14.1",
     "google-search-results-nodejs": "^2.1.0",
