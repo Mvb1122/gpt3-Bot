@@ -1,6 +1,7 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction, Message } = require('discord.js');
 const fs = require('fs')
+const { DEBUG } = require('.');
 
 const pos = ["It is certain", "It is decidedly so", "Without a doubt", "Yes definitely", "You may rely on it", "As I see it, yes", "Most likely", "Outlook good", "Yes", "Signs point to yes"];
 const nc = ["Reply hazy, try again", "Ask again later", "Better not tell you now", "Cannot predict now", "Concentrate and ask again"];
@@ -17,12 +18,24 @@ async function Preload() {
     // Preloading the ball image makes the image generation take about 1ms as opposed to like 15ms.
     fs.readFile("./8ball.png", (e, d) => {
         BallBuffer = d;
+
+        // Test making image.
+        if (DEBUG) {
+            const sentiment = all[Math.floor(Math.random() * all.length)]
+            const answer = sentiment[Math.floor(Math.random() * sentiment.length)];
+            const path = "./Temp/test.png";
+            MakeImage(answer, path);
+    
+            setTimeout(() => {
+                fs.unlinkSync(path);
+            }, 5000);
+        }
     })
 }
 Preload();
 
 // Use sharp to make an image.
-const sharp = require('sharp')
+const sharp = require('sharp');
 /**
  * @param {String} Text Input text to go on the ball.
  * @param {String} path Path to save to.
@@ -41,14 +54,17 @@ async function MakeImage(Text, path) {
 
     // Create text svg.
     const svg = `
-    <svg width="500" height="500">
+    <svg width="500">
         <style>
-        .title { 
-            fill: #5BCEFA; 
-            font-size: 80px; 
-            font-weight: bold; 
+        .title {
+            fill: #5BCEFA;
+            font-size: 80px;
+            font-weight: bold;
             font-family: "sans serif";
             white-space: break-spaces;
+            paint-order: stroke;
+            stroke: white;
+            stroke-width: 10px;
         }
         </style>
         <text y="0" text-anchor="middle" class="title">${Text}</text>
