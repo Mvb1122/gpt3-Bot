@@ -52,7 +52,7 @@ module.exports = {
           console.log(`File Length: ${StartLength}`)
 
           if (DiscordMessage != null && StartLength > 1000 && StartLength < 10000) {
-            let Cost = (StartLength * 0.000003);
+            let Cost = (StartLength * 0.0000005);
             Cost = Cost.toFixed(2);
             DiscordMessage.channel.send("Just if you were curious... I had to pay $" + Cost + " to get the AI to read this page...")
           }

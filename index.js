@@ -71,7 +71,7 @@ function FetchUserBaseJSON(id) {
     persona: ""
   }
 
-  if (fs.existsSync(`./${id}_Base.json`)) {
+  if (fs.existsSync(`./users/${id}_Base.json`)) {
     basic = JSON.parse(fs.readFileSync(`./${id}_Base.json`));
   }
 
@@ -84,7 +84,7 @@ function UpdateUserBase(id, text) {
 
   // Update it with the new base and write it.
   Persist.base = text
-  fs.writeFile(`./${id}_Base.json`, JSON.stringify(Persist), (e) => { });
+  fs.writeFile(`./users/${id}_Base.json`, JSON.stringify(Persist), (e) => { });
   return;
 }
 
@@ -100,7 +100,7 @@ function UpdateUserPersona(id, text, Nickname = undefined) {
 
   // Return a promise which resolves after the file has been written *and* after the full arrays have been updated.
   return new Promise(res => {
-    fs.writeFile(`./${id}_Base.json`, JSON.stringify(Persist), (e) => {
+    fs.writeFile(`./users/${id}_Base.json`, JSON.stringify(Persist), (e) => {
       UpdatePersonaArray().then(res);
     });
   })
@@ -733,7 +733,7 @@ const rootBase = "You will not use functions unless they are specifically asked 
 function fetchUserBase (id) {
   try {
     /** @type {string} */
-    const userbase = JSON.parse(fs.readFileSync(`./${id}_Base.json`)).base + "\n";
+    const userbase = JSON.parse(fs.readFileSync(`./users/${id}_Base.json`)).base + "\n";
     return rootBase + userbase.trim();
   } catch (e) {
     console.log(e);
@@ -938,7 +938,7 @@ client.once('ready', () => {
   client.user.setActivity("gpt3");
   console.log("Ready.")
 
-  let commands = ["./CreateMemoryThread.js", "./Ask.js", "./SetBase.js", "./FetchBase.js", "./ToggleMemory.js", "./Recover.js", "./Clear.js", "./FetchPersona.js", "./SetPersona.js"];
+  let commands = ["./CreateMemoryThread.js", "./Ask.js", "./SetBase.js", "./FetchBase.js", "./ToggleMemory.js", "./Recover.js", "./Clear.js", "./FetchPersona.js", "./SetPersona.js", "./8ball.js"];
 
   // Auto add all files in the Gradio_Commmands directory.
   const GradioPath = "./Gradio/Gradio_Commands/";
@@ -1022,9 +1022,9 @@ const cmt = require('./CreateMemoryThread.js')
 
 async function UpdatePersonaArray() {
   return new Promise((resolve) => {
-    fs.readdirSync("./").forEach(file => {
+    fs.readdirSync("./users/").forEach(file => {
       if (file.includes("_Base.json")) {
-        fs.readFile(`./${file}`, (err, data) => {
+        fs.readFile(`./users/${file}`, (err, data) => {
           const json = JSON.parse(data);
           const userID = file.substring(0, file.indexOf("_"));
           PersonaArray[userID] = json.persona;
