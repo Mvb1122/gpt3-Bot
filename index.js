@@ -443,7 +443,14 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
         requestData.functions = functions;
       }
     
-      resolve(await openai.createChatCompletion(requestData));
+      const data = await openai.createChatCompletion(requestData)
+      
+      // For safety, prevent @everyone and @here.
+      if (data.data.choices[0].message.content != undefined) {
+        data.data.choices[0].message.content = data.data.choices[0].message.content.replaceAll("@everyone", "@ everyone")
+        data.data.choices[0].message.content = data.data.choices[0].message.content.replaceAll("@here", "@ here")
+      }
+      resolve(data);
     } catch (e) {
       if (DiscordMessage != null && numReps == 0)
         DiscordMessage.channel.send("Request to AI failed, Retrying...") 
@@ -933,6 +940,9 @@ function AttachDataToObject(obj) {
 //#endregion
 
 //#region Discord Stuff
+/**
+ * @type {[{ data: Omit<SlashCommandBuilder, "addSubcommand" | "addSubcommandGroup">; execute(interaction: CommandInteraction): Promise<Message<boolean>>; OnMessageRecieved(message: any): Promise<...>;}]}
+ */
 let SlashCommands = [];
 client.once('ready', () => {
   client.user.setActivity("gpt3");
@@ -1103,6 +1113,13 @@ client.on('messageCreate',
       } 
     */
     //#endregion
+
+    // Run function command handlers if there are any.
+    for (let i = 0; i < SlashCommands.length; i++) {
+      if (SlashCommands[i].OnMessageRecieved != undefined) {
+        SlashCommands[i].OnMessageRecieved(message);
+      }
+    }
 
     // Allow the user to set their base. 
     const SetBaseCommand = "g!setbase";
