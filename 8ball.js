@@ -54,20 +54,21 @@ async function MakeImage(Text, path) {
 
     // Create text svg.
     const svg = `
-    <svg width="500">
+    <svg height="500" width="500">
         <style>
         .title {
             fill: #5BCEFA;
             font-size: 80px;
             font-weight: bold;
-            font-family: "sans serif";
+            font-family: sans-serif;
             white-space: break-spaces;
             paint-order: stroke;
             stroke: white;
             stroke-width: 10px;
         }
         </style>
-        <text y="0" text-anchor="middle" class="title">${Text}</text>
+
+        <text y="0" text-anchor="middle" dy="0.4em" class="title">${Text}</text>
     </svg>`
     const SVGBuffer = Buffer.from(svg)
 
@@ -144,7 +145,7 @@ module.exports = {
         MakeImage(answer, path).then(() => {
             // Save to temp folder and then send it off.
             interaction.editReply({content: `${QuestionStarter}My prediction is... **${answer}**!`, files: [path]}).then(() => {
-                // Delete it.
+                // Delete the image.
                 fs.unlink(path, (err) => {if (err) console.log(err)});
             })
         })
