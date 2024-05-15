@@ -10,6 +10,7 @@
   "keywords": [],
   "description": "",
   "dependencies": {
+    "@discordjs/voice": "^0.17.0",
     "@gradio/client": "^0.3.1",
     "@xenova/transformers": "^2.17.1",
     "a1111-webui-api": "^1.0.0",
@@ -17,6 +18,7 @@
     "color": "^4.2.3",
     "dictionary-en-us": "^3.0.0",
     "discord.js": "^14.14.1",
+    "ffmpeg-static": "^5.2.0",
     "google-search-results-nodejs": "^2.1.0",
     "gpt-3-encoder": "^1.1.4",
     "html-to-text": "^9.0.5",
@@ -25,6 +27,8 @@
     "openai": "^3.2.1",
     "openai-api": "^1.2.1",
     "sharp": "^0.32.6",
-    "update": "^0.7.4"
+    "tweetnacl": "^1.0.3",
+    "update": "^0.7.4",
+    "wavefile": "^11.0.0"
   }
 }

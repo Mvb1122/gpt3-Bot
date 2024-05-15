@@ -13,7 +13,8 @@ const client = new Discord.Client({
     Discord.GatewayIntentBits.Guilds,
     Discord.GatewayIntentBits.GuildMessages,
     Discord.GatewayIntentBits.MessageContent,
-    Discord.GatewayIntentBits.GuildMembers
+    Discord.GatewayIntentBits.GuildMembers,
+    Discord.GatewayIntentBits.GuildVoiceStates
   ],
 });
 const BaseAddress = "./ActiveBases.json";
@@ -948,7 +949,22 @@ client.once('ready', () => {
   client.user.setActivity("gpt3");
   console.log("Ready.")
 
-  let commands = ["./CreateMemoryThread.js", "./Ask.js", "./SetBase.js", "./FetchBase.js", "./ToggleMemory.js", "./Recover.js", "./Clear.js", "./FetchPersona.js", "./SetPersona.js", "./8ball.js"];
+  let commands = [
+    "./CreateMemoryThread.js", 
+    "./Ask.js", 
+    "./SetBase.js", 
+    "./FetchBase.js", 
+    "./ToggleMemory.js", 
+    "./Recover.js", 
+    "./Clear.js", 
+    "./FetchPersona.js", 
+    "./SetPersona.js", 
+    "./8ball.js", 
+    "./Voice.js",
+    "./Transcribe.js",
+    "./TTSToVC.js",
+    "./StopTTS.js"
+  ];
 
   // Auto add all files in the Gradio_Commmands directory.
   const GradioPath = "./Gradio/Gradio_Commands/";
@@ -964,7 +980,7 @@ client.once('ready', () => {
       SlashCommands.push(Module);
       CommandJSON.push(Module.data.toJSON());
     } else {
-      console.log(`[WARNING] The command at ${command} is missing a required "data" or "execute" property.`);
+      console.warn(`[WARNING] The command at ${command} is missing a required "data" or "execute" property.`);
     }
   });
 

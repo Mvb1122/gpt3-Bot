@@ -97,7 +97,7 @@ module.exports = {
         */
 
         // Download the image.
-        const attachment = interaction.options.getAttachment("image")
+        const attachment = interaction.options.getAttachment("image");
         // Name images randomly to keep from overwring same requests or whatever.
         const name = /* Math.floor(Math.random() * 10000) + */ attachment.name;
         const url = attachment.url
