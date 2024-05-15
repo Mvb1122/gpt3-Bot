@@ -1,7 +1,6 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
-const Index = require ('./index.js');
-const fs = require('fs');
+const Index = require ('../index.js');
 
 
 module.exports = {

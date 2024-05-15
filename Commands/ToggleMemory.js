@@ -1,6 +1,6 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
-const { IsChannelMemory, ClearAll, bases, GetBaseIdFromChannel } = require('./index.js');
+const { IsChannelMemory, ClearAll, bases, GetBaseIdFromChannel } = require('../index.js');
 
 
 

@@ -949,22 +949,13 @@ client.once('ready', () => {
   client.user.setActivity("gpt3");
   console.log("Ready.")
 
-  let commands = [
-    "./CreateMemoryThread.js", 
-    "./Ask.js", 
-    "./SetBase.js", 
-    "./FetchBase.js", 
-    "./ToggleMemory.js", 
-    "./Recover.js", 
-    "./Clear.js", 
-    "./FetchPersona.js", 
-    "./SetPersona.js", 
-    "./8ball.js", 
-    "./Voice.js",
-    "./Transcribe.js",
-    "./TTSToVC.js",
-    "./StopTTS.js"
-  ];
+  let commands = [];
+
+  const NormalCommandPath = "./Commands/";
+  fs.readdirSync(NormalCommandPath).forEach(file => {
+    if (file.includes('.js'))
+      commands.push(`${NormalCommandPath}${file}`)
+  })
 
   // Auto add all files in the Gradio_Commmands directory.
   const GradioPath = "./Gradio/Gradio_Commands/";
@@ -1044,7 +1035,7 @@ module.exports = {
   PersonaArray
 }
 
-const cmt = require('./CreateMemoryThread.js')
+const cmt = require('./Commands/CreateMemoryThread.js')
 
 async function UpdatePersonaArray() {
   return new Promise((resolve) => {
@@ -1308,7 +1299,7 @@ async function AskChatGPTAndSendResponse(content, message) {
 
 //#region Debug Gradio stuff.
 const Gradio = require('./Gradio/Gradio_Stuff.js');
-const SetBase = require('./SetBase');
+const SetBase = require('./Commands/SetBase');
 
 /* 
 1: Main PC Both GPUs

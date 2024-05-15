@@ -1,7 +1,7 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction, Message } = require('discord.js');
 const fs = require('fs')
-const { DEBUG } = require('.');
+const { DEBUG } = require('../index');
 
 const pos = ["It is certain", "It is decidedly so", "Without a doubt", "Yes definitely", "You may rely on it", "As I see it, yes", "Most likely", "Outlook good", "Yes", "Signs point to yes"];
 const nc = ["Reply hazy, try again", "Ask again later", "Better not tell you now", "Cannot predict now", "Concentrate and ask again"];
@@ -16,14 +16,15 @@ async function Preload() {
     pipe = await pipeline('sentiment-analysis', "Xenova/distilbert-base-uncased-finetuned-sst-2-english");
 
     // Preloading the ball image makes the image generation take about 1ms as opposed to like 15ms.
-    fs.readFile("./8ball.png", (e, d) => {
+    fs.readFile(__dirname + "/8ball.png", (e, d) => {
+        if (e) console.log(e);
         BallBuffer = d;
 
         // Test making image.
         if (DEBUG) {
             const sentiment = all[Math.floor(Math.random() * all.length)]
             const answer = sentiment[Math.floor(Math.random() * sentiment.length)];
-            const path = "./Temp/test.png";
+            const path = "../Temp/test.png";
             MakeImage(answer, path);
     
             setTimeout(() => {

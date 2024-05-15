@@ -1,8 +1,8 @@
 //Ignore ts(80001)
-const { SlashCommandBuilder, CommandInteraction, Message, ChannelType, TextChannel, AudioPlayer } = require('discord.js');
-const { VoiceConnectionStatus, createAudioPlayer, NoSubscriberBehavior, joinVoiceChannel, createAudioResource, AudioPlayerStatus, getVoiceConnection } = require('@discordjs/voice');
+const { SlashCommandBuilder, CommandInteraction, Message, ChannelType, AudioPlayer } = require('discord.js');
+const { VoiceConnectionStatus, createAudioPlayer, NoSubscriberBehavior, joinVoiceChannel, createAudioResource, getVoiceConnection } = require('@discordjs/voice');
 const { Voice } = require('./Voice');
-const { client } = require('.');
+const { client } = require('../index');
 
 function getPlayer() {
     return createAudioPlayer(

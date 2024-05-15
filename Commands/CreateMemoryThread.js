@@ -1,6 +1,6 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
-const { GetBaseIdFromChannel, IsMessageInThread } = require('./index.js');
+const { GetBaseIdFromChannel, IsMessageInThread } = require('../index.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
