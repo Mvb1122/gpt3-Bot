@@ -126,7 +126,7 @@ module.exports = {
             const set = VCSets[i];
             if (set.UserID == message.author.id && set.InputID == message.channelId) {
                 // If there's no player, then make one.
-                const path = `./Temp/${message.author.id}_chat_tts.wav`;
+                const path = `../Temp/${message.author.id}_chat_tts.wav`;
                 Voice(message.content, path).then(() => {
                     PlayAudioToVC(path, set) /* .then(() => {
                         fs.unlinkSync(path);

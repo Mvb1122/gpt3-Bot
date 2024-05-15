@@ -174,5 +174,8 @@ module.exports = {
         {
             message.delete();
         }
-    }
+    },
+
+    // Also share bias statement.
+    GetBias
 };
