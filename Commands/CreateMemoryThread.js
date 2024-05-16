@@ -23,7 +23,7 @@ module.exports = {
      * @returns Nothing.
      */
     CreateMemoryThread: async function CreateMemoryThread(message) {
-      if (IsMessageInThread(message)) message.reply("You can't use this command in a thread!")
+      if (await IsMessageInThread(message)) message.reply("You can't use this command in a thread!")
       let ID = -1;
       do {
         ID = Math.floor(Math.random() * 100000);

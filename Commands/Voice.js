@@ -53,7 +53,7 @@ module.exports = {
         await interaction.deferReply();
         const line = interaction.options.getString("line");
 
-        const path = `../Temp/${interaction.user.id}_tts.wav`;
+        const path = __dirname + `/../Temp/${interaction.user.id}_tts.wav`;
         Voice(line, path).then(() => {
             // Save to temp folder and then send it off.
             interaction.editReply({content: `Here's your audio! Voiced line: \`\`\`${line}\`\`\``, files: [path]}).then(() => {

@@ -2,8 +2,6 @@
 const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
 const Index = require ('../index.js');
 
-
-
 module.exports = {
 	data: new SlashCommandBuilder()
         .setName('ask')
@@ -26,16 +24,8 @@ module.exports = {
     async execute(interaction) {
         await interaction.deferReply();
         if (interaction.member == null) interaction.member = interaction.user;
-        let username;
-        try {
-            username = interaction.member.nickname ?? interaction.member.username
-        } catch {
-            try {
-                username = interaction.member.displayName
-            } catch {
-                username = "User";
-            }
-        }
+        let username = interaction.member.nickname ?? interaction.member.user.globalName ?? interaction.member.user.username;
+
         let UserQuestion = interaction.options.getString("question");
         interaction.member.id
         // If the user has sent a text document, attach it to our prompt so that ReadPage can be used.

@@ -2,6 +2,7 @@ const Discord = require('discord.js')
 const Generate = require('../Gradio/Gradio_Stuff').PredictContentDefault
 const GetTags = require("../Gradio/Helpers").GetPromptsFromPlaintextUsingGPT
 const fs = require('fs')
+const { client } = require('..')
 
 module.exports = {
   keywords: "generate, draw, image",
@@ -31,8 +32,9 @@ module.exports = {
    * @param {Discord.CommandInteraction} DiscordMessage 
    */
   async execute(parameters, DiscordMessage) {
+    const channel = await client.channels.fetch(DiscordMessage.channelId);
     if (parameters.content == undefined) {
-      DiscordMessage.channel.send("No content provided!");
+      channel.send("No content provided!");
       return JSON.stringify({ sucessful: false, reason: "No content provided." })
     }
 
@@ -43,7 +45,7 @@ module.exports = {
     // Get tags.
     new Promise((resolve) => {
       GetTags(parameters.content, DiscordMessage.user != null ? DiscordMessage.user.id : undefined).then(async tags => {
-        let generating = await (DiscordMessage.channel.send(`Generating ${parameters.count} image${(parameters.count > 1) ? "s" : ""}` + "... Tags: ```" + tags + "```"));
+        let generating = await (channel.send(`Generating ${parameters.count} image${(parameters.count > 1) ? "s" : ""}` + "... Tags: ```" + tags + "```"));
 
         /**
          * @type {[Promise<String>]}
@@ -60,9 +62,7 @@ module.exports = {
               images[i] = await images[i];
             }
 
-            console.log(images)
-
-            DiscordMessage.channel.send({
+            channel.send({
               content: "Generated... Original input: ```" + parameters.content + "``` Tags: ```" + tags + "```",
               files: images
             }).then(() => {

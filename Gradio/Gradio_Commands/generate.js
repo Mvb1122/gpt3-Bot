@@ -192,7 +192,11 @@ module.exports = {
                 // If we're generating more than 1 image, send the user a message letting them know how progress is going.
                 let generating = undefined;
                 // console.log("UseMessage: " + UseMessage)
-                if (UseMessage) generating = interaction.channel.send(content)
+                try {
+                    if (UseMessage) generating = interaction.channel.send(content)
+                } catch (e) {
+                    // Must be in a thread or something.
+                }
 
                 // Generate a bunch of seeds, first, I guess. 
                 let seeds = [];
@@ -209,7 +213,7 @@ module.exports = {
                     
                     thisImage.then(async () => {
                         // console.log("Path: " + (await thisImage));
-                        if (UseMessage) {
+                        if (UseMessage && generating != undefined) {
                             NumImagesGenerated++;
                             generating = (await generating).edit(`${content.replace("Queued", "Generating") + (NumImagesGenerated)} image${(NumImagesGenerated > 1) ? "s" : ""} generated!`)
                         }

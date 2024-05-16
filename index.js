@@ -725,7 +725,12 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
     */
   
     // Summarize convo if needed (do async)
-    SummarizeConvo(messages, DiscordMessage);
+    try {
+      SummarizeConvo(messages, DiscordMessage);
+    } catch (e) {
+      console.log(e);
+    }
+      
   
     if (!wasClearAllCalled)
       resolve(messages);
@@ -928,8 +933,12 @@ async function SendMessage(Message, StringContent) {
  * Returns true if the specified message's channel is a type of thread.
  * @param {Discord.Message} DiscordMessage 
  */
-function IsMessageInThread(DiscordMessage) {
-  return DiscordMessage.channel.type == Discord.ChannelType.PublicThread || DiscordMessage.channel.type == Discord.ChannelType.PrivateThread || DiscordMessage.channel.type == Discord.ChannelType.AnnouncementThread;
+async function IsMessageInThread(DiscordMessage) {
+  const type = (await client.channels.fetch(DiscordMessage.channelId)).type;
+
+  return type == Discord.ChannelType.PublicThread || 
+    type == Discord.ChannelType.PrivateThread || 
+    type == Discord.ChannelType.AnnouncementThread
 }
 
 function AttachDataToObject(obj) {
@@ -951,16 +960,13 @@ client.once('ready', () => {
 
   let commands = [];
 
-  const NormalCommandPath = "./Commands/";
-  fs.readdirSync(NormalCommandPath).forEach(file => {
-    if (file.includes('.js'))
-      commands.push(`${NormalCommandPath}${file}`)
-  })
-
-  // Auto add all files in the Gradio_Commmands directory.
-  const GradioPath = "./Gradio/Gradio_Commands/";
-  fs.readdirSync(GradioPath).forEach(file => {
-    commands.push(`${GradioPath}${file}`)
+  // Auto add all files in the various commands directories.
+  const CommandDirectories = ["./Commands/", "./Gradio/Gradio_Commands/", "./Security_Commands/"];
+  CommandDirectories.forEach(dir => {
+    fs.readdirSync(dir).forEach(file => {
+      if (file.includes('.js'))
+        commands.push(`${dir}${file}`)
+    })  
   })
 
   //#region Command handler stuff.
@@ -968,6 +974,11 @@ client.once('ready', () => {
   commands.forEach(command => {
     const Module = require(command);
     if ('data' in Module && 'execute' in Module) {
+      // Run OnConfigureSecurity before pushing anything.
+      if ('OnConfigureSecurity' in Module) {
+        Module.OnConfigureSecurity();
+      }
+      
       SlashCommands.push(Module);
       CommandJSON.push(Module.data.toJSON());
     } else {
