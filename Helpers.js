@@ -29,4 +29,16 @@ function CountCharactersInSections(string, char, Spliter = "\n") {
     return outputs;
 }
 
-module.exports = {countCharacter, CountCharactersInSections}
+const HandlerFactory = require("./HFAIModelHandler")
+const handler = HandlerFactory.CreateModelHandler("AdamCodd/distilroberta-nsfw-prompt-stable-diffusion", "text-classification", { topk: null })
+
+/**
+ * Uses an AI to judge how NSFW tags are.
+ * @param {String} tags AI Tags to judge.
+ * @returns {Promise<{ label: "NSFW" | "SFW"; score: number; }[]>}
+ */
+async function JudgeNSFWTags(tags) {
+    return handler.Run(tags);
+}
+
+module.exports = {countCharacter, CountCharactersInSections, JudgeNSFWTags}
