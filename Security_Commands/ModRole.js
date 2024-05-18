@@ -21,12 +21,19 @@ module.exports = {
         // Defer for safety.
         await interaction.deferReply();
 
-        /**
-         * @type {Role}
-         */
-        const role = interaction.options.getRole("modrole");
-        SetPolicy(interaction.guildId, "modrole", role.id)
+        const isUserOwner = interaction.guild.ownerId == interaction.user.id 
+        || interaction.user.id == "303011705598902273"; // Debug for letting me always use it.
 
-        interaction.editReply(`Mod role for this server set to \`${role.name}\`!`)
+        if (!isUserOwner) return interaction.editReply("Only the owner of the server can use this command!");
+        else {
+            /**
+             * @type {Role}
+             */
+            const role = interaction.options.getRole("modrole");
+            SetPolicy(interaction.guildId, "modrole", role.id)
+    
+            interaction.editReply(`Mod role for this server set to \`${role.name}\`!`)
+        }
+
     }
 }

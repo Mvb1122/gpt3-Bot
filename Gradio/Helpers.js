@@ -99,9 +99,24 @@ async function GetPromptsFromPlaintextUsingGPT(Plain, id = undefined) {
     return response.replaceAll("\n", ", ");
 }
 
-const {countCharacter} = require("../Helpers.js")
+const {countCharacter} = require("../Helpers.js");
+const { GetPolicy } = require('../Security.js');
+
+async function WriteToLogChannel(guildId, message) {
+    const logChannel = await GetPolicy(guildId, "modchannel");
+    if (logChannel != undefined) {
+        const Log = await Index.client.channels.fetch(logChannel);
+        // Send text while preventing mentions from pinging.
+        Log.send(message, {
+            "allowed_mentions": { 
+                users: ['0'], 
+                roles: ['0'] 
+            }
+        });
+    }
+}
 
 module.exports = {
     ImageIsValid, Download, countCharacter, GetPromptsFromPlaintextUsingGPT,
-    NonSplitTypes, types
+    NonSplitTypes, types, WriteToLogChannel
 }

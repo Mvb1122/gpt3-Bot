@@ -5,7 +5,6 @@ let Security = {
     1234: { /* Initial property is guildId */
         policies: {
             promptNSFW: true,
-            bypassNSFW: [1234, 1234],
             modrole: 1234,
             modchannel: 1234,
         }
@@ -22,22 +21,48 @@ async function SaveSecurity() {
     fp.writeFile("./Security.json", JSON.stringify(Security));
 }
 
-async function ReloadSecurity() {
-    const ReloadedSecurity = JSON.parse(await fp.readFile("./Security.json"));
+function ReloadSecurity(backup = true) {
+    return new Promise(async res => {
+        const ReloadedSecurity = JSON.parse(await fp.readFile("./Security.json"));
 
-    // If we're losing something, then write a backup.
-    if (Security != ReloadedSecurity && Security != {}) fp.writeFile("./Security_Backup.json", JSON.stringify(Security));
+        // If we're losing something, then write a backup.
+        if (Security != ReloadedSecurity && Security != {} && backup) fp.writeFile("./Security_Backup.json", JSON.stringify(Security));
 
-    Security = ReloadedSecurity;
+        Security = ReloadedSecurity;
+        res();
+    })
 }
+// Reload on boot.
+ReloadSecurity(false);
 
 /**
-     * Fetches a policy from the security.
-     * @param {number} gid GuildID
-     * @param {String} policy PolicyName
-     */
-function GetPolicy(gid, policy) {
-    if (typeof gid != String) throw new Error("Wrong paramter passed! gid should be typeof String.")
+ * An array of the policies that the Security manager accepts.
+ * @type {String[]}
+ */
+const policies = ["promptnsfw", "modrole","modchannel"];
+/**
+ * An array of strings that define what type each policy accepts.
+ * @type {"boolean" | "RoleID" | "ChannelID"}
+ */
+const policyTypes = ["boolean", "RoleID", "ChannelID"];
+const policyHelp = [
+    "Enable NSFW Filtering",
+    "The role who can bypass NSFW.",
+    "The channel to log messages to."
+];
+
+if (!(policies.length == policyTypes.length && policies.length == policyHelp.length)) throw new Error("Security Policy type, Policy name, Policy help array length mismatch!");
+
+/**
+ * Fetches a policy from the security.
+ * @param {string} gid GuildID
+ * @param {"promptnsfw" | "modrole" | "modchannel"} policy PolicyName
+ */
+async function GetPolicy(gid, policy) {
+    if (Security == {}) await ReloadSecurity(false);
+
+    const GuildIDType = typeof(gid);
+    if (GuildIDType != 'string') throw new Error("Wrong paramter passed! gid should be typeof String.")
 
     return Security[gid].policies[policy];
 }
@@ -50,12 +75,15 @@ function GetPolicy(gid, policy) {
      * @returns 
      */
 async function SetPolicy(gid, policy, value) {
-    if (Security[gid] == undefined) Security[gid] = {policies: {}}
-
-    Security[gid].policies[policy] = value;
-    return SaveSecurity();
+    if (!policies.includes(policy)) {
+        throw new Error(`Invalid Policy name: ${policy}!`);
+    } else {
+        if (Security[gid] == undefined) Security[gid] = {policies: {}}
+        Security[gid].policies[policy] = value;
+        return SaveSecurity();
+    }
 }
 
 module.exports = {
-    ReloadSecurity, SaveSecurity, GetPolicy, SetPolicy
+    ReloadSecurity, SaveSecurity, GetPolicy, SetPolicy, policies, policyTypes, policyHelp
 }

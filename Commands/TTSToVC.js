@@ -3,6 +3,7 @@ const { SlashCommandBuilder, CommandInteraction, Message, ChannelType, AudioPlay
 const { VoiceConnectionStatus, createAudioPlayer, NoSubscriberBehavior, joinVoiceChannel, createAudioResource, getVoiceConnection } = require('@discordjs/voice');
 const { Voice, GetEmbeddingsToChoices, ListEmbeddings } = require('../VoiceV2');
 const { client } = require('../index');
+const { WriteToLogChannel } = require('../Gradio/Helpers');
 
 function getPlayer() {
     return createAudioPlayer(
@@ -118,7 +119,7 @@ module.exports = {
             OutputID: output.id,
             OutputGuildID: interaction.guildId,
             Player: getPlayer(), // Use a generic new player.
-            model: model
+            Model: model
         });
 
         interaction.editReply(`Link created! Just send messages in <#${input.id}> to test!`);
@@ -135,10 +136,13 @@ module.exports = {
             if (set.UserID == message.author.id && set.InputID == message.channelId) {
                 // If there's no player, then make one.
                 const path = __dirname + `/../Temp/${message.author.id}_chat_tts.wav`;
-                Voice(message.content, path, set.model).then(() => {
+                Voice(message.content, path, set.Model).then(() => {
                     PlayAudioToVC(path, set) /* .then(() => {
                         fs.unlinkSync(path);
                     }) */ // TODO: Make PlayAudioToVC resolve later
+
+                    // Log what was said.
+                    WriteToLogChannel(message.guildId, `${message.author.displayName} in <#${set.OutputID}> voiced:\`\`\`` + message.content + "```")
                 })
 
                 // Since this voiced, we're done.

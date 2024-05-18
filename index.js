@@ -22,7 +22,7 @@ const RecoveryAddress = "./RecoveryBases.json"
 const DiscordToken = tokens.GetToken("discord");
 const DiscordClientId = "845159393494564904";
 const Helpers = require('./Helpers.js')
-// const DiscordSupportServerId = "762867801575784448";
+const DiscordSupportServerId = "762867801575784448";
 const DEBUG = false;
 //#endregion
 
@@ -956,64 +956,11 @@ client.once('ready', () => {
   client.user.setActivity("gpt3");
   console.log("Ready.")
 
-  let commands = [];
+  RefreshSlashCommands();
 
-  // Auto add all files in the various commands directories.
-  const CommandDirectories = ["./Commands/", "./Gradio/Gradio_Commands/", "./Security_Commands/"];
-  CommandDirectories.forEach(dir => {
-    fs.readdirSync(dir).forEach(file => {
-      if (file.includes('.js'))
-        commands.push(`${dir}${file}`)
-    })  
-  })
-
-  //#region Command handler stuff.
-  let CommandJSON = [];
-  commands.forEach(command => {
-    const Module = require(command);
-    if ('data' in Module && 'execute' in Module) {
-      // Run OnConfigureSecurity before pushing anything.
-      if ('OnConfigureSecurity' in Module) {
-        Module.OnConfigureSecurity();
-      }
-      
-      SlashCommands.push(Module);
-      CommandJSON.push(Module.data.toJSON());
-    } else {
-      console.warn(`[WARNING] The command at ${command} is missing a required "data" or "execute" property.`);
-    }
-  });
-
-  const rest = new Discord.REST().setToken(DiscordToken);
-  // Refresh commands:
-  (async () => {
-    try {
-      console.log(`Started refreshing application commands.`);
-
-      // The put method is used to fully refresh all commands in the guild with the current set
-      const data = await rest.put(
-        Discord.Routes.applicationCommands(DiscordClientId /*, guildId */), // use with ApplicationGuildCommands for testing.
-        { body: CommandJSON },
-      );
-
-      // Clear support server commands.
-      /*
-      await rest.put(
-        Discord.Routes.applicationGuildCommands(clientid, guildId),
-        { body: {} },
-      );
-      */
-
-      console.log(`Successfully reloaded ${data.length} application (/) commands.`);
-    } catch (error) {
-      // And of course, make sure you catch and log any errors!
-      console.error(error);
-    }
-  })();
-  //#endregion
-  //#endregion
   //#region Load PersonaArray on boot.
   UpdatePersonaArray();
+  //#endregion
 })
 
 
@@ -1048,6 +995,67 @@ module.exports = {
 }
 
 const cmt = require('./Commands/CreateMemoryThread.js')
+
+//#region Command handler stuff.
+function RefreshSlashCommands() {
+  let commands = [];
+
+  // Auto add all files in the various commands directories.
+  const CommandDirectories = ["./Commands/", "./Gradio/Gradio_Commands/", "./Security_Commands/"];
+  CommandDirectories.forEach(dir => {
+    fs.readdirSync(dir).forEach(file => {
+      if (file.includes('.js'))
+        commands.push(`${dir}${file}`);
+    });
+  });
+
+  let CommandJSON = [];
+  let CommandNameList = [];
+  commands.forEach(command => {
+    const Module = require(command);
+    if ('data' in Module && 'execute' in Module) {
+      // Run OnConfigureSecurity before pushing anything.
+      if ('OnConfigureSecurity' in Module) {
+        Module.OnConfigureSecurity();
+      }
+
+      SlashCommands.push(Module);
+      CommandJSON.push(Module.data.toJSON());
+
+      if (DEBUG) CommandNameList.push(Module.data.name);
+    } else {
+      console.warn(`[WARNING] The command at ${command} is missing a required "data" or "execute" property.`);
+    }
+  });
+
+  if (DEBUG) console.log(CommandNameList);
+
+  const rest = new Discord.REST().setToken(DiscordToken);
+  // Refresh commands:
+  (async () => {
+    try {
+      console.log(`Started refreshing application commands.`);
+
+      // The put method is used to fully refresh all commands in the guild with the current set
+      const data = await rest.put(
+        Discord.Routes.applicationCommands(DiscordClientId /*, guildId */), // use with ApplicationGuildCommands for testing.
+        { body: CommandJSON }
+      );
+
+      // Add support server commands.
+      if (DEBUG)
+        rest.put(
+          Discord.Routes.applicationGuildCommands(DiscordClientId, DiscordSupportServerId),
+          { body: CommandJSON },
+        );
+      console.log(`Successfully reloaded ${data.length} application (/) commands.`);
+    } catch (error) {
+      // And of course, make sure you catch and log any errors!
+      console.error(error);
+    }
+  })();
+}
+//#endregion
 
 async function UpdatePersonaArray() {
   return new Promise((resolve) => {
@@ -1348,6 +1356,7 @@ let val = Gradio.GetTagsFromImage(debugImagePath)
 
 //#region Chat AI Microservice for the web.
 const http = require('http');
+const { debug } = require('console');
 const MicroserviceHTML = fs.readFileSync("./Microservice.html");
 /**
  * Parses the request.

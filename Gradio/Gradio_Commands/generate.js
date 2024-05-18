@@ -3,9 +3,12 @@ const { SlashCommandBuilder, CommandInteraction, Message } = require('discord.js
 const Gradio = require('../Gradio_Stuff.js')
 const fs = require('fs')
 
-const { countCharacter, GetPromptsFromPlaintextUsingGPT } = require('../Helpers.js')
+const { countCharacter, GetPromptsFromPlaintextUsingGPT, WriteToLogChannel } = require('../Helpers.js');
+const { GetPolicy } = require('../../Security.js');
+const { JudgeNSFWTags } = require('../../Helpers.js')
 
 module.exports = {
+    //#region Command data.
 	data: new SlashCommandBuilder()
         .setName('generate')
         .setDescription('Generates the specified image from the given prompts.')
@@ -69,6 +72,7 @@ module.exports = {
             .setRequired(false)
         })
         ,
+    //#endregion
 
     /**
      * Generates the message with the specified count.
@@ -110,6 +114,30 @@ module.exports = {
             UsingGPTTags = true;
             UseMessage = true;
         }
+
+        // Check NSFW if needed.
+        if (GetPolicy(interaction.guildId, "promptnsfw")) {
+            const tags = await JudgeNSFWTags(prompts);
+            // Judge.
+            let nsfw, sfw;
+            for (let i = 0; i < tags.length; i++) switch (tags[i].label) {
+                case 'NSFW':
+                    nsfw = tags[i].score
+                    break;
+                case 'SFW':
+                    sfw = tags[i].score
+                    break;
+            }
+
+            if (nsfw > sfw) {
+                WriteToLogChannel(interaction.guildId, `${interaction.user.displayName} tried to generate images in <#${interaction.channelId}> in volation of NSFW security policy!` + "```\n" + prompts + "```")
+                return interaction.editReply(":flushed:  That... That's too lewd. I couldn't possibly draw that! (Tone down your NSFW!)")
+            } 
+        }
+
+        // Write to log what was drawn.
+        WriteToLogChannel(interaction.guildId, `${interaction.user.displayName} generated images with tags:` + "```\n" + prompts + "```");
+
 
         let count = interaction.options.getInteger("count") ?? 1;
         // count = Number.parseInt(count);
