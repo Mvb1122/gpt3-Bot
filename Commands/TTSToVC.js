@@ -1,7 +1,7 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction, Message, ChannelType, AudioPlayer } = require('discord.js');
 const { VoiceConnectionStatus, createAudioPlayer, NoSubscriberBehavior, joinVoiceChannel, createAudioResource, getVoiceConnection } = require('@discordjs/voice');
-const { Voice } = require('./Voice');
+const { Voice, GetEmbeddingsToChoices, ListEmbeddings } = require('../VoiceV2');
 const { client } = require('../index');
 
 function getPlayer() {
@@ -72,6 +72,7 @@ async function ConnectToChannel(set) {
     OutputID: number;
     OutputGuildID: number;
     Player: AudioPlayer;
+    Model: string
 }[]}
  */
 let VCSets = []
@@ -91,6 +92,11 @@ module.exports = {
                 .setDescription("The channel to read. If left blank, uses current.")
                 .addChannelTypes(ChannelType.GuildText)
                 .setRequired(false)
+        })
+        .addStringOption(o => {
+            return o.setName("model")
+                .setDescription("The Model to use.")
+                .setChoices(GetEmbeddingsToChoices())
         }),
 
     /**
@@ -102,6 +108,7 @@ module.exports = {
         await interaction.deferReply();
         // Get inputs.
         const input = interaction.options.getChannel("input") ?? interaction.channel;
+        const model = interaction.options.getString("model") ?? ListEmbeddings()[0];
         const output = interaction.options.getChannel("output");
 
         // Add the set and reply.
@@ -110,7 +117,8 @@ module.exports = {
             InputID: input.id,
             OutputID: output.id,
             OutputGuildID: interaction.guildId,
-            Player: getPlayer() // Use a generic new player.
+            Player: getPlayer(), // Use a generic new player.
+            model: model
         });
 
         interaction.editReply(`Link created! Just send messages in <#${input.id}> to test!`);
@@ -126,8 +134,8 @@ module.exports = {
             const set = VCSets[i];
             if (set.UserID == message.author.id && set.InputID == message.channelId) {
                 // If there's no player, then make one.
-                const path = `../Temp/${message.author.id}_chat_tts.wav`;
-                Voice(message.content, path).then(() => {
+                const path = __dirname + `/../Temp/${message.author.id}_chat_tts.wav`;
+                Voice(message.content, path, set.model).then(() => {
                     PlayAudioToVC(path, set) /* .then(() => {
                         fs.unlinkSync(path);
                     }) */ // TODO: Make PlayAudioToVC resolve later
