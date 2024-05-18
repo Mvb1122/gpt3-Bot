@@ -32,7 +32,7 @@ module.exports = {
       
       /** @type {Discord.Channel} */
       const thread = await Channel.threads.create({
-        name: 'Memory Channel ' + ID,
+        name: this.MemoryChannelPrefix + ID,
         autoArchiveDuration: 60,
         reason: 'User requested thread for ChatGPT with Memory.',
       });
@@ -41,5 +41,7 @@ module.exports = {
       message.BotData.bases[GetBaseIdFromChannel(thread)] = "";
       thread.send("Memory enabled! I'm now watching this thread!");
       return message.reply(`Thread created! <#${thread.id}>`);
-    }
+    },
+
+    MemoryChannelPrefix: 'Memory Channel '
 };

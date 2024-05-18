@@ -590,7 +590,7 @@ GetSafeChatGPTResponse([{ role: "user", content: "Can you hear me?" }], null).th
 async function SummarizeConvo(messages, DiscordMessage) {
   return new Promise(async res => {
     // If this is the first time that the AI has responded, and the channel is a thread, write a summary of the convo up to this point.
-    if (IsMessageInThread(DiscordMessage)) {
+    if (await IsMessageInThread(DiscordMessage) && IsChannelMemory(DiscordMessage.channel) && DiscordMessage.channel.name.includes(cmt.MemoryChannelPrefix)) {
       // Count number of AI responses.
       let NumberOfAIResponses = 0;
       for (let i = 0; i < messages.length; i++) {
@@ -748,8 +748,8 @@ function fetchUserBase (id) {
     /** @type {string} */
     const userbase = JSON.parse(fs.readFileSync(`./users/${id}_Base.json`)).base + "\n";
     return rootBase + userbase.trim();
-  } catch (e) {
-    console.log(e);
+  } catch {
+    // Getting here means that the user is new/doesn't have a base.
     return rootBase.trim() + "\n";
   }
 }
@@ -936,9 +936,7 @@ async function SendMessage(Message, StringContent) {
 async function IsMessageInThread(DiscordMessage) {
   const type = (await client.channels.fetch(DiscordMessage.channelId)).type;
 
-  return type == Discord.ChannelType.PublicThread || 
-    type == Discord.ChannelType.PrivateThread || 
-    type == Discord.ChannelType.AnnouncementThread
+  return type == Discord.ChannelType.PublicThread || type == Discord.ChannelType.PrivateThread || type == Discord.ChannelType.AnnouncementThread;
 }
 
 function AttachDataToObject(obj) {
@@ -1018,8 +1016,11 @@ client.once('ready', () => {
   UpdatePersonaArray();
 })
 
-// { "ChannelNum": "base stuff here"}
+
 // Load bases from file on boot.
+/**
+ * @type {{ChannelNum: {}}}
+ */
 let bases = {};
 if (fs.existsSync(BaseAddress)) bases = JSON.parse(fs.readFileSync(BaseAddress));
 
@@ -1157,8 +1158,8 @@ client.on('messageCreate',
         bases[GetBaseIdFromChannel(message.channel)] = [];
         return message.channel.send("Memory enabled! I'm now watching this channel!");
       } else {
+        delete bases[GetBaseIdFromChannel(interaction.channel)];
         ClearAll({}, message);
-        bases[GetBaseIdFromChannel(message.channel)] = undefined;
         return message.channel.send("No longer watching this channel! Feel free to speak without my gaze upon your writings.")
       }
     }
@@ -1202,7 +1203,7 @@ client.on('messageCreate',
         Text += ` ${attachment.url}`;
       })
       
-      messages = messages.concat(NewMessage("user", Text, authorname));
+      messages = messages.concat(NewMessage("user", Text, /* authorname */ ));
       // base = base.concat(NewMessage("user", message.content.trim())); // `\n${authorname}: ` + message.content.trim();
       await AskChatGPTAndSendResponse(messages, message);
     }

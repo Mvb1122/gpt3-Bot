@@ -34,7 +34,7 @@ module.exports = {
         }
 
         let messages = Index.NewMessage("system", Index.fetchUserBase(interaction.member.id))
-            .concat(Index.NewMessage("user", UserQuestion, username))
+            .concat(Index.NewMessage("user", UserQuestion))
         
         await Index.RequestChatGPT(messages, interaction)
             .then(val => {

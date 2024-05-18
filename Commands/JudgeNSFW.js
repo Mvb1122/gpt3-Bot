@@ -6,7 +6,7 @@
 
 
 //Ignore ts(80001)
-const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
+const { SlashCommandBuilder, CommandInteraction, PermissionsBitField } = require('discord.js');
 
 const Judge = require("../Helpers").JudgeNSFWTags;
 
@@ -18,7 +18,8 @@ module.exports = {
             return option.setName("text")
                 .setDescription("The text to judge.")
                 .setRequired(true)
-        }),
+        })
+        .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
 
     /**
      * Generates the message with the specified count.

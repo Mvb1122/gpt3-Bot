@@ -15,13 +15,12 @@ module.exports = {
      */
     async execute(interaction) {
         await interaction.deferReply();
-        interaction.channel.id = interaction.channelId;
         if (!IsChannelMemory(interaction.channel)) {
             bases[GetBaseIdFromChannel(interaction.channel)] = [];
             interaction.editReply("Memory enabled! I'm now watching this channel!");
         } else {
+            delete bases[GetBaseIdFromChannel(interaction.channel)];
             ClearAll({}, interaction);
-            bases[interaction.channelId] = undefined;
             interaction.editReply("No longer watching this channel! Feel free to speak without my gaze upon your writings.")
         }
     }
