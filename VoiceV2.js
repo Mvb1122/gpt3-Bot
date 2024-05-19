@@ -139,6 +139,9 @@ module.exports = {
 
     Preload: Start,
 
+    /** Acceptable audio types for Embedding. */
+    AudioTypes: ["wav", "mp3", "mp4", "avi", "m4a", "ogg", "ogx"],
+
     ListEmbeddings,
 
     /**

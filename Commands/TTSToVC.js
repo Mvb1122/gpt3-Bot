@@ -1,5 +1,5 @@
 //Ignore ts(80001)
-const { SlashCommandBuilder, CommandInteraction, Message, ChannelType, AudioPlayer } = require('discord.js');
+const { SlashCommandBuilder, CommandInteraction, Message, ChannelType, AudioPlayer, VoiceChannel } = require('discord.js');
 const { VoiceConnectionStatus, createAudioPlayer, NoSubscriberBehavior, joinVoiceChannel, createAudioResource, getVoiceConnection } = require('@discordjs/voice');
 const { Voice, GetEmbeddingsToChoices, ListEmbeddings } = require('../VoiceV2');
 const { client } = require('../index');
@@ -27,13 +27,20 @@ function getPlayer() {
 }} set Set information.
  * @param {Number} guild GuildID
  */
-async function PlayAudioToVC(path, set) {
-    // Make sure we have a voice connection to the channel.
-    await ConnectToChannel(set);
+function PlayAudioToVC(path, set) {
+    return new Promise(async res => {
+        // Make sure we have a voice connection to the channel.
+        await ConnectToChannel(set);
 
-    // Now that we're sure we have a connection, play the thing.
-    const resource = createAudioResource(path);
-    set.Player.play(resource);
+        // Now that we're sure we have a connection, play the thing.
+        const resource = createAudioResource(path);
+        set.Player.play(resource);
+
+        // When the player has finished playing, resolve the promise.
+        set.Player.on('idle', () => {
+            res();
+        })
+    })
 }
 
 async function ConnectToChannel(set) {
@@ -41,10 +48,9 @@ async function ConnectToChannel(set) {
         let connection;
         const vc = getVoiceConnection(set.OutputGuildID);
 
-        if (vc != undefined) {
-            connection = vc;
+        if (vc != undefined && vc.subscribe != undefined) {
             // Add the player.
-            connection.subscribe(set.Player);
+            vc.subscribe(set.Player);
 
             res();
         }
@@ -77,6 +83,27 @@ async function ConnectToChannel(set) {
 }[]}
  */
 let VCSets = []
+
+// Load VCSets on boot and save on exit.
+const fs = require('fs');
+const VCSetsFile = "./VCSets.json";
+if (fs.existsSync(VCSetsFile)) {
+    VCSets = JSON.parse(fs.readFileSync(VCSetsFile));
+
+    // Add new players.
+    for (let i = 0; i < VCSets.length; i++) {
+        VCSets[i].Player = getPlayer();
+    }
+}
+
+function WriteVCSets() {
+    // Delete all players.
+    const sets = VCSets;
+    for (let i = 0; i < sets.length; i++) 
+        delete sets[i].Player;
+
+    return fs.writeFileSync(VCSetsFile, JSON.stringify(sets));
+}
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -122,6 +149,9 @@ module.exports = {
             Model: model
         });
 
+        // Write VCSets whenever a new one is made.
+        WriteVCSets();
+
         interaction.editReply(`Link created! Just send messages in <#${input.id}> to test!`);
     },
 
@@ -134,25 +164,34 @@ module.exports = {
         for (let i = 0; i < VCSets.length; i++) {
             const set = VCSets[i];
             if (set.UserID == message.author.id && set.InputID == message.channelId) {
-                // If there's no player, then make one.
+                // Check that user is in the voice call.
+                /**
+                 * @type {VoiceChannel}
+                 */
+                const output = await client.channels.fetch(set.OutputID);
+                const inCall = output.members.has(message.author.id)
+
                 const path = __dirname + `/../Temp/${message.author.id}_chat_tts.wav`;
-                Voice(message.content, path, set.Model).then(() => {
-                    PlayAudioToVC(path, set) /* .then(() => {
-                        fs.unlinkSync(path);
-                    }) */ // TODO: Make PlayAudioToVC resolve later
+                if (inCall)
+                    Voice(message.content, path, set.Model).then(() => {
+                        PlayAudioToVC(path, set)
+                        // Delete audio after it has finished playing.
+                        .then(() => {
+                            fs.unlinkSync(path);
+                        })
 
-                    // Log what was said.
-                    WriteToLogChannel(message.guildId, `${message.author.displayName} in <#${set.OutputID}> voiced:\`\`\`` + message.content + "```")
-                })
+                        // Log what was said.
+                        WriteToLogChannel(message.guildId, `${message.author.displayName} in <#${set.OutputID}> voiced:\`\`\`` + message.content + "```")
+                    })
 
-                // Since this voiced, we're done.
+                // Since this considered voicing, we're done.
                 return;
             };
         }
     },
 
     // Also share voice sets and useful voice information.
-    VCSets, PlayAudioToVC,
+    VCSets, PlayAudioToVC, WriteVCSets,
 
     /**
      * @param {AutocompleteInteraction} interaction The Autocomplete request.
