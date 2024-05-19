@@ -1042,13 +1042,7 @@ function RefreshSlashCommands() {
         Discord.Routes.applicationCommands(DiscordClientId /*, guildId */), // use with ApplicationGuildCommands for testing.
         { body: CommandJSON }
       );
-
-      // Add support server commands.
-      if (DEBUG)
-        rest.put(
-          Discord.Routes.applicationGuildCommands(DiscordClientId, DiscordSupportServerId),
-          { body: CommandJSON },
-        );
+      
       console.log(`Successfully reloaded ${data.length} application (/) commands.`);
     } catch (error) {
       // And of course, make sure you catch and log any errors!
@@ -1226,24 +1220,34 @@ client.on("interactionCreate",
    * @param {Discord.CommandInteraction} int 
    */
   async (interaction) => {
-    if (!interaction.isChatInputCommand()) return;
+      // Find command by name.
+      const name = interaction.commandName;
+      for (let i = 0; i < SlashCommands.length; i++) {
+        const module = SlashCommands[i];
+        /** @type {Discord.SlashCommandBuilder} */
+        let data = module.data;
+        if (data.name == name) {
+          try {
 
-    // Find command by name.
-    const name = interaction.commandName;
-    for (let i = 0; i < SlashCommands.length; i++) {
-      const module = SlashCommands[i];
-      /** @type {Discord.SlashCommandBuilder} */
-      let data = module.data;
-      if (data.name == name) {
-        try {
-          return module.execute(AttachDataToObject(interaction));
-        } catch (error) {
-          if (interaction.replied) interaction.editReply("Something went wrong!")
-          else interaction.reply("Something went wrong!");
+            // If it's a Chat Input (finished Slash Command)
+            if (interaction.isChatInputCommand())
+              return module.execute(AttachDataToObject(interaction));
+
+            // If it's an autocomplete request:
+            else if (interaction.isAutocomplete() && 'OnAutocomplete' in module) 
+              return module.OnAutocomplete(AttachDataToObject(interaction));
+
+          } catch (error) {
+            console.log(error);
+            if (interaction.isChatInputCommand()) {
+              if (interaction.replied) interaction.editReply("Something went wrong!")
+              else interaction.reply("Something went wrong!");
+            }
+          }
         }
       }
     }
-  })
+  )
 
 async function AskChatGPTAndSendResponse(content, message) {
   let requestOut = RequestChatGPT(content, message)

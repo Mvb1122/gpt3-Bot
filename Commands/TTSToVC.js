@@ -97,7 +97,7 @@ module.exports = {
         .addStringOption(o => {
             return o.setName("model")
                 .setDescription("The Model to use.")
-                .setChoices(GetEmbeddingsToChoices())
+                .setAutocomplete(true)
         }),
 
     /**
@@ -152,5 +152,23 @@ module.exports = {
     },
 
     // Also share voice sets and useful voice information.
-    VCSets, PlayAudioToVC
+    VCSets, PlayAudioToVC,
+
+    /**
+     * @param {AutocompleteInteraction} interaction The Autocomplete request.
+     */
+    async OnAutocomplete(interaction) {
+        // Get active embeddings.
+        const choices = GetEmbeddingsToChoices();
+        
+        // Get what the user has currently typed in.
+        const stringValue = interaction.options.getFocused();
+        
+        // Filter to just matching ones. Also, cut off if we have more than twenty responses.
+		let filtered = choices.filter(choice => choice.name.toLowerCase().startsWith(stringValue.toLowerCase()));
+        if (filtered.length > 20) filtered = filtered.slice(0, 20);
+		
+        // Send back our response.
+        await interaction.respond(filtered);
+    }
 }

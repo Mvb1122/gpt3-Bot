@@ -62,7 +62,7 @@ function ConvertFFMPEG(AudioFileName) {
     return new Promise(res => {
         const OutputName = "./audio.wav";
         // First convert auto to .wav with specifications required by the embedding AI.
-        const ffmpeg = spawn('ffmpeg', [`-i`, AudioFileName, `-ar`, `16000`, `-ac`, `1`, `-ab`, `256k`, OutputName, `-y`]);
+        const ffmpeg = spawn('ffmpeg', [`-i`, AudioFileName, `-ar`, `16000`, `-ac`, `1`, OutputName, `-y`]);
         ffmpeg.stderr.on('end', () => {
             res(OutputName);
         })

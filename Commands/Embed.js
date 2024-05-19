@@ -4,7 +4,7 @@
 3. Command activated. (execute and OnMessageRecieved work now.) 
 */
 
-const AudioTypes = ["wav", "mp3", "mp4", "avi"];
+const AudioTypes = ["wav", "mp3", "mp4", "avi", "m4a", "ogg", "ogx"];
 function FileIsAudio(name) {
     for (let i = 0; i < AudioTypes.length; i++) if (name.includes(AudioTypes[i])) return true;
     return false;
@@ -55,7 +55,7 @@ module.exports = {
             try {
                 AudioPath = await Download(url, `./Temp/${fileName}`);
                 Embed(AudioPath, `./Voice Embeddings/${name}.bin`).then(() => {
-                    interaction.editReply("Embed processed! Please wait a few minutes and then it'll be available on the `/ttstovc` and `/voice` commands!");
+                    interaction.editReply("Embed processed! It should be available on the `/ttstovc` and `/voice` commands immediately!");
                     
                     // Update commands.
                     RefreshSlashCommands();

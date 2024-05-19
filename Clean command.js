@@ -29,8 +29,16 @@ module.exports = {
         const demo = interaction.options.getString("demo") ?? null; // If required then you can remove the ?? null.
     },
 
+    // Below here is not required; should be deleted if not needed.
     OnConfigureSecurity() {
         // Configure some security stuff, eg; 
         // this.data.setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    },
+
+    /**
+     * @param {AutocompleteInteraction} interaction The Autocomplete request.
+     */
+    async OnAutocomplete(interaction) {
+
     }
 }
