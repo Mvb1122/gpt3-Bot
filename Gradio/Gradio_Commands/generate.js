@@ -116,7 +116,9 @@ module.exports = {
         }
 
         // Check NSFW if needed.
-        if (GetPolicy(interaction.guildId, "promptnsfw")) {
+        const ScanPromptsNSFW = await GetPolicy(interaction.guildId, "promptnsfw");
+        if (ScanPromptsNSFW) {
+            console.log(`Policy on ${interaction.guildId} is true.`)
             const tags = await JudgeNSFWTags(prompts);
             // Judge.
             let nsfw, sfw;

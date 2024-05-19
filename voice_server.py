@@ -6,7 +6,12 @@ import time
 used_time = time.time()
 embedding_file_name = "./Voice Embeddings/New_Embedding.bin"
 
-synthesiser = pipeline("text-to-speech", "microsoft/speecht5_tts")
+device = "cpu"
+if (torch.cuda.is_available()): device = "cuda:0"
+
+print("Running audio synth on " + device)
+
+synthesiser = pipeline("text-to-speech", "microsoft/speecht5_tts", device=device)
 used_time = time.time() - used_time
 
 '''
@@ -48,7 +53,7 @@ def embed(source, target):
   # Calculate speech embeddings.
   import torchaudio
   from speechbrain.inference.speaker import EncoderClassifier
-  classifier = EncoderClassifier.from_hparams(source="speechbrain/spkrec-xvect-voxceleb", savedir="pretrained_models/spkrec-xvect-voxceleb", run_opts={"device":"cuda"}) # run_opts={"device":"cuda"})
+  classifier = EncoderClassifier.from_hparams(source="speechbrain/spkrec-xvect-voxceleb", savedir="pretrained_models/spkrec-xvect-voxceleb", run_opts={"device":device}) # run_opts={"device":"cuda"})
   signal, fs = torchaudio.load(source)
   embeddings = classifier.encode_batch(signal)
 

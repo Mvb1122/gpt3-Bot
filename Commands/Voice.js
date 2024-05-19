@@ -28,9 +28,12 @@ module.exports = {
         const model = interaction.options.getString("model") ?? null;
 
         const path = __dirname + `/../Temp/${interaction.user.id}_tts.wav`;
+        let time = performance.now();
         Voice(line, path, model).then(() => {
             // Save to temp folder and then send it off.
-            interaction.editReply({content: `Here's your audio! Voiced line: \`\`\`${line}\`\`\``, files: [path]}).then(() => {
+            time = performance.now() - time;
+
+            interaction.editReply({content: `Here's your audio! Voiced line: \`\`\`${line}\`\`\`\n Time Taken: ${(time/1000).toFixed(2)}s`, files: [path]}).then(() => {
                 // Delete the image.
                 fs.unlink(path, (err) => {if (err) console.log(err)});
             })

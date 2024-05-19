@@ -27,7 +27,7 @@ function postJSON(URL, data) {
     })
 }
 
-const DoConsoleLog = true;
+const DoConsoleLog = false;
 /**
  * Starts the AI embedding and voicing server process.
  * @returns {Promise} A promise which resolves when the AI is running.
@@ -77,6 +77,8 @@ function ListEmbeddings() {
     return fs.readdirSync(__dirname + "/Voice Embeddings/");
 }
 
+const DefaultEmbedding = "./Voice Embeddings/girl.bin";
+
 module.exports = {
     /**
      * Voices a text line into a file.
@@ -89,10 +91,12 @@ module.exports = {
         return new Promise(async res => {
             if (!Started) await Start();
 
-            if (model == null) {
+            if (model == undefined || model == null) {
                 console.warn("No embedding supplied! Using default.");
-                model = this.DefaultEmbedding;
+                model = DefaultEmbedding;
             }
+
+            if (!model.endsWith(".bin")) model += ".bin";
 
             const Data = {
                 location: location,
@@ -109,7 +113,7 @@ module.exports = {
     },
     
     EmbedDirectory: "./Voice Embeddings/",
-    DefaultEmbedding: "./Voice Embeddings/New_Embedding.bin",
+    DefaultEmbedding,
 
     Embed(AudioFileName, EmbedName) {
         return new Promise(res => {

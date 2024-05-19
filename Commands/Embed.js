@@ -56,9 +56,6 @@ module.exports = {
                 AudioPath = await Download(url, `./Temp/${fileName}`);
                 Embed(AudioPath, `./Voice Embeddings/${name}.bin`).then(() => {
                     interaction.editReply("Embed processed! It should be available on the `/ttstovc` and `/voice` commands immediately!");
-                    
-                    // Update commands.
-                    RefreshSlashCommands();
                 })
             } catch (e) {
                 interaction.editReply("Please check your file! Something went wrong.\n```" + e + "```");
