@@ -24,7 +24,13 @@ module.exports = {
     async execute(interaction) {
         await interaction.deferReply();
         if (interaction.member == null) interaction.member = interaction.user;
-        let username = interaction.member.nickname ?? interaction.member.user.globalName ?? interaction.member.user.username;
+        let username;
+        
+        try {
+            username = interaction.member.nickname ?? interaction.user.globalName ?? interaction.user.username;
+        } catch {
+            username = "User"
+        }
 
         let UserQuestion = interaction.options.getString("question");
         interaction.member.id

@@ -1,4 +1,4 @@
-node index.js
+nodemon index.js
 node index.js
 node index.js
 node index.js

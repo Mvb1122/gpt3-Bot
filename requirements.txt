@@ -1,0 +1,5 @@
+Flask==3.0.3
+soundfile==0.12.1
+speechbrain==1.0.0
+torch==2.3.0
+torchaudio==2.3.0

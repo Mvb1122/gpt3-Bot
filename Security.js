@@ -63,7 +63,7 @@ async function GetPolicy(gid, policy) {
 
     const GuildIDType = typeof(gid);
     if (GuildIDType != 'string') throw new Error("Wrong paramter passed! gid should be typeof String.")
-
+        
     return Security[gid].policies[policy];
 }
 
@@ -78,7 +78,8 @@ async function SetPolicy(gid, policy, value) {
     if (!policies.includes(policy)) {
         throw new Error(`Invalid Policy name: ${policy}!`);
     } else {
-        if (Security[gid] == undefined) Security[gid] = {policies: {}}
+        if (Security[gid] == undefined || Security[gid].policies == undefined) Security[gid] = {policies: {}}
+        
         Security[gid].policies[policy] = value;
         return SaveSecurity();
     }

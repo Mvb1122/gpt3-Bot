@@ -1,5 +1,5 @@
 //Ignore ts(80001)
-const { SlashCommandBuilder, CommandInteraction, PermissionsBitField, Role } = require('discord.js');
+const { SlashCommandBuilder, CommandInteraction, PermissionFlagsBits, Role } = require('discord.js');
 const { SetPolicy } = require('../Security');
 
 module.exports = {
@@ -11,7 +11,7 @@ module.exports = {
                 .setDescription("The moderation role.")
                 .setRequired(true);
         })
-        .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     /**
      * Generates the message with the specified count.

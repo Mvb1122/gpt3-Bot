@@ -991,7 +991,8 @@ module.exports = {
   Recover,
   FetchUserPersona,
   UpdateUserPersona,
-  PersonaArray
+  PersonaArray,
+  RefreshSlashCommands
 }
 
 const cmt = require('./Commands/CreateMemoryThread.js')

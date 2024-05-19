@@ -6,15 +6,15 @@
 
 
 //Ignore ts(80001)
-const { SlashCommandBuilder, CommandInteraction, ChannelType, GuildRoleManager, Collection } = require('discord.js');
+const { SlashCommandBuilder, CommandInteraction, ChannelType, GuildRoleManager, Collection, PermissionFlagsBits } = require('discord.js');
 const Security = require('../Security');
 
 const CommonConfigureValueName = "value";
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('setpolicy')
-        .setDescription("Sets a security policy on this bot."),
-        // .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+        .setDescription("Sets a security policy on this bot.")
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     /**
      * Generates the message with the specified count.
@@ -30,6 +30,13 @@ module.exports = {
 
 
             // Check if they have the mod role.
+        try {
+            _ = await Security.GetPolicy(interaction.guildId, "modrole");
+        } catch (e) {
+            if (e) 
+                return interaction.editReply("Please run `/modrole` before this!");
+        }
+
         const ModRoleID = await Security.GetPolicy(interaction.guildId, "modrole");
         const UserRoles = interaction.member.roles.cache;
         const HasModRole = UserRoles.some((val, key) => {

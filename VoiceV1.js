@@ -12,17 +12,18 @@ async function Preload() {
 const speaker_embeddings = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/speaker_embeddings.bin';
 
 const wavefile = require('wavefile');
-const VoiceV2 = require('./VoiceV2');
+
 /**
  * Gets the voice line for a thing.
  * @param {String} q Text to speak.
  * @param {String} p Path to write to.
+ * @param {*} m ignored for drop-in compatability with VoiceV2
  * @returns {Promise<String>} Path written to.
  * 
  * @deprecated
  * @see VoiceV2
  */
-async function Voice(q, p) {
+async function Voice(q, p, m) {
     // Don't preload until first call.
     if (pipe == undefined) await Preload();
     

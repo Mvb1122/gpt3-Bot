@@ -136,3 +136,5 @@ Thumbs.db
 /Temp
 Security.json
 Security_Backup.json
+/pretrained_models
+/Voice Embeddings

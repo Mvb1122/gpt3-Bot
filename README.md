@@ -16,4 +16,5 @@ If you want to try the bot, you can [join the discord server](https://discord.co
 1. Copy the Repo.
 2. `npm i package.json` or whatever
 3. Fill up `token_blank.json` and rename it to `token.json`
-4. Run start.bat or `node index.js`
+4. Run `pip install -r requirements.txt` to get stuff for AI voicing.
+5. Run start.bat or `node index.js`

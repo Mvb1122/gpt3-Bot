@@ -1,7 +1,7 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
 const fs = require('fs');
-const { Voice, GetEmbeddingsToChoices } = require('../VoiceV2');
+const { GetEmbeddingsToChoices, Voice } = require('../VoiceV2');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -25,7 +25,7 @@ module.exports = {
     async execute(interaction) {
         await interaction.deferReply();
         const line = interaction.options.getString("line");
-        const model = interaction.options.getString("model") ?? undefined;
+        const model = interaction.options.getString("model") ?? null;
 
         const path = __dirname + `/../Temp/${interaction.user.id}_tts.wav`;
         Voice(line, path, model).then(() => {
