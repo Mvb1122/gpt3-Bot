@@ -26,10 +26,12 @@ module.exports = {
         
         // Check that user either has mod role or owns the server.
         const isUserOwner = interaction.guild.ownerId == interaction.user.id 
-            || interaction.user.id == "303011705598902273"; // Debug for letting me always use it.
+        //    || interaction.user.id == "303011705598902273"; // Debug for letting me always use it.
 
 
-            // Check if they have the mod role.
+        // Check if they have the mod role.
+            // Ensure modrole is set. 
+            // TODO: Add HasPolicy() to Security. 
         try {
             _ = await Security.GetPolicy(interaction.guildId, "modrole");
         } catch (e) {
@@ -43,7 +45,7 @@ module.exports = {
             return key == ModRoleID;
         });
 
-        if (!HasModRole || !isUserOwner) {
+        if (!(HasModRole || isUserOwner)) {
             return interaction.editReply("You don't have the mod role!");
         }
 

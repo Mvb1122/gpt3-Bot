@@ -1,5 +1,13 @@
 // Module for simplifying access to security policies.
 const fp = require('fs/promises');
+const fs = require('fs');
+const Index = require('./index');
+
+const FileNames = {
+    Security: "./Security.json",
+    Security_Backup: "./Security_Backup.json",
+    UniLog: "./UniLog.json"
+}
 
 let Security = {
     1234: { /* Initial property is guildId */
@@ -13,20 +21,27 @@ let Security = {
 Security = {}; 
 
 async function SaveSecurity() {
-    const ReloadedSecurity = JSON.parse(await fp.readFile("./Security.json"));
+    const ReloadedSecurity = JSON.parse(await fp.readFile(FileNames.Security));
 
     // If we're losing something, then write a backup.
-    if (Security != ReloadedSecurity) fp.writeFile("./Security_Backup.json", JSON.stringify(Security));
+    if (Security != ReloadedSecurity) fp.writeFile(FileNames.Security_Backup, JSON.stringify(Security));
 
-    fp.writeFile("./Security.json", JSON.stringify(Security));
+    fp.writeFile(FileNames.Security, JSON.stringify(Security));
 }
 
 function ReloadSecurity(backup = true) {
     return new Promise(async res => {
-        const ReloadedSecurity = JSON.parse(await fp.readFile("./Security.json"));
+        // If the security file doesn't exist, use the backup. If that doesn't exist, stick with the default empty object.
+        const target = FileNames.Security;
+        if (!fs.existsSync(FileNames.Security)) 
+            if (fs.existsSync(FileNames.Security_Backup)) target = FileNames.Security_Backup;
+            else return res();
+        
+        // Otherwise, just read it from file.
+        const ReloadedSecurity = JSON.parse(await fp.readFile(FileNames.Security));
 
         // If we're losing something, then write a backup.
-        if (Security != ReloadedSecurity && Security != {} && backup) fp.writeFile("./Security_Backup.json", JSON.stringify(Security));
+        if (Security != ReloadedSecurity && Security != {} && backup) fp.writeFile(FileNames.Security_Backup, JSON.stringify(Security));
 
         Security = ReloadedSecurity;
         res();
@@ -68,12 +83,12 @@ async function GetPolicy(gid, policy) {
 }
 
 /**
-     * 
-     * @param {number} gid GuildID
-     * @param {String} policy PolicyName
-     * @param {*} value Policy value. Must be serializable.
-     * @returns 
-     */
+ * 
+ * @param {number} gid GuildID
+ * @param {String} policy PolicyName
+ * @param {*} value Policy value. Must be serializable.
+ * @returns 
+ */
 async function SetPolicy(gid, policy, value) {
     if (!policies.includes(policy)) {
         throw new Error(`Invalid Policy name: ${policy}!`);
@@ -85,6 +100,36 @@ async function SetPolicy(gid, policy, value) {
     }
 }
 
+/**
+ * Log for all servers.
+ */
+let UniLog = {};
+if (fs.existsSync(FileNames.UniLog))
+    fp.readFile(FileNames.UniLog).then(d => {
+        UniLog = JSON.parse(d);
+    });
+
+async function WriteToLogChannel(guildId, message) {
+    const logChannel = await GetPolicy(guildId, "modchannel");
+    if (logChannel != undefined) {
+        const Log = await Index.client.channels.fetch(logChannel);
+        // Send text while preventing mentions from pinging.
+        Log.send(message, {
+            "allowed_mentions": { 
+                users: ['0'], 
+                roles: ['0'] 
+            }
+        });
+
+        // Write to the UniLog. 
+        if (UniLog[guildId] == undefined) UniLog[guildId] = [];
+        UniLog[guildId].push(message);
+        
+        // Warning: May cause file corruption during times of high usage/when file cannot be written fast enough.
+        fp.writeFile("./UniLog.json", JSON.stringify(UniLog));
+    }
+}
+
 module.exports = {
-    ReloadSecurity, SaveSecurity, GetPolicy, SetPolicy, policies, policyTypes, policyHelp
+    ReloadSecurity, SaveSecurity, GetPolicy, SetPolicy, policies, policyTypes, policyHelp, WriteToLogChannel
 }

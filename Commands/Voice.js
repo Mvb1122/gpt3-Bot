@@ -2,6 +2,7 @@
 const { SlashCommandBuilder, CommandInteraction, AutocompleteInteraction } = require('discord.js');
 const fs = require('fs');
 const { GetEmbeddingsToChoices, Voice } = require('../VoiceV2');
+const { WriteToLogChannel } = require('../Security');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -37,10 +38,13 @@ module.exports = {
                 interaction.editReply({content: `Here's your audio! Voiced line: \`\`\`${line}\`\`\`\n Time Taken: ${(time/1000).toFixed(2)}s`, files: [path]}).then(() => {
                     // Delete the image.
                     fs.unlink(path, (err) => {if (err) console.log(err)});
+
+                    // Write to log about it.
+                    WriteToLogChannel(interaction.guildId, `${interaction.user.globalName} voiced the following: \`\`\`` + line + "\`\`\`");
                 })
             })
         } catch {
-            interaction.editReply("Your text was too long! Please cut it shorter.");
+            return await interaction.editReply("Your text was too long! Please cut it shorter.");
         }
     },
 

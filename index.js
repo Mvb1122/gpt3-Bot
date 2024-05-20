@@ -961,6 +961,24 @@ client.once('ready', () => {
   //#region Load PersonaArray on boot.
   UpdatePersonaArray();
   //#endregion
+
+  /* Creepy message sending code for snooping on weird servers.
+  client.guilds.cache.forEach(async guild => {
+    console.log(`${guild.name} | ${guild.id}`);
+    if (guild.id == "1004416383989338185") {
+      console.log("reached!");
+      const channels = guild.channels.cache;
+      for (let i = 0; i < channels.size; i++) {
+        const channel = channels.at(i);
+        if (channel.name == "general") {
+          await channel.send("Heyo, dunno if you'll get this because I'm sending it through a weird way, but JSYK I'm disabling public install beacuse I'm not really intending to provide a service to people. You can keep using this server though, I don't even know if I can even remove this bot from the server on my own lmao.\n-Micah")
+          console.log("Sent!");
+          break;
+        }
+      }
+    }
+  })
+  */ 
 })
 
 
