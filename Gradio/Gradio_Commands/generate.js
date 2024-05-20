@@ -2,9 +2,8 @@
 const { SlashCommandBuilder, CommandInteraction, Message } = require('discord.js');
 const Gradio = require('../Gradio_Stuff.js')
 const fs = require('fs')
-
-const { countCharacter, GetPromptsFromPlaintextUsingGPT, WriteToLogChannel } = require('../Helpers.js');
-const { GetPolicy } = require('../../Security.js');
+const { countCharacter, GetPromptsFromPlaintextUsingGPT,  } = require('../Helpers.js');
+const { GetPolicy, WriteToLogChannel } = require('../../Security.js');
 const { JudgeNSFWTags } = require('../../Helpers.js')
 
 module.exports = {

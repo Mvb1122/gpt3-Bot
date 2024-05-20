@@ -40,7 +40,7 @@ module.exports = {
                 })
             })
         } catch {
-            interaction.editReply("Your text was too long! Please cut it shorter.");
+            return await interaction.editReply("Your text was too long! Please cut it shorter.");
         }
     },
 

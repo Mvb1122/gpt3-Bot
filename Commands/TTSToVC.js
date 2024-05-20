@@ -3,7 +3,8 @@ const { SlashCommandBuilder, CommandInteraction, Message, ChannelType, AudioPlay
 const { VoiceConnectionStatus, createAudioPlayer, NoSubscriberBehavior, joinVoiceChannel, createAudioResource, getVoiceConnection } = require('@discordjs/voice');
 const { Voice, GetEmbeddingsToChoices, ListEmbeddings } = require('../VoiceV2');
 const { client } = require('../index');
-const { WriteToLogChannel } = require('../Gradio/Helpers');
+const fs = require('fs');
+const { WriteToLogChannel } = require('../Security');
 
 function getPlayer() {
     return createAudioPlayer(
@@ -85,7 +86,6 @@ async function ConnectToChannel(set) {
 let VCSets = []
 
 // Load VCSets on boot and save on exit.
-const fs = require('fs');
 const VCSetsFile = "./VCSets.json";
 if (fs.existsSync(VCSetsFile)) {
     VCSets = JSON.parse(fs.readFileSync(VCSetsFile));
