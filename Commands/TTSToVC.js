@@ -1,7 +1,7 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction, Message, ChannelType, AudioPlayer, VoiceChannel } = require('discord.js');
 const { VoiceConnectionStatus, createAudioPlayer, NoSubscriberBehavior, joinVoiceChannel, createAudioResource, getVoiceConnection } = require('@discordjs/voice');
-const { Voice, GetEmbeddingsToChoices, ListEmbeddings } = require('../VoiceV2');
+const { Voice, GetEmbeddingsToChoices, ListEmbeddings, DefaultEmbedding } = require('../VoiceV2');
 const { client } = require('../index');
 const fs = require('fs');
 const { WriteToLogChannel } = require('../Security');
@@ -31,43 +31,52 @@ function getPlayer() {
 function PlayAudioToVC(path, set) {
     return new Promise(async res => {
         // Make sure we have a voice connection to the channel.
-        await ConnectToChannel(set);
-
+        await ConnectToChannel(set)
+        
         // Now that we're sure we have a connection, play the thing.
         const resource = createAudioResource(path);
         set.Player.play(resource);
-
+        
         // When the player has finished playing, resolve the promise.
         set.Player.on('idle', () => {
             res();
-        })
+        }, { once: true })
     })
 }
 
-async function ConnectToChannel(set) {
+/**
+ * A function which ensures that a set's player is hooked up to a connection to its specified OutputID channel.
+ * @param {{
+    UserID: number;
+    InputID: number;
+    OutputID: number;
+    OutputGuildID: number;
+    Player: AudioPlayer;
+}} set Set information.
+ * @returns {Promise} Promise which resolves when connected.
+ */
+function ConnectToChannel(set) {
     return new Promise(async (res) => {
-        let connection;
-        const vc = getVoiceConnection(set.OutputGuildID);
+        let Connection = getVoiceConnection(set.OutputGuildID);
 
-        if (vc != undefined && vc.subscribe != undefined) {
+        if (Connection != undefined) {
             // Add the player.
-            vc.subscribe(set.Player);
+            Connection.subscribe(set.Player);
 
-            res();
-        }
-        else {
+            return res();
+        } else {
             const guild = await client.guilds.fetch(set.OutputGuildID);
             const adapterCreator = guild.voiceAdapterCreator;
 
-            connection = joinVoiceChannel({
+            Connection = joinVoiceChannel({
                 channelId: set.OutputID,
                 guildId: set.OutputGuildID,
-                adapterCreator: adapterCreator,
+                adapterCreator: adapterCreator
             });
-
-            connection.on(VoiceConnectionStatus.Ready, async (e) => {
-                connection.subscribe(set.Player);
-                res();
+            
+            Connection.on(VoiceConnectionStatus.Ready, async () => {
+                Connection.subscribe(set.Player);
+                return res();
             }, { once: true });
         }
     });
@@ -86,23 +95,35 @@ async function ConnectToChannel(set) {
 let VCSets = []
 
 // Load VCSets on boot and save on exit.
-const VCSetsFile = "./VCSets.json";
-if (fs.existsSync(VCSetsFile)) {
-    VCSets = JSON.parse(fs.readFileSync(VCSetsFile));
+function LoadSets() {
+    if (fs.existsSync(VCSetsFile)) {
+        VCSets = JSON.parse(fs.readFileSync(VCSetsFile));
 
-    // Add new players.
-    for (let i = 0; i < VCSets.length; i++) {
-        VCSets[i].Player = getPlayer();
+        // Add new players.
+        for (let i = 0; i < VCSets.length; i++) {
+            VCSets[i].Player = getPlayer();
+        }
     }
 }
 
-function WriteVCSets() {
-    // Delete all players.
-    const sets = VCSets;
-    for (let i = 0; i < sets.length; i++) 
-        delete sets[i].Player;
+const VCSetsFile = "./VCSets.json";
+LoadSets();
 
-    return fs.writeFileSync(VCSetsFile, JSON.stringify(sets));
+/**
+ * DO NOT RUN THIS!
+ */
+function WriteVCSets(sets = VCSets) {
+    // Also set VCSets here.
+    VCSets = sets;
+
+    // Ensure that sets is a deep copy before writing.
+    const copy = JSON.parse(JSON.stringify(sets));
+
+    // Delete all players.
+    for (let i = 0; i < sets.length; i++)
+        delete copy[i].Player;
+
+    return fs.writeFileSync(VCSetsFile, JSON.stringify(copy));
 }
 
 module.exports = {
@@ -136,21 +157,44 @@ module.exports = {
         await interaction.deferReply();
         // Get inputs.
         const input = interaction.options.getChannel("input") ?? interaction.channel;
-        const model = interaction.options.getString("model") ?? ListEmbeddings()[0];
+        const model = interaction.options.getString("model") ?? DefaultEmbedding;
         const output = interaction.options.getChannel("output");
 
-        // Add the set and reply.
-        VCSets.push({
+        const set = {
             UserID: interaction.user.id,
             InputID: input.id,
             OutputID: output.id,
             OutputGuildID: interaction.guildId,
             Player: getPlayer(), // Use a generic new player.
             Model: model
-        });
+        };
+        
+        // Look to see if this set has already been created.
+        const keys = Object.keys(set);
+        for (let i = 0; i < VCSets.length; i++) if (VCSets[i].UserID == set.UserID) {
+            let same = [], different = [];
+            keys.forEach((key) => {
+                if (set[key] == VCSets[i][key]) {
+                    same.push(key);
+                } else different.push(key)
+            })
 
-        // Write VCSets whenever a new one is made.
-        WriteVCSets();
+            different.splice(different.indexOf("Player"), 1) // Remove player from different list. (It's always different.)
+
+            // If model is the same, then replace. Otherwise, warn the user.
+            if (same.length == keys.length - 1) { // `keys.length - 1` is the length of the whole set object without the player, which will never be the same.
+                return interaction.editReply("You've already set this up! Try running `/stoptts` if you want to turn it off.")
+            } else {
+                // Update.
+                VCSets.splice(i, 1);
+                VCSets.push(set);
+                return interaction.editReply(`Link updated! (You already had TTS setup, except these changed: \`${different.join(", ")}\`)`)
+            }
+        }
+        // Add the set and write.
+        VCSets.push(set);
+
+        WriteVCSets(VCSets);
 
         interaction.editReply(`Link created! Just send messages in <#${input.id}> to test!`);
     },
@@ -172,17 +216,18 @@ module.exports = {
                 const inCall = output.members.has(message.author.id)
 
                 const path = __dirname + `/../Temp/${message.author.id}_chat_tts.wav`;
-                if (inCall)
+                if (inCall) {
                     Voice(message.content, path, set.Model).then(() => {
                         PlayAudioToVC(path, set)
-                        // Delete audio after it has finished playing.
-                        .then(() => {
-                            fs.unlinkSync(path);
-                        })
+                            // Delete audio after it has finished playing.
+                            .then(() => {
+                                fs.unlinkSync(path);
+                            })
 
                         // Log what was said.
                         WriteToLogChannel(message.guildId, `${message.author.displayName} in <#${set.OutputID}> voiced:\`\`\`` + message.content + "```")
                     })
+                }
 
                 // Since this considered voicing, we're done.
                 return;
@@ -199,14 +244,14 @@ module.exports = {
     async OnAutocomplete(interaction) {
         // Get active embeddings.
         const choices = GetEmbeddingsToChoices();
-        
+
         // Get what the user has currently typed in.
         const stringValue = interaction.options.getFocused();
-        
+
         // Filter to just matching ones. Also, cut off if we have more than twenty responses.
-		let filtered = choices.filter(choice => choice.name.toLowerCase().startsWith(stringValue.toLowerCase()));
+        let filtered = choices.filter(choice => choice.name.toLowerCase().startsWith(stringValue.toLowerCase()));
         if (filtered.length > 20) filtered = filtered.slice(0, 20);
-		
+
         // Send back our response.
         await interaction.respond(filtered);
     }

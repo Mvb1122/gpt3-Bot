@@ -23,6 +23,7 @@ const text = `
 - TTS should stay on indefinitely until you stop it manually.	
 	- If it glitches, you may have to stop/start it.
 - TTS messages will only be read if you're in the call.
+- You can rerun \`/starttts\` to change settings if you want.
 
 # Stopping TTS:
 - Just run \`/stoptts\` to stop it.

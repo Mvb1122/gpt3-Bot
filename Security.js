@@ -110,6 +110,8 @@ if (fs.existsSync(FileNames.UniLog))
     });
 
 async function WriteToLogChannel(guildId, message) {
+    console.log(`[${guildId}] ${message.replaceAll("\`\`\`", "\n")} `);
+
     const logChannel = await GetPolicy(guildId, "modchannel");
     if (logChannel != undefined) {
         const Log = await Index.client.channels.fetch(logChannel);
@@ -120,14 +122,14 @@ async function WriteToLogChannel(guildId, message) {
                 roles: ['0'] 
             }
         });
-
-        // Write to the UniLog. 
-        if (UniLog[guildId] == undefined) UniLog[guildId] = [];
-        UniLog[guildId].push(message);
-        
-        // Warning: May cause file corruption during times of high usage/when file cannot be written fast enough.
-        fp.writeFile("./UniLog.json", JSON.stringify(UniLog));
     }
+
+    // Write to the UniLog. 
+    if (UniLog[guildId] == undefined) UniLog[guildId] = [];
+    UniLog[guildId].push(message);
+    
+    // Warning: May cause file corruption during times of high usage/when file cannot be written fast enough.
+    fp.writeFile("./UniLog.json", JSON.stringify(UniLog));
 }
 
 async function WriteToLogChannel(guildId, message) {

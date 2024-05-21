@@ -1350,7 +1350,7 @@ const SetBase = require('./Commands/SetBase');
 3: Main PC Both GPUs + Server
 4: Main PC Main
 */
-Gradio.ConnectToPreset(2);
+Gradio.ConnectToPreset(1);
 
 //#region Gradio Demo generate.
 /*

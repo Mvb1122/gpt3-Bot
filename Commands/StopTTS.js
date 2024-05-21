@@ -1,5 +1,7 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
+let { VCSets, WriteVCSets } = require('./TTSToVC');
+const { getVoiceConnection } = require('@discordjs/voice');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -14,19 +16,23 @@ module.exports = {
         // Defer for safety.
         await interaction.deferReply();
 
-        let { VCSets, WriteVCSets } = require('./TTSToVC');
-
         // Delete VCSets entry under user's id.
         let Deleted = false;
         for (let i = 0; i < VCSets.length; i++) {
-            if (VCSets[i].UserID == interaction.user.id && VCSets[i].InputID == interaction.channelId) {
-                VCSets = VCSets.splice(i, 1);
-                require("./TTSToVC").VCSets = VCSets;
+            const IsUser = VCSets[i].UserID == interaction.user.id;
+            const IsChannel = VCSets[i].InputID == interaction.channelId;
+            
+            if (IsUser && IsChannel) {
+                // Try to disconnect voice.
+                const connection = getVoiceConnection(VCSets[i].OutputGuildID);
+                if (connection != undefined) connection.destroy()
+
+                VCSets.splice(i, 1);
                 Deleted = true;
             }
         }
 
-        WriteVCSets();
+        WriteVCSets(VCSets);
 
         if (!Deleted)
             interaction.editReply("Please run this in a channel which is reading your messages! See `/ttshelp` for more information.")
