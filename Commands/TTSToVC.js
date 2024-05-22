@@ -171,26 +171,27 @@ module.exports = {
         
         // Look to see if this set has already been created.
         const keys = Object.keys(set);
-        for (let i = 0; i < VCSets.length; i++) if (VCSets[i].UserID == set.UserID) {
-            let same = [], different = [];
-            keys.forEach((key) => {
-                if (set[key] == VCSets[i][key]) {
-                    same.push(key);
-                } else different.push(key)
-            })
+        for (let i = 0; i < VCSets.length; i++) 
+            if (VCSets[i].UserID == set.UserID) {
+                let same = [], different = [];
+                keys.forEach((key) => {
+                    if (set[key] == VCSets[i][key]) {
+                        same.push(key);
+                    } else different.push(key)
+                })
 
-            different.splice(different.indexOf("Player"), 1) // Remove player from different list. (It's always different.)
+                different.splice(different.indexOf("Player"), 1) // Remove player from different list. (It's always different.)
 
-            // If model is the same, then replace. Otherwise, warn the user.
-            if (same.length == keys.length - 1) { // `keys.length - 1` is the length of the whole set object without the player, which will never be the same.
-                return interaction.editReply("You've already set this up! Try running `/stoptts` if you want to turn it off.")
-            } else {
-                // Update.
-                VCSets.splice(i, 1);
-                VCSets.push(set);
-                return interaction.editReply(`Link updated! (You already had TTS setup, except these changed: \`${different.join(", ")}\`)`)
+                // If model is the same, then replace. Otherwise, warn the user.
+                if (same.length == keys.length - 1) { // `keys.length - 1` is the length of the whole set object without the player, which will never be the same.
+                    return interaction.editReply("You've already set this up! Try running `/stoptts` if you want to turn it off.")
+                } else {
+                    // Update.
+                    VCSets.splice(i, 1);
+                    VCSets.push(set);
+                    return interaction.editReply(`Link updated! (You already had TTS setup, except these changed: \`${different.join(", ")}\`)`)
+                }
             }
-        }
         // Add the set and write.
         VCSets.push(set);
 
@@ -215,7 +216,7 @@ module.exports = {
                 const output = await client.channels.fetch(set.OutputID);
                 const inCall = output.members.has(message.author.id)
 
-                const path = __dirname + `/../Temp/${message.author.id}_chat_tts.wav`;
+                const path = __dirname + `/../Temp/${Math.floor(Math.random() * 100000)}_chat_tts.wav`; // Prevent error when speaking too fast by randomly naming tts wavs.
                 if (inCall) {
                     Voice(message.content, path, set.Model).then(() => {
                         PlayAudioToVC(path, set)
