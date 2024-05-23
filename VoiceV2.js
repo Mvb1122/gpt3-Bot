@@ -90,6 +90,7 @@ function Start() {
         pythonProcess.stderr.on('data', (data) => {
             if (DoConsoleLog)    
                 console.log(data.toString());
+            
             if (data.includes("Running on")) {
                 Started = true;
                 res();
@@ -110,18 +111,24 @@ function ConvertFFMPEG(AudioFileName) {
         let options = [];
 
         // Special options for dealing with Opus audio.
-        if (AudioFileName.includes(".pcm")) options = options.concat("-f s16le -ar 48k -ac 2".split(" "))
-        else options = options.concat([`-ar`, `16000`, `-ac`, `1`])
+        if (AudioFileName.includes(".pcm")) options = options.concat(`-f s16le -ar 48k -ac 2 -i ${AudioFileName}`.split(" "))
+        else options = options.concat([`-i`, AudioFileName, `-ar`, `16000`, `-ac`, `1`])
 
         // Finally, add output stuff.
-        options = options.concat([`-i`, AudioFileName, OutputName, `-y`]);
+        options = options.concat([OutputName, `-y`]);
 
-        // console.log(`ffmpeg ${options.join(" ")}`);
+        if (DoConsoleLog)
+            console.log(`ffmpeg ${options.join(" ")}`);
+        
         const ffmpeg = spawn('ffmpeg', options);
 
         ffmpeg.stderr.on('end', () => {
             res(OutputName);
         })
+
+        if (DoConsoleLog) {
+            ffmpeg.stderr.on('data', (d) => console.log(d.toString()));
+        }
     })
 }
 
@@ -285,9 +292,9 @@ module.exports = {
                     fp.unlink(name);
                     res(e.message.text != null ? e.message.text : e.message);
                 }, (e) => {
-                    // If we fail, still delete. Just res blank.
+                    // If we fail, still delete. Just res the error I guess.
                     fp.unlink(name);
-                    res("");
+                    res(e);
                 });
             })
         })

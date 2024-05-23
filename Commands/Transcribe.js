@@ -198,15 +198,15 @@ module.exports = {
                 // Join voice call, subscribe to all people.
                     // EnsureHasConnectionTo(input);
                 input.members.forEach(member => {
-                    SubscribeTranscribe(member, set);
+                    if (!member.user.bot) // Only transcribe people.
+                        SubscribeTranscribe(member, set);
                 })
             });
         } else if (subcommand == "stopcall") {
-            let removed = false; 
             const VoiceID = interaction.member.voice.channelId ?? null;
-
             if (VoiceID == null) return interaction.editReply("Please join the call you wish to stop transcribing.");
-
+            
+            let removed = false; 
             for (let i = 0; i < TranscribingSets.length; i++)
                 if (TranscribingSets[i].Input == VoiceID) {
                     // Try to leave VC.
@@ -214,9 +214,13 @@ module.exports = {
                     if (connection != undefined) connection.destroy()
 
                     TranscribingSets.splice(i, 1);
+                    removed = true;
                 }
 
-            interaction.editReply("Stopped listening!")
+            if (removed)
+                interaction.editReply("Stopped listening!")
+            else
+                interaction.editReply("It doesn't look like I was listening!")
         }
     },
 
@@ -230,10 +234,11 @@ module.exports = {
      */
     OnVoiceStateUpdate(oldState, newState) {
         // Look to see if they joined a channel we're transcribing.
-        for (let i = 0; i < TranscribingSets.length; i++) 
-            if (newState.channelId == TranscribingSets[i].Input) {
-                SubscribeTranscribe(newState.member, TranscribingSets[i]);
-            }
+        if (!member.user.bot) // Only transcribe people.
+            for (let i = 0; i < TranscribingSets.length; i++) 
+                if (newState.channelId == TranscribingSets[i].Input) {
+                    SubscribeTranscribe(newState.member, TranscribingSets[i]);
+                }
     }
 }
 
