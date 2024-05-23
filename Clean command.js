@@ -6,7 +6,7 @@
 
 
 //Ignore ts(80001)
-const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
+const { SlashCommandBuilder, CommandInteraction, VoiceState } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -39,6 +39,15 @@ module.exports = {
      * @param {AutocompleteInteraction} interaction The Autocomplete request.
      */
     async OnAutocomplete(interaction) {
+
+    },
+
+    /**
+     * Triggers when a user's voice state updates.
+     * @param {VoiceState} oldState 
+     * @param {VoiceState} newState 
+     */
+    OnVoiceStateUpdate(oldState, newState) {
 
     }
 }

@@ -7,13 +7,8 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
 const { Download } = require('../Gradio/Helpers');
-const { Embed, AudioTypes } = require('../VoiceV2');
+const { Embed, FileIsAudio, NonSplitTypes } = require('../VoiceV2');
 const fp = require('fs/promises');
-
-function FileIsAudio(name) {
-    for (let i = 0; i < AudioTypes.length; i++) if (name.includes(AudioTypes[i])) return true;
-    return false;
-}
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -48,7 +43,7 @@ module.exports = {
         let AudioPath;
         
         if (!FileIsAudio(fileName))
-            return interaction.editReply("You provided a non-supported image. Here are the supported types: ```" + NonSplitTypes + "```\nSee `/ttshelp` for more information.")
+            return interaction.editReply("You provided a non-supported audio/video file! Here are the supported types: ```" + NonSplitTypes + "```\nSee `/ttshelp` for more information.")
         else 
             try {
                 AudioPath = await Download(url, `./Temp/${fileName}`);

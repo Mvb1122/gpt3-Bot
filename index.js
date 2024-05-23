@@ -1267,6 +1267,15 @@ client.on("interactionCreate",
     }
   )
 
+// Handle Voice state changes.
+client.on("voiceStateUpdate", (old, newState) => {
+  for (let i = 0; i < SlashCommands.length; i++) {
+    const module = SlashCommands[i];
+    if ('OnVoiceStateUpdate' in module) 
+      module.OnVoiceStateUpdate(old, newState);
+  }
+})
+
 async function AskChatGPTAndSendResponse(content, message) {
   let requestOut = RequestChatGPT(content, message)
     .then(Convo => {

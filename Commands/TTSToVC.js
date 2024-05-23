@@ -1,7 +1,7 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction, Message, ChannelType, AudioPlayer, VoiceChannel } = require('discord.js');
-const { VoiceConnectionStatus, createAudioPlayer, NoSubscriberBehavior, joinVoiceChannel, createAudioResource, getVoiceConnection } = require('@discordjs/voice');
-const { Voice, GetEmbeddingsToChoices, ListEmbeddings, DefaultEmbedding } = require('../VoiceV2');
+const { VoiceConnectionStatus, createAudioPlayer, NoSubscriberBehavior, joinVoiceChannel, createAudioResource, getVoiceConnection, VoiceConnection } = require('@discordjs/voice');
+const { Voice, GetEmbeddingsToChoices, DefaultEmbedding } = require('../VoiceV2');
 const { client } = require('../index');
 const fs = require('fs');
 const { WriteToLogChannel } = require('../Security');
@@ -17,7 +17,6 @@ function getPlayer() {
 }
 
 /**
- * 
  * @param {String} path Path to sound file.
  * @param {{
     UserID: number;
@@ -53,7 +52,7 @@ function PlayAudioToVC(path, set) {
     OutputGuildID: number;
     Player: AudioPlayer;
 }} set Set information.
- * @returns {Promise} Promise which resolves when connected.
+ * @returns {Promise<VoiceConnection>} Promise which resolves when connected.
  */
 function ConnectToChannel(set) {
     return new Promise(async (res) => {
@@ -61,9 +60,10 @@ function ConnectToChannel(set) {
 
         if (Connection != undefined) {
             // Add the player.
-            Connection.subscribe(set.Player);
+            if (set.Player != undefined)
+                Connection.subscribe(set.Player);
 
-            return res();
+            return res(Connection);
         } else {
             const guild = await client.guilds.fetch(set.OutputGuildID);
             const adapterCreator = guild.voiceAdapterCreator;
@@ -71,12 +71,15 @@ function ConnectToChannel(set) {
             Connection = joinVoiceChannel({
                 channelId: set.OutputID,
                 guildId: set.OutputGuildID,
-                adapterCreator: adapterCreator
+                adapterCreator: adapterCreator,
+                selfDeaf: false,
+                selfMute: false
             });
             
             Connection.on(VoiceConnectionStatus.Ready, async () => {
-                Connection.subscribe(set.Player);
-                return res();
+                if (set.Player != undefined)
+                    Connection.subscribe(set.Player);
+                return res(await Connection);
             }, { once: true });
         }
     });
@@ -139,7 +142,7 @@ module.exports = {
         .addChannelOption(o => {
             return o.setName("input")
                 .setDescription("The channel to read. If left blank, uses current.")
-                .addChannelTypes(ChannelType.GuildText)
+                .addChannelTypes(ChannelType.GuildText, ChannelType.PublicThread, ChannelType.PrivateThread, ChannelType.AnnouncementThread)
                 .setRequired(false)
         })
         .addStringOption(o => {
@@ -158,7 +161,9 @@ module.exports = {
         // Get inputs.
         const input = interaction.options.getChannel("input") ?? interaction.channel;
         const model = interaction.options.getString("model") ?? DefaultEmbedding;
-        const output = interaction.options.getChannel("output");
+        const UserVoiceChannelID = interaction.member.voice.channelId;
+        const output = interaction.options.getChannel("output") ?? (UserVoiceChannelID != null ? await client.channels.fetch(UserVoiceChannelID) : null) ?? null;
+        if (output == null) return interaction.editReply("Please join or select a voice channel!");;
 
         const set = {
             UserID: interaction.user.id,
@@ -237,7 +242,7 @@ module.exports = {
     },
 
     // Also share voice sets and useful voice information.
-    VCSets, PlayAudioToVC, WriteVCSets,
+    VCSets, PlayAudioToVC, WriteVCSets, ConnectToChannel,
 
     /**
      * @param {AutocompleteInteraction} interaction The Autocomplete request.

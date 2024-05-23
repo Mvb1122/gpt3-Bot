@@ -1,65 +1,132 @@
 //Ignore ts(80001)
-const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
-const wavefile = require('wavefile')
-
-let pipe = undefined;
-// Loads the AI in advance to decrease time-to-response for user.
-async function Preload() {
-    // Allocate a pipeline for sentiment-analysis
-    const { pipeline } = await import("@xenova/transformers");
-    pipe = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en');
-}
+const { SlashCommandBuilder, CommandInteraction, ChannelType, VoiceChannel, GuildMember, VoiceState } = require('discord.js');
+const { Download } = require('../Gradio/Helpers');
+const { Transcribe, FileIsAudio, NonSplitTypes, PreloadTranscribe } = require('../VoiceV2');
+const fp = require('fs/promises');
+const fs = require('fs');
+const { ConnectToChannel } = require('./TTSToVC');
+const { getVoiceConnection, VoiceConnection, EndBehaviorType } = require('@discordjs/voice');
+const { client } = require('..');
+const prism = require('prism-media')
 
 /**
- * Transcribes audio to text.
- * @param {Float64Array} data Path or URL to audio to be transcribed.
- * @returns {Promise<{text: String, time: Number}>} Text, transcribed. time is in ms.
+ * Ensures that a voice connection to a channel exists.
+ * @param {VoiceChannel} channel 
+ * @returns {Promise<VoiceConnection>} The connection. 
  */
-async function Transcribe(data) {
-    // Only preload on first call.
-    if (pipe == undefined) await Preload();
-
-    const start = performance.now();
-    const output = await pipe(data);
-    time = performance.now() - start;
-    output.time = time;
-    return output;
+async function EnsureHasConnectionTo(channel) {
+    if (getVoiceConnection(channel) == undefined)
+        return await ConnectToChannel({ OutputGuildID: channel.guildId, OutputID: channel.id });
+    else return getVoiceConnection(channel);
 }
 
-async function TranscribeURL(url) {
-    // Load audio data
-    let buffer = Buffer.from(await fetch(url).then(x => x.arrayBuffer()))
+function TranscribeURL(url, name) {
+    return new Promise(async res => {
+        // Load audio data
+        const path = await Download(url, `./Temp/${name}`)
+        Transcribe(path).then(v => {
+            fp.unlink(path);
+            res(v);
+        });
+    })
+}
 
-    // Read .wav file and convert it to required format
-    let wav = new wavefile.WaveFile(buffer);
-    wav.toBitDepth('32f'); // Pipeline expects input as a Float32Array
-    wav.toSampleRate(16000); // Whisper expects audio with a sampling rate of 16000
-    let audioData = wav.getSamples();
-    if (Array.isArray(audioData)) {
-        if (audioData.length > 1) {
-            const SCALING_FACTOR = Math.sqrt(2);
+// const SubscribedMembers = [];
 
-            // Merge channels (into first channel to save memory)
-            for (let i = 0; i < audioData[0].length; ++i) {
-                audioData[0][i] = SCALING_FACTOR * (audioData[0][i] + audioData[1][i]) / 2;
+/**
+ * Subscribes transcription onto a user.
+ * @param {GuildMember} user User to subscribe transcription onto.
+ * @param {{ Output: number; Input: number }} Set to transcribe to. 
+ */
+async function SubscribeTranscribe(user, set) {
+    // Prevent subscribing to a user twice.
+    /*
+    const UserGuildId = `${user.guild.id}|${user.id}`;
+    if (SubscribedMembers.indexOf(UserGuildId) != -1) return;
+    else SubscribedMembers.push(UserGuildId); 
+    */
+
+    // Subscribe to the user's audio.
+    const connection = await EnsureHasConnectionTo(await client.channels.fetch(set.Input))
+    const subscription = connection.receiver.subscribe(user.id, 
+        { 
+            end: { 
+                behavior: EndBehaviorType.AfterSilence, 
+                duration: 100 
             }
         }
+    );
 
-        // Select first channel
-        audioData = audioData[0];
-    }
+    let path = MakeRandomPath();
+    const writeStream = fs.createWriteStream(path);
 
-    return await Transcribe(audioData);
+    const opusDecoder = new prism.opus.Decoder({
+        frameSize: 960,
+        channels: 2,
+        rate: 48000,
+    });
+
+    subscription.pipe(opusDecoder).pipe(writeStream);
+
+    subscription.on('close', async () => {
+        Transcribe(path).then(async val => {
+            val = val.trim();
+            fp.unlink(path);
+
+            const output = await client.channels.fetch(set.Output);
+            if (val.toLowerCase() != "you" && val != "")
+                output.send(`${user.nickname ?? user.displayName} | ${val}`);
+        })
+
+        // If this set is still in the list, then keep transcribing.
+        if (TranscribingSets.indexOf(set) != -1) SubscribeTranscribe(user, set);
+    });
 }
+
+let TranscribingSets = [
+    {
+        Output: 1234, // Text channel ID.
+        Input: 1234 // Voice channel ID. 
+    }
+];
+TranscribingSets = [];
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('transcribe')
         .setDescription("Transcribes audio to text.")
-        .addAttachmentOption(option => {
-            return option.setName("voice")
-                .setDescription("The voice you want to transcribe.")
-                .setRequired(true)
+        .addSubcommandGroup(o => {
+            return o.setName("mode")
+                .setDescription("Transcribe a file or a voice call.")
+                .addSubcommand(s => {
+                    return s.setName("file")
+                        .setDescription("Transcribe a file.")
+                        .addAttachmentOption(option => {
+                            return option.setName("voice")
+                                .setDescription("The voice you want to transcribe.")
+                                .setRequired(true)
+                        })
+                })
+                .addSubcommand(s => {
+                    return s.setName("call")
+                        .setDescription("Transcribe a voice call.")
+                        .addChannelOption(op => {
+                            return op.setName("input")
+                                .setDescription("The voice call to transcribe.")
+                                .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
+                                .setRequired(false);
+                        })
+                        .addChannelOption(op => {
+                            return op.setName("output")
+                                .setDescription("The text channel to transcribe into.")
+                                .addChannelTypes(ChannelType.GuildText, ChannelType.PublicThread, ChannelType.PrivateThread, ChannelType.AnnouncementThread)
+                                .setRequired(false);
+                        })
+                })
+                .addSubcommand(s => {
+                    return s.setName("stopcall")
+                        .setDescription("Stops transcribing a voice call.")
+                })
         }),
 
     /**
@@ -69,22 +136,107 @@ module.exports = {
     async execute(interaction) {
         await interaction.deferReply();
 
-        // Download it.
-        const attachment = interaction.options.getAttachment("voice")
-        const url = attachment.url
+        // Get subcommand.
+        const subcommand = interaction.options.getSubcommand();
 
-        // return interaction.editReply("You provided a non-supported image. Here are the supported types: ```" + "Actually I'm not sure what's supported, but if it broke, then it's probably not supported." + "```")
-        try {
-            const text = await TranscribeURL(url);
-            interaction.editReply({
-                content: "```" + text.text + "```\nTime: " + text.time.toFixed(2)/1000 + " seconds",
-                files: [url]
+        if (subcommand == "file") {
+            const attachment = interaction.options.getAttachment("voice")
+            const url = attachment.url, name = attachment.name;
+            if (!FileIsAudio(name)) return interaction.editReply("You provided a non-supported audio/video file! Here are the supported types: ```" + NonSplitTypes + "```\nSee `/ttshelp` for more information.");
+
+            // return interaction.editReply("You provided a non-supported image. Here are the supported types: ```" + "Actually I'm not sure what's supported, but if it broke, then it's probably not supported." + "```")
+            try {
+                let TimeTaken = performance.now();
+                TranscribeURL(url, name).then(val => {
+                    TimeTaken = ((performance.now() - TimeTaken) / 1000).toFixed(2);
+                    if (val.length >= 2000) {
+                        do {
+                            let end = val.length >= 2000 ? 2000 : val.length
+                            interaction.channel.send(val.substring(0, end));
+                            val = val.substring(end);
+                        } while (val.length != 0)
+
+                        interaction.editReply({
+                            content: "```See below!```\nTime Taken: " + TimeTaken + " seconds",
+                            files: [url]
+                        });
+                    } else
+                        interaction.editReply({
+                            content: "```" + val + "```\nTime Taken: " + TimeTaken + " seconds",
+                            files: [url]
+                        });
+                })
+            } catch (e) {
+                interaction.editReply("Something went wrong! ```" + e + "```");
+            }
+        } else if (subcommand == "call") {
+            interaction.editReply("I'll join in a second! Once I'm in, I'll be listening. You can run `/transcribe mode stopcall` to stop.");
+
+            /**
+             * @type {VoiceChannel}
+             */
+            let input;
+
+            // Select the output text channel.
+            const output = interaction.options.getChannel("output") ?? interaction.channel;
+
+            // Select the input voice channel.
+            const ChannelInput = interaction.options.getChannel("input");
+            const inputId = (ChannelInput != null ? ChannelInput.id : null) ?? interaction.member.voice.channelId ?? null;
+            if (inputId == null) return interaction.editReply("Please join or select a voice channel!");
+            else input = await client.channels.fetch(inputId);
+
+            // Make up a transcribing set.
+            const set = {
+                Output: output.id,
+                Input: input.id
+            }
+            TranscribingSets.push(set);
+
+            // Because this will make lots of calls to transcribe, force it to be preloaded before we actually start transcribing anything.
+            PreloadTranscribe().then(() => {
+                // Join voice call, subscribe to all people.
+                    // EnsureHasConnectionTo(input);
+                input.members.forEach(member => {
+                    SubscribeTranscribe(member, set);
+                })
             });
-        } catch (e) {
-            interaction.editReply("Something went wrong! ```" + e + "```");
+        } else if (subcommand == "stopcall") {
+            let removed = false; 
+            const VoiceID = interaction.member.voice.channelId ?? null;
+
+            if (VoiceID == null) return interaction.editReply("Please join the call you wish to stop transcribing.");
+
+            for (let i = 0; i < TranscribingSets.length; i++)
+                if (TranscribingSets[i].Input == VoiceID) {
+                    // Try to leave VC.
+                    const connection = getVoiceConnection(interaction.guildId);
+                    if (connection != undefined) connection.destroy()
+
+                    TranscribingSets.splice(i, 1);
+                }
+
+            interaction.editReply("Stopped listening!")
         }
     },
 
     // Export transcribe methods.
-    Transcribe, TranscribeURL
+    TranscribeURL,
+
+    /**
+     * Handles people joining/leaving call causing voice subscription requirements. 
+     * @param {VoiceState} oldState 
+     * @param {VoiceState} newState 
+     */
+    OnVoiceStateUpdate(oldState, newState) {
+        // Look to see if they joined a channel we're transcribing.
+        for (let i = 0; i < TranscribingSets.length; i++) 
+            if (newState.channelId == TranscribingSets[i].Input) {
+                SubscribeTranscribe(newState.member, TranscribingSets[i]);
+            }
+    }
+}
+
+function MakeRandomPath() {
+    return `./Temp/${(Math.random() * 10000).toFixed(0)}.pcm`;
 }

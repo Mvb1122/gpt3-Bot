@@ -13,23 +13,38 @@ print("Running audio synth on " + device)
 
 synthesiser = pipeline("text-to-speech", "microsoft/speecht5_tts", device=device)
 used_time = time.time() - used_time
-
-'''
-# To be used if GPU support is added for this model:
-# Make sure the synthesiser lands on the GPU.
-if torch.cuda.is_available():
-  synthesiser.to("cuda:0")
-''' 
-
 print("Loading time: " + str(used_time))
 
-'''
-from datasets import load_dataset
-embeddings_dataset = load_dataset("Matthijs/cmu-arctic-xvectors", split="validation")
-speaker_embedding = torch.tensor(embeddings_dataset[7306]["xvector"]).unsqueeze(0)
-print(speaker_embedding.size())
-# You can replace this embedding with your own as well.
-'''
+# Gets transcription AI stuff.
+def MakeTranscriber():
+  from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
+  torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+  model_id = "openai/whisper-large-v3"
+  model = AutoModelForSpeechSeq2Seq.from_pretrained(model_id, torch_dtype=torch_dtype, low_cpu_mem_usage=True, use_safetensors=True)
+  model.to(device)
+  processor = AutoProcessor.from_pretrained(model_id)
+
+  return pipeline(
+    "automatic-speech-recognition",
+    model=model,
+    tokenizer=processor.tokenizer,
+    feature_extractor=processor.feature_extractor,
+    max_new_tokens=128,
+    chunk_length_s=30,
+    batch_size=16,
+    return_timestamps=False,
+    torch_dtype=torch_dtype,
+    device=device,
+  )
+
+transcriber = None
+def transcribe(path):
+  global transcriber
+  # Make transcriber if needed.
+  if type(transcriber) is type(None):
+    transcriber = MakeTranscriber()
+    
+  return transcriber(path)
 
 def GetEmbedding(location):
   with open(location, "rb") as f:
@@ -111,6 +126,24 @@ def embed_function():
             return jsonify({'error': 'Invalid JSON structure', 'data': data}), 400
     else:
         return jsonify({'error': 'Request must be JSON', 'data': request.form }), 400
-    
+
+@app.route('/transcribe', methods=['POST'])
+def transcribe_function():
+  if request.is_json:
+      data = request.get_json()
+      if 'source' in data:
+          return jsonify({'message': transcribe(data['source'])}), 200
+      else:
+          return jsonify({'error': 'Invalid JSON structure', 'data': data}), 400
+  else:
+      return jsonify({'error': 'Request must be JSON', 'data': request.form }), 400
+
+@app.route('/preload_transcribe', methods=['POST', 'GET'])
+def preload_transcribe():
+  global transcriber
+  # Make transcriber if needed.
+  if type(transcriber) is type(None):
+    transcriber = MakeTranscriber()
+  return jsonify({'Message': True}), 200
 
 app.run(debug=False, port=4963)
