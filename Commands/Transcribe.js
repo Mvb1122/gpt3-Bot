@@ -1,5 +1,5 @@
 //Ignore ts(80001)
-const { SlashCommandBuilder, CommandInteraction, ChannelType, VoiceChannel, GuildMember, VoiceState } = require('discord.js');
+const { SlashCommandBuilder, CommandInteraction, ChannelType, VoiceChannel, GuildMember, VoiceState, Message } = require('discord.js');
 const { Download } = require('../Gradio/Helpers');
 const { Transcribe, FileIsAudio, NonSplitTypes, PreloadTranscribe } = require('../VoiceV2');
 const fp = require('fs/promises');
@@ -7,7 +7,8 @@ const fs = require('fs');
 const { ConnectToChannel } = require('./TTSToVC');
 const { getVoiceConnection, VoiceConnection, EndBehaviorType } = require('@discordjs/voice');
 const { client } = require('..');
-const prism = require('prism-media')
+const prism = require('prism-media');
+const { LogTo, StartLog, StopLog } = require('../TranscriptionLogger');
 
 /**
  * Ensures that a voice connection to a channel exists.
@@ -31,20 +32,23 @@ function TranscribeURL(url, name) {
     })
 }
 
-// const SubscribedMembers = [];
+const SubscribedMembers = [];
 
 /**
  * Subscribes transcription onto a user.
  * @param {GuildMember} user User to subscribe transcription onto.
  * @param {{ Output: number; Input: number }} Set to transcribe to. 
  */
-async function SubscribeTranscribe(user, set) {
+async function SubscribeTranscribe(user, set, bypassSubscribedMembers = false) {
     // Prevent subscribing to a user twice.
-    /*
-    const UserGuildId = `${user.guild.id}|${user.id}`;
-    if (SubscribedMembers.indexOf(UserGuildId) != -1) return;
-    else SubscribedMembers.push(UserGuildId); 
-    */
+    if (!bypassSubscribedMembers) {
+        const UserGuildId = `${user.guild.id}|${user.id}`;
+        if (SubscribedMembers.indexOf(UserGuildId) == -1) {
+            // Add to the list, but also allow our recursions to bypass this if we're adding a new person.
+            SubscribedMembers.push(UserGuildId); 
+            bypassSubscribedMembers = true;
+        }
+    }
 
     // Subscribe to the user's audio.
     const connection = await EnsureHasConnectionTo(await client.channels.fetch(set.Input))
@@ -67,16 +71,41 @@ async function SubscribeTranscribe(user, set) {
     });
 
     subscription.pipe(opusDecoder).pipe(writeStream);
+    
+    let start = 0;
+    subscription.on("data", () => {
+        if (start == 0) {
+            start = performance.now();
+        }
+    })
 
     subscription.on('close', async () => {
-        Transcribe(path).then(async val => {
-            val = val.trim();
-            fp.unlink(path);
+        const TimeTaken = performance.now() - start;
+        
+        // Only transcribe if they were talking for more than 1/3 second.
+        if (TimeTaken >= 150)
+            Transcribe(path).then(async val => {
+                val = val.trim();
+                const Name = user.nickname ?? user.displayName;
+                if (val.toLowerCase() == "you" || val == "") return;
 
-            const output = await client.channels.fetch(set.Output);
-            if (val.toLowerCase() != "you" && val != "")
-                output.send(`${user.nickname ?? user.displayName} | ${val}`);
-        })
+                LogTo(user.guild.id, "STT", Name, val);
+
+                // Always delete file.
+                await fp.unlink(path);
+            }, () => {
+                // If the transcription fails, just unlink the audio file, I guess.
+                try {
+                    fp.unlink(path);
+                } catch {
+                    ; // Do nothing.
+                }
+            })
+
+        else // Just delete the file.
+            try { 
+                fp.unlink(path) 
+            } catch { ; } // Do nothing.
 
         // If this set is still in the list, then keep transcribing.
         if (TranscribingSets.indexOf(set) != -1) SubscribeTranscribe(user, set);
@@ -197,6 +226,10 @@ module.exports = {
             PreloadTranscribe().then(() => {
                 // Join voice call, subscribe to all people.
                     // EnsureHasConnectionTo(input);
+
+                // Start the logger thing.
+                StartLog(interaction.guildId, set.Output);
+
                 input.members.forEach(member => {
                     if (!member.user.bot) // Only transcribe people.
                         SubscribeTranscribe(member, set);
@@ -215,6 +248,9 @@ module.exports = {
 
                     TranscribingSets.splice(i, 1);
                     removed = true;
+
+                    // Also stop the logger.
+                    StopLog(interaction.guildId);
                 }
 
             if (removed)
@@ -234,7 +270,7 @@ module.exports = {
      */
     OnVoiceStateUpdate(oldState, newState) {
         // Look to see if they joined a channel we're transcribing.
-        if (!member.user.bot) // Only transcribe people.
+        if (!newState.member.user.bot && SubscribedMembers.indexOf(`${newState.guild.id}|${newState.member.id}`) == -1) // Only transcribe people.
             for (let i = 0; i < TranscribingSets.length; i++) 
                 if (newState.channelId == TranscribingSets[i].Input) {
                     SubscribeTranscribe(newState.member, TranscribingSets[i]);

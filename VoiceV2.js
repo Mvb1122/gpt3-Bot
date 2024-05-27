@@ -151,6 +151,12 @@ function FileIsAudio(name) {
     return false;
 }
 
+/**
+ * A promise which resolves when the last transcription job is done.
+ * @type {Promise}
+ */
+let LastTranscribe = null;
+
 module.exports = {
     /**
      * Voices a text line into a file.
@@ -172,25 +178,29 @@ module.exports = {
 
             // Reformat text to replace numbers with words.
             const numbers = text.match(NumberMatchingRegex);
-            if (numbers != null) {
-                // Go through each one and replace it.
-                for (let i = 0; i < numbers.length; i++) {
-                    /**
-                     * @type {string}
-                     */
-                    const sub = numbers[i].replaceAll(",", "");
-                    const hasPoint = sub.includes(".")
-                    const pointIndex = hasPoint ? sub.indexOf(".") : sub.length;
-                    const beforePoint = sub.substring(0, pointIndex);
-
-                    let converted = converter.toWords(beforePoint);
-                    if (hasPoint) try {
-                        let afterPoint = sub.substring(pointIndex + 1);
-                        converted += " point " + converter.toWords(afterPoint);
-                    } catch { ; } // Do nothing.
-
-                    text = text.replace(numbers[i], converted);
+            try {
+                if (numbers != null) {
+                    // Go through each one and replace it.
+                    for (let i = 0; i < numbers.length; i++) {
+                        /**
+                         * @type {string}
+                         */
+                        const sub = numbers[i].replaceAll(",", "");
+                        const hasPoint = sub.includes(".")
+                        const pointIndex = hasPoint ? sub.indexOf(".") : sub.length;
+                        const beforePoint = sub.substring(0, pointIndex);
+    
+                        let converted = converter.toWords(beforePoint);
+                        if (hasPoint) try {
+                            let afterPoint = sub.substring(pointIndex + 1);
+                            converted += " point " + converter.toWords(afterPoint);
+                        } catch { ; } // Do nothing.
+    
+                        text = text.replace(numbers[i], converted);
+                    }
                 }
+            } catch {
+                ; // Do nothing.
             }
 
             // Fix acronyms, only if the message isn't in all caps.
@@ -281,7 +291,9 @@ module.exports = {
      * @returns {Promise<string>} A promise which resolves the audio's text.
      */
     Transcribe(location) {
-        return new Promise(async res => {
+        const thisTranscribe = new Promise(async (res, rej) => {
+            if (LastTranscribe != null) await LastTranscribe;
+            // Wait for last transcription request to finish before starting this one.
             if (!Started) await Start();
 
             ConvertFFMPEG(location).then(name => {
@@ -292,12 +304,18 @@ module.exports = {
                     fp.unlink(name);
                     res(e.message.text != null ? e.message.text : e.message);
                 }, (e) => {
-                    // If we fail, still delete. Just res the error I guess.
-                    fp.unlink(name);
-                    res(e);
+                    // If we fail, still delete. Just reject the error I guess.
+                    try {
+                        fp.unlink(name);
+                    } catch {
+                        ; // Do nothing.
+                    }
+                    rej(e);
                 });
-            })
-        })
+            });
+        });
+        LastTranscribe = thisTranscribe;
+        return thisTranscribe;
     },
 
     /**

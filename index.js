@@ -1388,7 +1388,6 @@ let val = Gradio.GetTagsFromImage(debugImagePath)
 
 //#region Chat AI Microservice for the web.
 const http = require('http');
-const { debug } = require('console');
 const MicroserviceHTML = fs.readFileSync("./Microservice.html");
 /**
  * Parses the request.
@@ -1421,9 +1420,11 @@ async function listener(req, res) {
     res.setHeader("content-type", "text/html")
     return res.end(MicroserviceHTML);
   }
-
 }
 
+// On boot, delete the Temp folder.
+const fp = require('fs/promises')
+fs.readdirSync("./Temp/").forEach(file => fp.unlink(`./Temp/${file}`))
 
 const host = "192.168.1.3", port = "7243"
 const server = http.createServer(listener);

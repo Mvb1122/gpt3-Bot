@@ -5,6 +5,7 @@ const { Voice, GetEmbeddingsToChoices, DefaultEmbedding } = require('../VoiceV2'
 const { client } = require('../index');
 const fs = require('fs');
 const { WriteToLogChannel } = require('../Security');
+const { HasLog, LogTo } = require('../TranscriptionLogger');
 
 function getPlayer() {
     return createAudioPlayer(
@@ -163,7 +164,7 @@ module.exports = {
         const model = interaction.options.getString("model") ?? DefaultEmbedding;
         const UserVoiceChannelID = interaction.member.voice.channelId;
         const output = interaction.options.getChannel("output") ?? (UserVoiceChannelID != null ? await client.channels.fetch(UserVoiceChannelID) : null) ?? null;
-        if (output == null) return interaction.editReply("Please join or select a voice channel!");;
+        if (output == null) return await interaction.editReply("Please join or select a voice channel!");;
 
         const set = {
             UserID: interaction.user.id,
@@ -189,20 +190,20 @@ module.exports = {
 
                 // If model is the same, then replace. Otherwise, warn the user.
                 if (same.length == keys.length - 1) { // `keys.length - 1` is the length of the whole set object without the player, which will never be the same.
-                    return interaction.editReply("You've already set this up! Try running `/stoptts` if you want to turn it off.")
+                    return await interaction.editReply("You've already set this up! Try running `/stoptts` if you want to turn it off.")
                 } else {
                     // Update.
                     VCSets.splice(i, 1);
                     VCSets.push(set);
-                    return interaction.editReply(`Link updated! (You already had TTS setup, except these changed: \`${different.join(", ")}\`)`)
+                    WriteVCSets(VCSets);
+                    return await interaction.editReply(`Link updated! (You already had TTS setup, except these changed: \`${different.join(", ")}\`)`)
                 }
             }
         // Add the set and write.
         VCSets.push(set);
 
+        await interaction.editReply(`Link created! Just send messages in <#${input.id}> to test!`);
         WriteVCSets(VCSets);
-
-        interaction.editReply(`Link created! Just send messages in <#${input.id}> to test!`);
     },
 
     /**
@@ -230,7 +231,13 @@ module.exports = {
                                 fs.unlinkSync(path);
                             })
 
-                        // Log what was said.
+                        // Log what was said, also log to transcriptions if needed.
+                        if (HasLog(message.guildId)) {
+                            const user = message.member;
+                            const Name = user.nickname ?? user.displayName;
+                            LogTo(message.guildId, "TTS", Name, message.content.trim())
+                        }
+
                         WriteToLogChannel(message.guildId, `${message.author.displayName} in <#${set.OutputID}> voiced:\`\`\`` + message.content + "```")
                     })
                 }
