@@ -172,6 +172,7 @@ function WriteVCSets(sets = VCSets) {
     return fs.writeFileSync(VCSetsFile, JSON.stringify(copy));
 }
 
+let LastVoiceTime = 0;
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('starttts')
@@ -265,19 +266,13 @@ module.exports = {
             };
         }
 
+        const HasAllVoiceInVC = await HasPolicy(message.guildId, "allvoiceinvc");
+        const PolicyValue = await GetPolicy(message.guildId, "allvoiceinvc");
         // If this is a voice call text channel, just read their message.
-        if (message.channel.type == ChannelType.GuildVoice && (HasPolicy(message.guildId, "allvoiceinvc") && GetPolicy(message.guildId, "allvoiceinvc"))) {
-            // Ensure that user is in channel.
-            let UserInChannel = false;
-            /**
-             * @type {VoiceChannel}
-             */
-            const channel = message.channel;
-            for (let i = 0; i < channel.members.size; i++) 
-                if (channel.members.at(i).id == message.id) UserInChannel = true;
-
+        if (message.channel.type == ChannelType.GuildVoice && (HasAllVoiceInVC && PolicyValue)) {
             // Don't voice message if they aren't in the actual voice channel.
-            if (!UserInChannel) return;
+            const inCall = message.channel.members.has(message.author.id)
+            if (!inCall) return;
 
             const path = __dirname + `/../Temp/${Math.floor(Math.random() * 100000)}_chat_tts.wav`; // Prevent error when speaking too fast by randomly naming tts wavs.
             const set = {
@@ -288,7 +283,7 @@ module.exports = {
                 Player: getPlayer(), // Use a generic new player.
                 Model: VoiceV2.DefaultEmbedding
             };
-            
+
             Voice(message.content, path, set.Model).then(() => {
                 PlayAudioToVC(path, set)
                     // Delete audio after it has finished playing.

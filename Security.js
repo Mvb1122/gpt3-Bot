@@ -80,6 +80,7 @@ if (!(policies.length == policyTypes.length && policies.length == policyHelp.len
  * Fetches a policy from the security.
  * @param {string} gid GuildID
  * @param {"promptnsfw" | "modrole" | "modchannel" | "allvoiceinvc"} policy PolicyName
+ * @returns {Promise<*>}
  */
 async function GetPolicy(gid, policy) {
     if (Security == {}) await ReloadSecurity(false);
@@ -97,10 +98,10 @@ async function GetPolicy(gid, policy) {
  * Says whether a guild has a policy or not.
  * @param {string} gid GuildID
  * @param {"promptnsfw" | "modrole" | "modchannel" | "allvoiceinvc"} policy PolicyName
- * @returns {boolean}
+ * @returns {Promise<boolean>}
  */
 async function HasPolicy(gid, policy) {
-    return (await GetPolicy(gid, policy)) == undefined && Security[gid] != undefined;
+    return Security[gid] != undefined && !((await GetPolicy(gid, policy)) == undefined); // Lazy execution makes this safe.
 }
 
 /**
@@ -108,7 +109,7 @@ async function HasPolicy(gid, policy) {
  * @param {number} gid GuildID
  * @param {String} policy PolicyName
  * @param {*} value Policy value. Must be serializable.
- * @returns 
+ * @returns {Promise} Promise that resolves when entirely finished saving.
  */
 async function SetPolicy(gid, policy, value) {
     if (!policies.includes(policy)) {
