@@ -54,32 +54,53 @@ ReloadSecurity(false);
  * An array of the policies that the Security manager accepts.
  * @type {String[]}
  */
-const policies = ["promptnsfw", "modrole","modchannel"];
+const policies = ["promptnsfw", "modrole","modchannel","allvoiceinvc"];
 /**
  * An array of strings that define what type each policy accepts.
  * @type {"boolean" | "RoleID" | "ChannelID"}
  */
-const policyTypes = ["boolean", "RoleID", "ChannelID"];
+const policyTypes = ["boolean", "RoleID", "ChannelID", "boolean"];
 const policyHelp = [
     "Enable NSFW Filtering",
     "The role who can bypass NSFW.",
-    "The channel to log messages to."
+    "The channel to log messages to.",
+    "Whether or not to read all voice chat text messages in voice chat"
 ];
+
+const PolicyDefaults = {
+    "promptnsfw": false,
+    "modrole": undefined,
+    "modchannel": undefined,
+    "allvoiceinvc": true
+}
 
 if (!(policies.length == policyTypes.length && policies.length == policyHelp.length)) throw new Error("Security Policy type, Policy name, Policy help array length mismatch!");
 
 /**
  * Fetches a policy from the security.
  * @param {string} gid GuildID
- * @param {"promptnsfw" | "modrole" | "modchannel"} policy PolicyName
+ * @param {"promptnsfw" | "modrole" | "modchannel" | "allvoiceinvc"} policy PolicyName
  */
 async function GetPolicy(gid, policy) {
     if (Security == {}) await ReloadSecurity(false);
 
     const GuildIDType = typeof(gid);
     if (GuildIDType != 'string') throw new Error("Wrong paramter passed! gid should be typeof String.")
-        
+
+    // If the guild isn't listed, return the default value.
+    if (Security[gid] == undefined) return PolicyDefaults[policy]
+
     return Security[gid].policies[policy];
+}
+
+/**
+ * Says whether a guild has a policy or not.
+ * @param {string} gid GuildID
+ * @param {"promptnsfw" | "modrole" | "modchannel" | "allvoiceinvc"} policy PolicyName
+ * @returns {boolean}
+ */
+async function HasPolicy(gid, policy) {
+    return (await GetPolicy(gid, policy)) == undefined && Security[gid] != undefined;
 }
 
 /**
@@ -147,5 +168,5 @@ async function WriteToLogChannel(guildId, message) {
 }
 
 module.exports = {
-    ReloadSecurity, SaveSecurity, GetPolicy, SetPolicy, policies, policyTypes, policyHelp, WriteToLogChannel
+    ReloadSecurity, SaveSecurity, GetPolicy, SetPolicy, policies, policyTypes, policyHelp, WriteToLogChannel, HasPolicy
 }
