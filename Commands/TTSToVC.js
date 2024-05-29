@@ -6,6 +6,7 @@ const { client } = require('../index');
 const fs = require('fs');
 const { WriteToLogChannel } = require('../Security');
 const { HasLog, LogTo } = require('../TranscriptionLogger');
+const VoiceV2 = require('../VoiceV2');
 
 function getPlayer() {
     return createAudioPlayer(
@@ -114,8 +115,49 @@ const VCSetsFile = "./VCSets.json";
 LoadSets();
 
 /**
- * DO NOT RUN THIS!
- */
+* Adds a user set list thing to the VCSets list.
+* @param {{
+UserID: string;
+InputID: string;
+OutputID: string;
+OutputGuildID: string;
+Player: string | null;
+Model: string | null;
+}} set The set to register.
+* @returns {string} The status message.
+*/
+async function Register(set) {
+    // Look to see if this set has already been created.
+    const keys = Object.keys(set);
+    for (let i = 0; i < VCSets.length; i++)
+        if (VCSets[i].UserID == set.UserID && set.InputID == VCSets[i].InputID) {
+            let same = [], different = [];
+            keys.forEach((key) => {
+                if (set[key] == VCSets[i][key]) {
+                    same.push(key);
+                } else different.push(key)
+            })
+
+            different.splice(different.indexOf("Player"), 1) // Remove player from different list. (It's always different.)
+
+            // If model is the same, then replace. Otherwise, warn the user.
+            if (same.length == keys.length - 1) { // `keys.length - 1` is the length of the whole set object without the player, which will never be the same.
+                return "You've already set this up! Try running `/stoptts` if you want to turn it off.";
+            } else {
+                // Update.
+                VCSets.splice(i, 1);
+                VCSets.push(set);
+                WriteVCSets(VCSets);
+                return `Link updated! (You already had TTS setup, except these changed: \`${different.join(", ")}\`)`;
+            }
+        }
+
+    // Add the set and write.
+    VCSets.push(set);
+
+    WriteVCSets(VCSets);
+}
+
 function WriteVCSets(sets = VCSets) {
     // Also set VCSets here.
     VCSets = sets;
@@ -152,6 +194,8 @@ module.exports = {
                 .setAutocomplete(true)
         }),
 
+    Register,
+    
     /**
      * Generates the message with the specified count.
      * @param {CommandInteraction} interaction 
@@ -175,40 +219,14 @@ module.exports = {
             Model: model
         };
         
-        // Look to see if this set has already been created.
-        const keys = Object.keys(set);
-        for (let i = 0; i < VCSets.length; i++) 
-            if (VCSets[i].UserID == set.UserID) {
-                let same = [], different = [];
-                keys.forEach((key) => {
-                    if (set[key] == VCSets[i][key]) {
-                        same.push(key);
-                    } else different.push(key)
-                })
-
-                different.splice(different.indexOf("Player"), 1) // Remove player from different list. (It's always different.)
-
-                // If model is the same, then replace. Otherwise, warn the user.
-                if (same.length == keys.length - 1) { // `keys.length - 1` is the length of the whole set object without the player, which will never be the same.
-                    return await interaction.editReply("You've already set this up! Try running `/stoptts` if you want to turn it off.")
-                } else {
-                    // Update.
-                    VCSets.splice(i, 1);
-                    VCSets.push(set);
-                    WriteVCSets(VCSets);
-                    return await interaction.editReply(`Link updated! (You already had TTS setup, except these changed: \`${different.join(", ")}\`)`)
-                }
-            }
-        // Add the set and write.
-        VCSets.push(set);
+        Register(set);
 
         await interaction.editReply(`Link created! Just send messages in <#${input.id}> to test!`);
-        WriteVCSets(VCSets);
     },
 
     /**
      * Executes code when message is recieved.
-     * @param {Message} message The inputted message. 
+     * @param {Message} message
      */
     async OnMessageRecieved(message) {
         // Check if it matches an input.
@@ -245,6 +263,36 @@ module.exports = {
                 // Since this considered voicing, we're done.
                 return;
             };
+        }
+
+        // If this is a voice call text channel, just read their message.
+        if (message.channel.type == ChannelType.GuildVoice) {
+            const path = __dirname + `/../Temp/${Math.floor(Math.random() * 100000)}_chat_tts.wav`; // Prevent error when speaking too fast by randomly naming tts wavs.
+            const set = {
+                UserID: message.author.id,
+                InputID: message.channelId,
+                OutputID: message.channelId,
+                OutputGuildID: message.guildId,
+                Player: getPlayer(), // Use a generic new player.
+                Model: VoiceV2.DefaultEmbedding
+            };
+            
+            Voice(message.content, path, set.Model).then(() => {
+                PlayAudioToVC(path, set)
+                    // Delete audio after it has finished playing.
+                    .then(() => {
+                        fs.unlinkSync(path);
+                    })
+
+                // Log what was said, also log to transcriptions if needed.
+                if (HasLog(message.guildId)) {
+                    const user = message.member;
+                    const Name = user.nickname ?? user.displayName;
+                    LogTo(message.guildId, "TTS", Name, message.content.trim())
+                }
+
+                WriteToLogChannel(message.guildId, `${message.author.displayName} in <#${set.OutputID}> voiced:\`\`\`` + message.content + "```")
+            })
         }
     },
 
