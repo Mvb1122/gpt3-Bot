@@ -9,18 +9,18 @@ const UsernameSeperator = ` | `
 * @returns {boolean}
 */
 function HasLog(GuildId) {
-   return Logs[GuildId] != undefined;
+    return Logs[GuildId] != undefined;
 }
 
 module.exports = {
     /**
-     * Logs to a guild using a 
+     * Logs to a guild using a specified event type
      * @param {string} GuildId 
-     * @param {"TTS" | "STT"} Type Type of Transcription
-     * @param {string} Name 
-     * @param {string} Content 
+     * @param {"TTS" | "STT" | "Join" | "Leave" | "Mute" | "Unmute"} Type Type of Transcription Event
+     * @param {string} Name Name of the user.
+     * @param {string | undefined} Content Text content. (Not necessary for events other than TTS/STT.)
      */
-    async LogTo(GuildId, Type, Name, Content) {
+    async LogTo(GuildId, Type, Name = "A User", Content = undefined) {
         // Get log.
         if (Logs[GuildId] == undefined) return;
 
@@ -29,11 +29,30 @@ module.exports = {
 
         switch (Type) {
             case "STT":
-                TranscriptionMessageContent = ":loud_sound: " + TranscriptionMessageContent
+                TranscriptionMessageContent = `:loud_sound: ${TranscriptionMessageContent}`
                 break;
         
             case "TTS":
-                TranscriptionMessageContent = ":writing_hand: " + TranscriptionMessageContent
+                TranscriptionMessageContent = `:writing_hand: ${TranscriptionMessageContent}`
+                break;
+            
+            case "Join":
+                TranscriptionMessageContent = `:green_square: ${Name} joined!`
+                break;
+            
+            case "Leave":
+                TranscriptionMessageContent = `:red_square: ${Name} left!`
+                break;
+
+            case "Mute":
+                TranscriptionMessageContent = `:mute: ${Name} muted!`
+                break;
+
+            case "Unmute":
+                TranscriptionMessageContent = `:speaking_head: ${Name} unmuted!`
+                break;
+
+            default:
                 break;
         }
 

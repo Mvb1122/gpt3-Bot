@@ -1,5 +1,5 @@
 //Ignore ts(80001)
-const { SlashCommandBuilder, CommandInteraction, ChannelType, VoiceChannel, GuildMember, VoiceState, Message } = require('discord.js');
+const { SlashCommandBuilder, CommandInteraction, ChannelType, VoiceChannel, GuildMember, VoiceState, Message, NewsChannel } = require('discord.js');
 const { Download } = require('../Gradio/Helpers');
 const { Transcribe, FileIsAudio, NonSplitTypes, PreloadTranscribe } = require('../VoiceV2');
 const fp = require('fs/promises');
@@ -274,7 +274,33 @@ module.exports = {
             for (let i = 0; i < TranscribingSets.length; i++) 
                 if (newState.channelId == TranscribingSets[i].Input) {
                     SubscribeTranscribe(newState.member, TranscribingSets[i]);
+                    break;
                 }
+
+        // ! This function also handles mute/unmute/join/leave events!
+        // Check if they're joining.
+        console.log(oldState);
+        const NewConnection = oldState.channelID === null || typeof oldState.channelID == 'undefined';
+        const ConnectionDestroyed = newState.channelID === null || typeof newState.channelID == 'undefined';
+        const Name = newState.member.nickname ?? newState.member.displayName;
+        if (NewConnection)
+            return LogTo(newState.guild.id, "Join", Name)
+
+        if (ConnectionDestroyed) 
+            return LogTo(newState.guild.id, "Leave", Name);
+
+        // Check if they're muting/unmuting.
+        if (!NewConnection && oldState.mute != newState.mute) {
+            switch (newState.mute) {
+                case true:
+                    LogTo(newState.guild.id, "Mute", Name)
+                    break;
+            
+                default:
+                    LogTo(newState.guild.id, "Unmute", Name)
+                    break;
+            }
+        }
     }
 }
 
