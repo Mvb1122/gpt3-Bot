@@ -279,9 +279,8 @@ module.exports = {
 
         // ! This function also handles mute/unmute/join/leave events!
         // Check if they're joining.
-        console.log(oldState);
-        const NewConnection = oldState.channelID === null || typeof oldState.channelID == 'undefined';
-        const ConnectionDestroyed = newState.channelID === null || typeof newState.channelID == 'undefined';
+        const NewConnection = oldState.channelId === null || typeof oldState.channelId == 'undefined';
+        const ConnectionDestroyed = newState.channelId === null || typeof newState.channelId == 'undefined';
         const Name = newState.member.nickname ?? newState.member.displayName;
         if (NewConnection)
             return LogTo(newState.guild.id, "Join", Name)
