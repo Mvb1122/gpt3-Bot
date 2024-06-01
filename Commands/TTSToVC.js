@@ -39,9 +39,9 @@ function PlayAudioToVC(path, set) {
         set.Player.play(resource);
         
         // When the player has finished playing, resolve the promise.
-        set.Player.on('idle', () => {
+        set.Player.once('idle', () => {
             res();
-        }, { once: true })
+        })
     })
 }
 
@@ -159,20 +159,28 @@ async function Register(set) {
 }
 
 function WriteVCSets(sets = VCSets) {
-    // Also set VCSets here.
-    VCSets = sets;
-
-    // Ensure that sets is a deep copy before writing.
-    const copy = JSON.parse(JSON.stringify(sets));
-
-    // Delete all players.
-    for (let i = 0; i < sets.length; i++)
-        delete copy[i].Player;
-
-    return fs.writeFileSync(VCSetsFile, JSON.stringify(copy));
+    try {
+        // Also set VCSets here.
+        VCSets = sets;
+    
+        // Copy the sets without Player.
+        const copy = []
+        for (let i = 0; i < sets.length; i++) {
+            const set = sets[i];
+            const clone = {};
+            const keys = Object.keys(set);
+            for (let j = 0; j < keys.length; j++) if (keys[j] != "Player") clone[keys[j]] = set[keys[j]];
+            
+            copy.push(clone);
+        }
+    
+        return fs.writeFileSync(VCSetsFile, JSON.stringify(copy));
+    } catch (error) {
+        console.log(error)
+        console.log(sets);
+    }
 }
 
-let LastVoiceTime = 0;
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('starttts')
@@ -230,6 +238,9 @@ module.exports = {
      * @param {Message} message
      */
     async OnMessageRecieved(message) {
+        // Ignore bots.
+        if (message.author.bot) return;
+
         // Check if it matches an input.
         for (let i = 0; i < VCSets.length; i++) {
             const set = VCSets[i];
