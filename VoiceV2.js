@@ -41,7 +41,9 @@ const PhoneticAlphabet = [
 /**
  * A boolean which states if the voice server has already been started. Should be treated as read-only.
  */
-let Started = false
+let Started = false, 
+/** A boolean which states if the transcription AI has been loaded or not. */
+transcribe_loaded = false;
 
 /**
  * Posts the data to the given URL.
@@ -112,7 +114,7 @@ function ConvertFFMPEG(AudioFileName) {
 
         // Special options for dealing with Opus audio.
         if (AudioFileName.includes(".pcm")) options = options.concat(`-f s16le -ar 48k -ac 2 -i ${AudioFileName}`.split(" "))
-        else options = options.concat([`-i`, AudioFileName, `-ar`, `16000`, `-ac`, `1`, `-af`, `"afftdn=nf=-25"`])
+        else options = options.concat([`-i`, AudioFileName, `-ar`, `16000`, `-ac`, `1`, `-filter:a`, `aresample=resampler=soxr, loudnorm, afftdn=nf=-25`])
 
         // Finally, add output stuff.
         options = options.concat([OutputName, `-y`]);
@@ -327,10 +329,13 @@ module.exports = {
             // Starts up the transcribe stuff.
             if (!Started) await Start();
 
-            postJSON("http://127.0.0.1:4963/preload_transcribe", {})
-            .then(() => {
-                res();
-            });
+            if (!transcribe_loaded)
+                postJSON("http://127.0.0.1:4963/preload_transcribe", {})
+                .then(() => {
+                    transcribe_loaded = true;
+                    res();
+                });
+            else res();
         })
     }
 }

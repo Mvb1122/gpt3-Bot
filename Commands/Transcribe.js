@@ -8,7 +8,7 @@ const { ConnectToChannel } = require('./TTSToVC');
 const { getVoiceConnection, VoiceConnection, EndBehaviorType } = require('@discordjs/voice');
 const { client } = require('..');
 const prism = require('prism-media');
-const { LogTo, StartLog, StopLog } = require('../TranscriptionLogger');
+const { LogTo, StartLog, StopLog, HasLog, GetLogId } = require('../TranscriptionLogger');
 
 /**
  * Ensures that a voice connection to a channel exists.
@@ -199,6 +199,11 @@ module.exports = {
                 interaction.editReply("Something went wrong! ```" + e + "```");
             }
         } else if (subcommand == "call") {
+            // Check if this call is already being transcribed.
+            if (HasLog(interaction.guildId))
+                return interaction.editReply(`There's already a transcription ongoing in this server! Please stop the other before starting. Transcription channel: <#${GetLogId(interaction.guildId)}>`)
+            
+
             interaction.editReply("I'll join in a second! Once I'm in, I'll be listening. You can run `/transcribe mode stopcall` to stop.");
 
             /**

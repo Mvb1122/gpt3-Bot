@@ -14,6 +14,16 @@ function HasLog(GuildId) {
 
 module.exports = {
     /**
+     * Returns the log of the GuildID
+     * @param {string} GuildID ID of the guild to fetch the log of.
+     * @returns {string | undefined} ChannelId of the guild's log.
+     */
+    GetLogId(GuildID) {
+        if (!HasLog(GuildID)) return undefined;
+        else return Logs[GuildID];
+    },
+
+    /**
      * Logs to a guild using a specified event type
      * @param {string} GuildId 
      * @param {"TTS" | "STT" | "Join" | "Leave" | "Mute" | "Unmute"} Type Type of Transcription Event
@@ -59,6 +69,7 @@ module.exports = {
         // Decide whether to send a message or to edit one.
         try {
             /**
+             * Force reload of the message in order to avoid breaking command responses by preventing them from properly being responded to.
              * @type {Message}
              */
             const last = await output.messages.fetch(output.lastMessageId)

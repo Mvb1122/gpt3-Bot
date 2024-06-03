@@ -17,6 +17,7 @@ print("Loading time: " + str(used_time))
 
 # Gets transcription AI stuff.
 def MakeTranscriber():
+  global transcriber
   from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
   torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
   model_id = "openai/whisper-large-v3"
@@ -24,7 +25,7 @@ def MakeTranscriber():
   model.to(device)
   processor = AutoProcessor.from_pretrained(model_id)
 
-  return pipeline(
+  transcriber = pipeline(
     "automatic-speech-recognition",
     model=model,
     tokenizer=processor.tokenizer,
@@ -36,6 +37,7 @@ def MakeTranscriber():
     torch_dtype=torch_dtype,
     device=device,
   )
+  return transcriber
 
 transcriber = None
 def transcribe(path):
@@ -144,6 +146,7 @@ def preload_transcribe():
   # Make transcriber if needed.
   if type(transcriber) is type(None):
     transcriber = MakeTranscriber()
+
   return jsonify({'Message': True}), 200
 
 app.run(debug=False, port=4963)
