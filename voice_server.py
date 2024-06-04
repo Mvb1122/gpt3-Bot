@@ -2,6 +2,8 @@ from transformers import pipeline
 import soundfile as sf
 import torch
 import time
+import torchaudio
+from audio_denoiser.AudioDenoiser import AudioDenoiser
 
 used_time = time.time()
 embedding_file_name = "./Voice Embeddings/New_Embedding.bin"
@@ -10,8 +12,10 @@ device = "cpu"
 if (torch.cuda.is_available()): device = "cuda:0"
 
 print("Running audio synth on " + device)
-
 synthesiser = pipeline("text-to-speech", "microsoft/speecht5_tts", device=device)
+
+# Also load denoiser.
+denoiser = AudioDenoiser(device=torch.device(device))
 used_time = time.time() - used_time
 print("Loading time: " + str(used_time))
 
@@ -67,11 +71,14 @@ def voice(Text, Embedding, File = "./Temp/Whatever.wav"):
   return True
 
 def embed(source, target):
+  # First, denoise audio.
+  signal, fs = torchaudio.load(source)
+  auto_scale = True # Recommended for low-volume input audio
+  signal = denoiser.process_waveform(waveform=signal, sample_rate=16000, auto_scale=auto_scale)
+
   # Calculate speech embeddings.
-  import torchaudio
   from speechbrain.inference.speaker import EncoderClassifier
   classifier = EncoderClassifier.from_hparams(source="speechbrain/spkrec-xvect-voxceleb", savedir="pretrained_models/spkrec-xvect-voxceleb", run_opts={"device":device}) # run_opts={"device":"cuda"})
-  signal, fs = torchaudio.load(source)
   embeddings = classifier.encode_batch(signal)
 
   # Here, embeddings is length 2048, so we need to squeeze it down.

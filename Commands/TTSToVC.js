@@ -238,8 +238,8 @@ module.exports = {
      * @param {Message} message
      */
     async OnMessageRecieved(message) {
-        // Ignore bots.
-        if (message.author.bot) return;
+        // Ignore bots and empty messages
+        if (message.author.bot || (message.content ?? "").trim().length == 0) return;
 
         // Check if it matches an input.
         for (let i = 0; i < VCSets.length; i++) {
