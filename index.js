@@ -73,7 +73,7 @@ function FetchUserBaseJSON(id) {
   }
 
   if (fs.existsSync(`./users/${id}_Base.json`)) {
-    basic = JSON.parse(fs.readFileSync(`./${id}_Base.json`));
+    basic = JSON.parse(fs.readFileSync(`./users/${id}_Base.json`));
   }
 
   return basic;

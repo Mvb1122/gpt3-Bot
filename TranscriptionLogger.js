@@ -28,14 +28,14 @@ module.exports = {
      * @param {string} GuildId 
      * @param {"TTS" | "STT" | "Join" | "Leave" | "Mute" | "Unmute"} Type Type of Transcription Event
      * @param {string} Name Name of the user.
-     * @param {string | undefined} Content Text content. (Not necessary for events other than TTS/STT.)
+     * @param {string | undefined} NewLogContent Text content. (Not necessary for events other than TTS/STT.)
      */
-    async LogTo(GuildId, Type, Name = "A User", Content = undefined) {
+    async LogTo(GuildId, Type, Name = "A User", NewLogContent = undefined) {
         // Get log.
         if (Logs[GuildId] == undefined) return;
 
         const output = await client.channels.fetch(Logs[GuildId]);
-        let TranscriptionMessageContent = `${Name}${UsernameSeperator}${Content}`;
+        let TranscriptionMessageContent = `${Name}${UsernameSeperator}${NewLogContent}`;
 
         switch (Type) {
             case "STT":
@@ -75,24 +75,24 @@ module.exports = {
             const last = await output.messages.fetch(output.lastMessageId)
 
             // If the last message was written by us, and we can squeeze in our continued transcription, add onto it.
-            if (last.author.id == client.user.id && (last.content + "\n" + TranscriptionMessageContent).length <= 2000) {
+            const MessageContent = last.content;
+            if (last.author.id == client.user.id && (NewLogContent + "\n " + TranscriptionMessageContent).length <= 2000) {
                 // If the last user was the person we just transcribed, then just append the transcription. Otherwise, add a newline and their name and stuff.
                     // Get the last user.
-                const lines = last.content.split("\n");
+                const lines = MessageContent.split("\n");
                 const lastLine = lines[lines.length - 1];
                 if (lastLine.includes(UsernameSeperator) && lastLine.substring(lastLine.indexOf(" "), lastLine.indexOf(UsernameSeperator)).trim() == Name) {
                     // Add punctuation if it's missing.
                     // if (!(last.content.endsWith(".") || last.content.endsWith("?") || last.content.endsWith("!"))) last.content += ".";
-                    return await last.edit(last.content.trim() + " " + Content.trim());
+                    return await last.edit(MessageContent.trim() + " " + NewLogContent.trim());
                 } else 
-                    return await last.edit(last.content + "\n" + TranscriptionMessageContent);
+                    return await last.edit(MessageContent + "\n" + TranscriptionMessageContent);
             } else 
                 // If that didn't match up just send a new message.
                 await output.send(TranscriptionMessageContent);
-        } catch (e) {
+        } catch {
             // If we error, send a new message.
             await output.send(TranscriptionMessageContent);
-            console.log(e);
         }
     },
 
