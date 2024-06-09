@@ -1070,9 +1070,17 @@ function RefreshSlashCommands() {
 }
 //#endregion
 
+const UsersFolder = "./users/";
 async function UpdatePersonaArray() {
   return new Promise((resolve) => {
-    fs.readdirSync("./users/").forEach(file => {
+    if (!fs.existsSync(UsersFolder)) {
+      // Make it and return.
+      return fs.mkdir(UsersFolder, () => {
+        resolve();
+      });
+    }
+
+    fs.readdirSync(UsersFolder).forEach(file => {
       if (file.includes("_Base.json")) {
         fs.readFile(`./users/${file}`, (err, data) => {
           const json = JSON.parse(data);
@@ -1359,7 +1367,7 @@ const SetBase = require('./Commands/SetBase');
 3: Main PC Both GPUs + Server
 4: Main PC Main
 */
-Gradio.ConnectToPreset(2);
+// Gradio.ConnectToPreset(2);
 
 //#region Gradio Demo generate.
 /*
@@ -1424,9 +1432,12 @@ async function listener(req, res) {
 
 // On boot, delete the Temp folder.
 const fp = require('fs/promises')
-fs.readdirSync("./Temp/").forEach(file => fp.unlink(`./Temp/${file}`))
+const TempDir = "./Temp/";
+if (fs.existsSync(TempDir))
+  fs.readdirSync(TempDir).forEach(file => fp.unlink(`${TempDir}${file}`))
+else fp.mkdir(TempDir);
 
-const host = "192.168.1.3", port = "7243"
+const host = "0.0.0.0", port = "7243"
 const server = http.createServer(listener);
 server.listen(port, host, () => {
   console.log(`Server is running on http://${host}:${port}`);

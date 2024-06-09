@@ -142,7 +142,7 @@ function ListEmbeddings() {
     return fs.readdirSync(__dirname + "/Voice Embeddings/");
 }
 
-const DefaultEmbedding = "./Voice Embeddings/girl.bin";
+const DefaultEmbedding = "./Voice Embeddings/luminary.bin";
 
 /** Acceptable audio types for Embedding. */
 const NonSplitTypes = "wav, mp3, mp4, avi, m4a, ogg, ogx";

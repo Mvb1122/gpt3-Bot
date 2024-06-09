@@ -7,6 +7,7 @@ const fs = require('fs');
 const { WriteToLogChannel, HasPolicy, GetPolicy } = require('../Security');
 const { HasLog, LogTo } = require('../TranscriptionLogger');
 const VoiceV2 = require('../VoiceV2');
+const Path = require('path')
 
 function getPlayer() {
     return createAudioPlayer(
@@ -252,7 +253,7 @@ module.exports = {
                 const output = await client.channels.fetch(set.OutputID);
                 const inCall = output.members.has(message.author.id)
 
-                const path = __dirname + `/../Temp/${Math.floor(Math.random() * 100000)}_chat_tts.wav`; // Prevent error when speaking too fast by randomly naming tts wavs.
+                const path = Path.normalize(__dirname + `\\..\\Temp\\${interaction.user.id}_tts.wav`); // Prevent error when speaking too fast by randomly naming tts wavs.
                 if (inCall) {
                     Voice(message.content, path, set.Model).then(() => {
                         PlayAudioToVC(path, set)

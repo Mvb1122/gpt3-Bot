@@ -3,6 +3,7 @@ const { SlashCommandBuilder, CommandInteraction, AutocompleteInteraction } = req
 const fs = require('fs');
 const { GetEmbeddingsToChoices, Voice } = require('../VoiceV2');
 const { WriteToLogChannel } = require('../Security');
+const Path = require('path')
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -28,7 +29,7 @@ module.exports = {
         const line = interaction.options.getString("line");
         const model = interaction.options.getString("model") ?? null;
 
-        const path = __dirname + `/../Temp/${interaction.user.id}_tts.wav`;
+        const path = Path.normalize(__dirname + `\\..\\Temp\\${interaction.user.id}_tts.wav`);
         let time = performance.now();
         try {
             Voice(line, path, model).then(() => {
