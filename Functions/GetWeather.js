@@ -23,6 +23,8 @@ module.exports = {
     },
 
     async execute(parameters, message) {
+      if (tokens.GetToken("openweathermap") == "") return JSON.stringify({ sucessful: false, reason: "Weather prediction is currently offline. Tell the user to try again later." })
+
       let town = parameters.town;
       let apiKey = tokens.GetToken("openweathermap");
       let response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${town}&appid=${apiKey}`);

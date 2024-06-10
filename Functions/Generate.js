@@ -3,6 +3,7 @@ const Generate = require('../Gradio/Gradio_Stuff').PredictContentDefault
 const GetTags = require("../Gradio/Helpers").GetPromptsFromPlaintextUsingGPT
 const fs = require('fs')
 const { client } = require('..')
+const Gradio_Stuff = require('../Gradio/Gradio_Stuff')
 
 module.exports = {
   keywords: "generate, draw, image",
@@ -32,6 +33,8 @@ module.exports = {
    * @param {Discord.CommandInteraction} DiscordMessage 
    */
   async execute(parameters, DiscordMessage) {
+    if (!Gradio_Stuff.isConnected()) return JSON.stringify({ sucessful: false, reason: "Image generation is currently offline. Please tell the user to try again later." })
+
     const channel = await client.channels.fetch(DiscordMessage.channelId);
     if (parameters.content == undefined) {
       channel.send("No content provided!");

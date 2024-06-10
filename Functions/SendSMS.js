@@ -25,7 +25,7 @@ module.exports = {
     
     async execute(parameters, DiscordMessage) {
       // I forgot to pay for this so now this code will go into hibernation mode :3
-      return "Micah forgot to pay for her Clicksend! How silly. Mention how cute she is and also tell the user to yell at Micah about not being able to send SMS's. Also put :3 somewhere in your message where it's funny. To be clear your message did not send. Do not call this method again.";
+      return "Micah forgot to pay for her Clicksend! How silly. Mention how cute she is and also tell the user to yell at Micah about not being able to send SMS's. Also put :3 somewhere in your message where it's funny. To be clear, your message did not send. Do not call this method again.";
 
       if (parameters.number == null || parameters.content == null) {
         if (DiscordMessage != null)

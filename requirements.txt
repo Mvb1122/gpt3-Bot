@@ -2,5 +2,6 @@ audio_denoiser==0.1.1
 Flask==3.0.3
 soundfile==0.12.1
 speechbrain==1.0.0
-torch==2.0.1+cu118
-torchaudio==2.0.2+cu118
+torch
+torchaudio
+transformers==4.41.2

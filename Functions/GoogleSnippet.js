@@ -33,6 +33,8 @@ module.exports = {
      * @param {Discord.Message} DiscordMessage 
      */
     async execute(parameters, DiscordMessage = null) {
+      if (tokens.GetToken("serpapi") == "") return JSON.stringify({ sucessful: false, reason: "Google searching is currently offline. Tell the user to try again later." })
+
       if (parameters.ShowUser == undefined) parameters.ShowUser = false;
       if (parameters.Query == undefined) return JSON.stringify({ sucessful: false, reason: "No query provided!" });
       return new Promise(res => {

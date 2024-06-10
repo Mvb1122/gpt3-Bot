@@ -171,7 +171,7 @@ async function FetchApp() {
 }
 
 async function IsConnected() {
-    if (apps.length > 0) {
+    if (apps.length != 0) {
         try {
             await (await FetchApp()).waitForReady()
             return true;

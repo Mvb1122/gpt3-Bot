@@ -78,6 +78,9 @@ module.exports = {
      * @param {CommandInteraction} interaction 
      */
     async execute(interaction) {
+        // If we're not connected, just say so.
+        if (!await Gradio.isConnected()) return interaction.reply("Image generation not connected right now! Please try again later.")
+
         /** @type {Boolean} */
         let IsMessageEphemeral = interaction.options.getBoolean("ephemeral") ?? false;
         
@@ -202,118 +205,116 @@ module.exports = {
             }
         }
 
-        if (Gradio.isConnected()) {
-            if (UsingGPTTags)
-                content += "Using ChatGPT tags: ```" + prompts + "```\nOriginal Prompt: ```" + interaction.options.getString("prompts") + "```";
+        if (UsingGPTTags)
+            content += "Using ChatGPT tags: ```" + prompts + "```\nOriginal Prompt: ```" + interaction.options.getString("prompts") + "```";
 
-            // If we're asked to make it secret, be secret.
-            if (IsMessageEphemeral) UseMessage = false;
+        // If we're asked to make it secret, be secret.
+        if (IsMessageEphemeral) UseMessage = false;
 
-            // Ceil count at 10.
-            if (count > 10) {
-                count = 10;
-                content += "Also, because you asked for more than 10 images, I put it down to ten. "
-            } else 
-                if (count <= 0) count = 1;
-            
+        // Ceil count at 10.
+        if (count > 10) {
+            count = 10;
+            content += "Also, because you asked for more than 10 images, I put it down to ten. "
+        } else 
+            if (count <= 0) count = 1;
+        
+        try {
+            // If we're generating more than 1 image, send the user a message letting them know how progress is going.
+            let generating = undefined;
+            // console.log("UseMessage: " + UseMessage)
             try {
-                // If we're generating more than 1 image, send the user a message letting them know how progress is going.
-                let generating = undefined;
-                // console.log("UseMessage: " + UseMessage)
-                try {
-                    if (UseMessage) generating = interaction.channel.send(content)
-                } catch (e) {
-                    // Must be in a thread or something.
-                }
+                if (UseMessage) generating = interaction.channel.send(content)
+            } catch (e) {
+                // Must be in a thread or something.
+            }
 
-                // Generate a bunch of seeds, first, I guess. 
-                let seeds = [];
-                for (let i = 0; i < count; i++) 
-                    seeds.push(Gradio.GenerateSeed());
+            // Generate a bunch of seeds, first, I guess. 
+            let seeds = [];
+            for (let i = 0; i < count; i++) 
+                seeds.push(Gradio.GenerateSeed());
 
-                // Generate each individual image.
-                    // Do this async so that way the generating server(s) run at full load.
-                let paths = []; let NumImagesGenerated = 0;
-                for (let i = 0; i < count; i++) {
-                    // As each image completes, update the counter.
-                    settings.seed = seeds[i]
-                    let thisImage = Gradio.PredictContent(settings, false)
-                    
-                    thisImage.then(async () => {
-                        // console.log("Path: " + (await thisImage));
-                        if (UseMessage && generating != undefined) {
-                            NumImagesGenerated++;
-                            generating = (await generating).edit(`${content.replace("Queued", "Generating") + (NumImagesGenerated)} image${(NumImagesGenerated > 1) ? "s" : ""} generated!`)
+            // Generate each individual image.
+                // Do this async so that way the generating server(s) run at full load.
+            let paths = []; let NumImagesGenerated = 0;
+            for (let i = 0; i < count; i++) {
+                // As each image completes, update the counter.
+                settings.seed = seeds[i]
+                let thisImage = Gradio.PredictContent(settings, false)
+                
+                thisImage.then(async () => {
+                    // console.log("Path: " + (await thisImage));
+                    if (UseMessage && generating != undefined) {
+                        NumImagesGenerated++;
+                        generating = (await generating).edit(`${content.replace("Queued", "Generating") + (NumImagesGenerated)} image${(NumImagesGenerated > 1) ? "s" : ""} generated!`)
+                    }
+                })
+
+                // After the image has been drawn, post-process it.
+                let ImagePlusPostProcess = new Promise(res => {
+                    thisImage.then(async (image) => {
+                        res(await PostProcess(image, settings.prompt))
+                    })
+                })
+                paths.push(ImagePlusPostProcess);
+
+                // Wait for a second between submitting each image in order to avoid hogging the system, I guess.
+                    // It also fixes an issue where the seed would get overwritten.
+                await new Promise(res => setTimeout(res, 1000));
+            }
+
+            // Send the images and then remove the message saying that we were generating.
+            Promise.all(paths).then(async (e) => {
+                // Ensure that all of the paths are valid.
+                for (let i = 0; i < paths.length; i++) paths[i] = await paths[i];
+                
+                interaction.editReply({"content": `Generated! Tags:\n\`\`\`${prompts}\`\`\``, files: paths})
+                    .then(async () => {
+                        if (generating != undefined && (await generating).deletable)
+                            (await generating).delete();
+                        
+                        // Also, because images are saved on the generating server, we can delete them off of the bot's server.
+                        function DeleteFiles() {
+                            paths.forEach(path => {
+                                fs.unlink(path, e => {if (e) console.log(e)})
+                            });
+                        }
+                        
+                        // Just because I'm weird, DM Micah all ephemeral images.
+                            // Where channel is null, it takes place in a DM.
+                            // ! For whatever reason, blank-stating the channel makes it work.
+                        interaction.channel; 
+                        if (IsMessageEphemeral || interaction.channel == null) {
+                            const { client } = require('../../index.js');
+                            await client.users.fetch('303011705598902273', false).then(async (user) => {
+                                console.log("Sending Micah Ephemeral images!");
+                                user.send({content: `Ephemeral image${(paths.length > 1) ? "s" : ""}`, files: paths})
+                                    .then(()=> {DeleteFiles();})
+                            });
+                        } else DeleteFiles();
+
+                        // If the user wants to be notified, notify them.
+                        let Notify = interaction.options.getBoolean("notify") ?? false
+                        if (Notify) {
+                            const userId = interaction.user.id;
+                            /**
+                             * @type {Message}
+                             */
+                            let notify = interaction.channel.send(`<@${userId}> Your images are done generating!`)
+                                
+                            notify.then(() => {
+                                    // After 10 seconds, delete the ping. 
+                                    setTimeout(async () => {
+                                        notify = await notify;
+                                        if (notify.deletable)
+                                            notify.delete();
+                                    }, 10000)
+                                })
                         }
                     })
-
-                    // After the image has been drawn, post-process it.
-                    let ImagePlusPostProcess = new Promise(res => {
-                        thisImage.then(async (image) => {
-                            res(await PostProcess(image, settings.prompt))
-                        })
-                    })
-                    paths.push(ImagePlusPostProcess);
-
-                    // Wait for a second between submitting each image in order to avoid hogging the system, I guess.
-                        // It also fixes an issue where the seed would get overwritten.
-                    await new Promise(res => setTimeout(res, 1000));
-                }
-
-                // Send the images and then remove the message saying that we were generating.
-                Promise.all(paths).then(async (e) => {
-                    // Ensure that all of the paths are valid.
-                    for (let i = 0; i < paths.length; i++) paths[i] = await paths[i];
-                    
-                    interaction.editReply({"content": `Generated! Tags:\n\`\`\`${prompts}\`\`\``, files: paths})
-                        .then(async () => {
-                            if (generating != undefined && (await generating).deletable)
-                                (await generating).delete();
-                            
-                            // Also, because images are saved on the generating server, we can delete them off of the bot's server.
-                            function DeleteFiles() {
-                                paths.forEach(path => {
-                                    fs.unlink(path, e => {if (e) console.log(e)})
-                                });
-                            }
-                            
-                            // Just because I'm weird, DM Micah all ephemeral images.
-                                // Where channel is null, it takes place in a DM.
-                                // ! For whatever reason, blank-stating the channel makes it work.
-                            interaction.channel; 
-                            if (IsMessageEphemeral || interaction.channel == null) {
-                                const { client } = require('../../index.js');
-                                await client.users.fetch('303011705598902273', false).then(async (user) => {
-                                    console.log("Sending Micah Ephemeral images!");
-                                    user.send({content: `Ephemeral image${(paths.length > 1) ? "s" : ""}`, files: paths})
-                                        .then(()=> {DeleteFiles();})
-                                });
-                            } else DeleteFiles();
-
-                            // If the user wants to be notified, notify them.
-                            let Notify = interaction.options.getBoolean("notify") ?? false
-                            if (Notify) {
-                                const userId = interaction.user.id;
-                                /**
-                                 * @type {Message}
-                                 */
-                                let notify = interaction.channel.send(`<@${userId}> Your images are done generating!`)
-                                    
-                                notify.then(() => {
-                                        // After 10 seconds, delete the ping. 
-                                        setTimeout(async () => {
-                                            notify = await notify;
-                                            if (notify.deletable)
-                                                notify.delete();
-                                        }, 10000)
-                                    })
-                            }
-                        })
-                })
-            } catch (e) {
-                console.log(e);
-                interaction.editReply("Unable to connect!");
-            }
-        } else interaction.editReply("Unable to connect!");
+            })
+        } catch (e) {
+            console.log(e);
+            interaction.editReply("Unable to connect!");
+        }
     },
 };

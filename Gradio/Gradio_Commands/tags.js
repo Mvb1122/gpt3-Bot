@@ -21,6 +21,9 @@ module.exports = {
      * @param {CommandInteraction} interaction 
      */
     async execute(interaction) {
+        // If we're not connected, just say so.
+        if (!await Gradio.isConnected()) return interaction.reply("Image generation not connected right now! Please try again later.")
+
         await interaction.deferReply();
         // Download image and tell if it's actually an image.
         const attachment = interaction.options.getAttachment("image")
