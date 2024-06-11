@@ -1042,6 +1042,7 @@ function RefreshSlashCommands() {
     if ('data' in Module && 'execute' in Module) {
       // Run OnConfigureSecurity before pushing anything.
       if ('OnConfigureSecurity' in Module) 
+      if ('OnConfigureSecurity' in Module) 
         Module.OnConfigureSecurity();
 
       SlashCommands.push(Module);
