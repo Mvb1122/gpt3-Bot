@@ -68,7 +68,7 @@ const policyHelp = [
 ];
 
 const PolicyDefaults = {
-    "promptnsfw": false,
+    "promptnsfw": true,
     "modrole": undefined,
     "modchannel": undefined,
     "allvoiceinvc": true
@@ -86,7 +86,7 @@ async function GetPolicy(gid, policy) {
     if (Security == {}) await ReloadSecurity(false);
 
     const GuildIDType = typeof(gid);
-    if (GuildIDType != 'string') throw new Error("Wrong paramter passed! gid should be typeof String.")
+    if (GuildIDType != 'string') console.log("Wrong paramter passed! gid should be typeof String.")
 
     // If the guild isn't listed, return the default value.
     if (Security[gid] == undefined) return PolicyDefaults[policy]

@@ -43,5 +43,12 @@ module.exports = {
       return message.reply(`Thread created! <#${thread.id}>`);
     },
 
-    MemoryChannelPrefix: 'Memory Channel '
+    MemoryChannelPrefix: 'Memory Channel ',
+
+    /** 
+     * Variable which determines if this command can be used as a user install app.
+     * Should be set to false if can't be used. If not defined, then it's assumed to be true.
+     * @default {true}
+     */
+    CanExternal: false,
 };

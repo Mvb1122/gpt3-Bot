@@ -170,15 +170,8 @@ async function FetchApp() {
     
 }
 
-async function IsConnected() {
-    if (apps.length != 0) {
-        try {
-            await (await FetchApp()).waitForReady()
-            return true;
-        } catch (e) {
-            return false;
-        }
-    } else return false;
+ function IsConnected() {
+    return apps.length != 0;
 }
 
 async function PredictContentDefault(Input) {

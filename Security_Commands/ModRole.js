@@ -34,6 +34,12 @@ module.exports = {
     
             interaction.editReply(`Mod role for this server set to \`${role.name}\`!`)
         }
+    },
 
-    }
+    /** 
+     * Variable which determines if this command can be used as a user install app.
+     * Should be set to false if can't be used. If not defined, then it's assumed to be true.
+     * @default {true}
+     */
+    CanExternal: false,
 }

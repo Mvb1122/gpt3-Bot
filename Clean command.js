@@ -35,6 +35,13 @@ module.exports = {
         // this.data.setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     },
 
+    /** 
+     * Variable which determines if this command can be used as a user install app.
+     * Should be set to false if can't be used. If not defined, then it's assumed to be true.
+     * @default {true}
+     */
+    CanExternal: true,
+
     /**
      * @param {AutocompleteInteraction} interaction The Autocomplete request.
      */

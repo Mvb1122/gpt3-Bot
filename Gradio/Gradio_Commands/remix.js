@@ -78,7 +78,7 @@ module.exports = {
      */
     async execute(interaction) {
         // If we're not connected, just say so.
-        if (!await Gradio.isConnected()) return interaction.reply("Image generation not connected right now! Please try again later.")
+        if (!Gradio.isConnected()) return interaction.reply("Image generation not connected right now! Please try again later.")
 
         /** @type {Boolean} */
         let IsMessageEphemeral = interaction.options.getBoolean("ephemeral") ?? false;

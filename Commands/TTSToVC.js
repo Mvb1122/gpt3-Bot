@@ -334,5 +334,12 @@ module.exports = {
 
         // Send back our response.
         await interaction.respond(filtered);
-    }
+    },
+
+    /** 
+     * Variable which determines if this command can be used as a user install app.
+     * Should be set to false if can't be used. If not defined, then it's assumed to be true.
+     * @default {true}
+     */
+    CanExternal: false,
 }

@@ -1031,15 +1031,33 @@ function RefreshSlashCommands() {
   let CommandJSON = [];
   let CommandNameList = [];
   commands.forEach(command => {
+    /**
+     * @type {{
+     *  data: Discord.SlashCommandBuilder,
+     *  OnConfigureSecurity: Function | undefined,
+     *  CanExternal: boolean | undefined
+     * }}
+     */
     const Module = require(command);
     if ('data' in Module && 'execute' in Module) {
       // Run OnConfigureSecurity before pushing anything.
-      if ('OnConfigureSecurity' in Module) {
+      if ('OnConfigureSecurity' in Module) 
         Module.OnConfigureSecurity();
-      }
 
       SlashCommands.push(Module);
-      CommandJSON.push(Module.data.toJSON());
+
+      // Add the required stuff for user commands.
+        // TODO: Update using proper APIs when DiscordJS allows it.
+      const JSON = Module.data.toJSON();
+      if (Module.CanExternal != false) { 
+        const extras = {
+          "integration_types": [0, 1], //0 for guild, 1 for user
+          "contexts": [0, 1, 2], //0 for guild, 1 for app DMs, 2 for GDMs and other DMs
+        }
+        Object.keys(extras).forEach(key => JSON[key] = extras[key]);
+      }
+
+      CommandJSON.push(JSON);
 
       if (DEBUG) CommandNameList.push(Module.data.name);
     } else {
@@ -1367,7 +1385,7 @@ const SetBase = require('./Commands/SetBase');
 3: Main PC Both GPUs + Server
 4: Main PC Main
 */
-// Gradio.ConnectToPreset(2);
+Gradio.ConnectToPreset(2);
 
 //#region Gradio Demo generate.
 /*
