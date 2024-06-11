@@ -78,7 +78,7 @@ def embed(source, target):
 
   # Calculate speech embeddings.
   from speechbrain.inference.speaker import EncoderClassifier
-  classifier = EncoderClassifier.from_hparams(source="speechbrain/spkrec-xvect-voxceleb", savedir="pretrained_models/spkrec-xvect-voxceleb", run_opts={"device":device}) # run_opts={"device":"cuda"})
+  classifier = EncoderClassifier.from_hparams(source="speechbrain/spkrec-xvect-voxceleb", savedir="pretrained_models/spkrec-xvect-voxceleb", run_opts={"device":device})
   embeddings = classifier.encode_batch(signal)
 
   # Here, embeddings is length 2048, so we need to squeeze it down.
