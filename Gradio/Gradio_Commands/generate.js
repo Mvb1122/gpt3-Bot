@@ -1,10 +1,12 @@
 //Ignore ts(80001)
-const { SlashCommandBuilder, CommandInteraction, Message } = require('discord.js');
+const { SlashCommandBuilder, CommandInteraction, Message, ButtonBuilder, ButtonStyle } = require('discord.js');
 const Gradio = require('../Gradio_Stuff.js')
 const fs = require('fs')
 const { countCharacter, GetPromptsFromPlaintextUsingGPT,  } = require('../Helpers.js');
 const { GetPolicy, WriteToLogChannel } = require('../../Security.js');
-const { JudgeNSFWTags } = require('../../Helpers.js')
+const { JudgeNSFWTags } = require('../../Helpers.js');
+const { ActionRowBuilder } = require('discord.js');
+const { client } = require('../../index.js');
 
 module.exports = {
     //#region Command data.
@@ -266,51 +268,69 @@ module.exports = {
             Promise.all(paths).then(async (e) => {
                 // Ensure that all of the paths are valid.
                 for (let i = 0; i < paths.length; i++) paths[i] = await paths[i];
-                
-                interaction.editReply({"content": `Generated! Tags:\n\`\`\`${prompts}\`\`\``, files: paths})
-                    .then(async () => {
-                        if (generating != undefined && (await generating).deletable)
-                            (await generating).delete();
-                        
-                        // Also, because images are saved on the generating server, we can delete them off of the bot's server.
-                        function DeleteFiles() {
-                            paths.forEach(path => {
-                                fs.unlink(path, e => {if (e) console.log(e)})
-                            });
-                        }
-                        
-                        // Just because I'm weird, DM Micah all ephemeral images.
-                            // Where channel is null, it takes place in a DM.
-                            // ! For whatever reason, blank-stating the channel makes it work.
-                        interaction.channel; 
-                        if (IsMessageEphemeral || interaction.channel == null) {
-                            const { client } = require('../../index.js');
-                            await client.users.fetch('303011705598902273', false).then(async (user) => {
-                                console.log("Sending Micah Ephemeral images!");
-                                user.send({content: `Ephemeral image${(paths.length > 1) ? "s" : ""}`, files: paths})
-                                    .then(()=> {DeleteFiles();})
-                            });
-                        } else DeleteFiles();
 
-                        // If the user wants to be notified, notify them.
-                        let Notify = interaction.options.getBoolean("notify") ?? false
-                        if (Notify) {
-                            const userId = interaction.user.id;
-                            /**
-                             * @type {Message}
-                             */
-                            let notify = interaction.channel.send(`<@${userId}> Your images are done generating!`)
-                                
-                            notify.then(() => {
-                                    // After 10 seconds, delete the ping. 
-                                    setTimeout(async () => {
-                                        notify = await notify;
-                                        if (notify.deletable)
-                                            notify.delete();
-                                    }, 10000)
-                                })
-                        }
-                    })
+                const GenMoreButton = new ButtonBuilder()
+                    .setCustomId("regen")
+                    .setLabel("More!")
+                    .setStyle(ButtonStyle.Primary);
+
+                const GenMoreRow = new ActionRowBuilder().addComponents(GenMoreButton);
+
+                const InteractionContent = { "content": `Generated! Tags:\n\`\`\`${prompts}\`\`\``, files: paths, components: [GenMoreRow] };
+                const EndResponse = interaction.editReply(InteractionContent);
+                
+                // Make more images if requested by calling this function again recursively.
+                (await EndResponse).awaitMessageComponent().then(v => {
+                    // Spoof what information is needed.
+                    v.options = interaction.options;
+                    v.reply = interaction.followUp;
+
+                    this.execute(v);
+                })
+                
+                EndResponse.then(async () => {
+                    if (generating != undefined && (await generating).deletable)
+                        (await generating).delete();
+                    
+                    // Also, because images are saved on the generating server, we can delete them off of the bot's server.
+                    function DeleteFiles() {
+                        paths.forEach(path => {
+                            fs.unlink(path, e => {if (e) console.log(e)})
+                        });
+                    }
+                    
+                    // Just because I'm weird, DM Micah all ephemeral images.
+                        // Where channel is null, it takes place in a DM.
+                        // ! For whatever reason, blank-stating the channel makes it work.
+                        interaction.channel; 
+                    if (IsMessageEphemeral || interaction.channel == null) {
+                        await client.users.fetch('303011705598902273', false).then(async (user) => {
+                            console.log("Sending Micah Ephemeral images!");
+                            user.send({content: `Ephemeral image${(paths.length > 1) ? "s" : ""}`, files: paths})
+                                .then(()=> {DeleteFiles();})
+                        });
+                    } else DeleteFiles();
+
+                    // If the user wants to be notified, notify them.
+                    let Notify = interaction.options.getBoolean("notify") ?? false
+                    if (Notify) {
+                        const userId = interaction.user.id;
+                        /**
+                         * @type {Message}
+                         */
+                        let notify = interaction.channel.send(`<@${userId}> Your images are done generating!`)
+                            
+                        notify.then(() => {
+                                // After 10 seconds, delete the ping. 
+                                setTimeout(async () => {
+                                    notify = await notify;
+                                    if (notify.deletable)
+                                        notify.delete();
+                                }, 10000)
+                            })
+                    }
+                })
+
             })
         } catch (e) {
             console.log(e);
