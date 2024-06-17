@@ -188,20 +188,21 @@ module.exports = {
         .setDescription("Voices your messages in a channel to a voice call.")
         .addChannelOption(o => {
             return o.setName("output")
-                .setDescription("The VC to voice into.")
+                .setDescription("The VC to voice into. If blank, uses current.")
                 .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
-                .setRequired(true);
+                .setRequired(false);
         })
         .addChannelOption(o => {
             return o.setName("input")
                 .setDescription("The channel to read. If left blank, uses current.")
                 .addChannelTypes(ChannelType.GuildText, ChannelType.PublicThread, ChannelType.PrivateThread, ChannelType.AnnouncementThread)
-                .setRequired(false)
+                .setRequired(false);
         })
         .addStringOption(o => {
             return o.setName("model")
                 .setDescription("The Model to use.")
                 .setAutocomplete(true)
+                .setRequired(false);
         }),
 
     Register,
@@ -253,7 +254,7 @@ module.exports = {
                 const output = await client.channels.fetch(set.OutputID);
                 const inCall = output.members.has(message.author.id)
 
-                const path = Path.normalize(__dirname + `\\..\\Temp\\${interaction.user.id}_tts.wav`); // Prevent error when speaking too fast by randomly naming tts wavs.
+                const path = Path.normalize(__dirname + `\\..\\Temp\\${message.author.id}_tts.wav`); // Prevent error when speaking too fast by randomly naming tts wavs.
                 if (inCall) {
                     Voice(message.content, path, set.Model).then(() => {
                         PlayAudioToVC(path, set)

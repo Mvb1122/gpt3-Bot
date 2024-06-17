@@ -32,11 +32,11 @@ module.exports = {
         const path = Path.normalize(__dirname + `\\..\\Temp\\${interaction.user.id}_tts.wav`);
         let time = performance.now();
         try {
-            Voice(line, path, model).then(() => {
+            Voice(line, path, model).then((val) => {
                 // Save to temp folder and then send it off.
                 time = performance.now() - time;
     
-                interaction.editReply({content: `Here's your audio! Voiced line: \`\`\`${line}\`\`\`\n Time Taken: ${(time/1000).toFixed(2)}s`, files: [path]}).then(() => {
+                interaction.editReply({content: `Here's your audio! Voiced line: \`\`\`${val.text}\`\`\`\n Time Taken: ${(time/1000).toFixed(2)}s`, files: [path]}).then(() => {
                     // Delete the image.
                     fs.unlink(path, (err) => {if (err) console.log(err)});
 
