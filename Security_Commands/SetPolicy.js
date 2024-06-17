@@ -6,7 +6,7 @@
 
 
 //Ignore ts(80001)
-const { SlashCommandBuilder, CommandInteraction, ChannelType, GuildRoleManager, Collection, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, CommandInteraction, ChannelType, PermissionFlagsBits } = require('discord.js');
 const Security = require('../Security');
 
 const CommonConfigureValueName = "value";
@@ -31,13 +31,8 @@ module.exports = {
 
         // Check if they have the mod role.
             // Ensure modrole is set. 
-            // TODO: Add HasPolicy() to Security. 
-        try {
-            _ = await Security.GetPolicy(interaction.guildId, "modrole");
-        } catch (e) {
-            if (e) 
-                return interaction.editReply("Please run `/modrole` before this!");
-        }
+        if (!Security.HasPolicy(interaction.guildId, "modrole")) 
+            return interaction.editReply("Please run `/modrole` before this!");
 
         const ModRoleID = await Security.GetPolicy(interaction.guildId, "modrole");
         const UserRoles = interaction.member.roles.cache;

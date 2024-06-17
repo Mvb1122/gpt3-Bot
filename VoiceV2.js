@@ -6,7 +6,13 @@ const fs = require('fs');
 // Text formatting reqs.
 const converter = require('number-to-words');
 const NumberMatchingRegex = new RegExp(/(\d+,?\.?\d?)+/g);
-const AcronymRegex = new RegExp(/([A-Z]\.?(?![a-z]))+/g);
+const AcronymRegex = new RegExp(/([A-Z]\.?(?![a-z']))+/g);
+const SpaceRegex = new RegExp(/ (?=[ ])/g);
+
+/**
+ * A boolean which describes whether to log the internal server process stuff.
+ */
+const DoConsoleLog = false;
 
 // I used AI to make this Array; don't laugh! This is what AI is meant to be used for, right?
 const PhoneticAlphabet = [
@@ -16,7 +22,7 @@ const PhoneticAlphabet = [
     { letter: "D", phonetic: "Dee" },
     { letter: "E", phonetic: "Eee" },
     { letter: "F", phonetic: "Eff" },
-    { letter: "G", phonetic: "Gee" },
+    { letter: "G", phonetic: "Jee" },
     { letter: "H", phonetic: "Aych" },
     { letter: "I", phonetic: "Eye" },
     { letter: "J", phonetic: "Jay" },
@@ -36,7 +42,17 @@ const PhoneticAlphabet = [
     { letter: "X", phonetic: "Ex" },
     { letter: "Y", phonetic: "Why" },
     { letter: "Z", phonetic: "Zed" }
+    
 ];
+
+// Below here I made by hand.
+const PhoneticSymbols = [
+    { letter: "/", phonetic: "slash" },
+    { letter: "&", phonetic: "and"},
+    { letter: "@", phonetic: "at"},
+    { letter: "%", phonetic: "percent"},
+    { letter: ":", phonetic: "colon"}
+]
 
 /**
  * A boolean which states if the voice server has already been started. Should be treated as read-only.
@@ -74,7 +90,6 @@ function postJSON(URL, data) {
     })
 }
 
-const DoConsoleLog = false;
 /**
  * Starts the AI embedding and voicing server process.
  * @returns {Promise} A promise which resolves when the AI is running.
@@ -114,7 +129,7 @@ function ConvertFFMPEG(AudioFileName) {
 
         // Special options for dealing with Opus audio.
         if (AudioFileName.includes(".pcm")) options = options.concat(`-f s16le -ar 48k -ac 2 -i ${AudioFileName}`.split(" "))
-        else options = options.concat([`-i`, AudioFileName, `-ar`, `16000`, `-ac`, `1`, `-af`, `silenceremove=1:0:-30dB`])
+        else options = options.concat([`-i`, AudioFileName, `-ar`, `16000`, `-ac`, `1`, /* `-af`, `silenceremove=1:0:-30dB` */])
 
         // Finally, add output stuff.
         options = options.concat([OutputName, `-y`]);
@@ -165,7 +180,7 @@ module.exports = {
      * @param {String} text Text to voice.
      * @param {String} location File location to write to.
      * @param {String} model Embedding Model to use.
-     * @returns {Promise<boolean>} Promise which resolves when generation is complete.
+     * @returns {Promise<{ text: string, message: boolean}>} Promise which resolves when generation is complete. `text` is the voiced text.
      */
     Voice(text, location, model) {
         return new Promise(async res => {
@@ -221,6 +236,15 @@ module.exports = {
                 }
             }
 
+            // Replace phonetic symbols.
+            PhoneticSymbols.forEach(symbol => {
+                if (text.includes(symbol.letter))
+                    text = text.replaceAll(symbol.letter, ` ${symbol.phonetic} `);
+            });
+
+            // Fix multiple spaces.
+            text = text.replace(SpaceRegex, "");
+
             const Data = {
                 location: location,
                 text: text,
@@ -229,9 +253,11 @@ module.exports = {
 
             // Ask server for stuff.
             postJSON("http://127.0.0.1:4963/gen", Data).then((d) => {
-                res(d.Message)
+                res({
+                    text: text,
+                    message: d.Message
+                })
             })
-            
         })
     },
     
