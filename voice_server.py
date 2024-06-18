@@ -1,4 +1,7 @@
-from transformers import pipeline
+transcription_model_id = "openai/whisper-large-v3"
+
+from transformers import pipeline, AutoModelForSpeechSeq2Seq, AutoProcessor
+from transformers.utils import is_flash_attn_2_available
 import soundfile as sf
 import torch
 import time
@@ -10,6 +13,7 @@ embedding_file_name = "./Voice Embeddings/New_Embedding.bin"
 
 device = "cpu"
 if (torch.cuda.is_available()): device = "cuda:0"
+torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 
 print("Running audio synth on " + device)
 synthesiser = pipeline("text-to-speech", "microsoft/speecht5_tts", device=device)
@@ -25,7 +29,12 @@ def MakeTranscriber():
   from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
   torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
   model_id = "openai/whisper-large-v3"
-  model = AutoModelForSpeechSeq2Seq.from_pretrained(model_id, torch_dtype=torch_dtype, low_cpu_mem_usage=True, use_safetensors=True)
+  model = AutoModelForSpeechSeq2Seq.from_pretrained(
+    model_id, torch_dtype=torch_dtype, 
+    low_cpu_mem_usage=True, 
+    use_safetensors=True,
+    attn_implementation="flash_attention_2" if is_flash_attn_2_available() else None # Use flash_attention_2 if it's avail. but don't worry otherwise.
+  )
   model.to(device)
   processor = AutoProcessor.from_pretrained(model_id)
 
@@ -82,7 +91,6 @@ def embed(source, target):
   embeddings = classifier.encode_batch(signal)
 
   # Here, embeddings is length 2048, so we need to squeeze it down.
-  import torch
   embeddings = torch.nn.functional.normalize(embeddings[:, :512], dim=-1).squeeze([1]) # Changes size from [1, 1, 1, 512] to [1, 512]
 
   # Write embeddings to a file.

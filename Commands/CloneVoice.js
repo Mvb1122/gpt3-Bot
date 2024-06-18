@@ -21,7 +21,11 @@ module.exports = {
         })
         .addStringOption(o => {
             return o.setName("embedname")
-                .setDescription("What to call your voice! Can be left blank.")
+                .setDescription("What to call your voice! Uses filename if blank.")
+        })
+        .addBooleanOption(o => {
+            return o.setName("removesilence")
+                .setDescription("Can improve results. Defaults to true.");
         }),
 
     /**
@@ -39,6 +43,7 @@ module.exports = {
         
         // Name the file after the attachment name if it's not given a name.
         const name = interaction.options.getString("embedname") ?? fileName;
+        const SilenceRemove = interaction.options.getBoolean("removesilence") ?? true;
         
         let AudioPath;
         
@@ -47,7 +52,7 @@ module.exports = {
         else 
             try {
                 AudioPath = await Download(url, `./Temp/${fileName}`);
-                Embed(AudioPath, `./Voice Embeddings/${name}.bin`).then(() => {
+                Embed(AudioPath, `./Voice Embeddings/${name}.bin`, SilenceRemove).then(() => {
                     interaction.editReply("Embed processed! It should be available on the `/ttstovc` and `/voice` commands immediately!");
 
                     // Delete the original audio.

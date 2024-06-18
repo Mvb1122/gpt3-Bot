@@ -2,7 +2,7 @@
 /**
  * A boolean which describes whether to log the internal server process stuff.
  */
-const DoConsoleLog = true;
+const DoConsoleLog = false;
 const VoiceDir = "/Voice Embeddings/";
 const DefaultEmbedding = `luminary.bin`;
 //#endregion
@@ -55,7 +55,9 @@ const PhoneticSymbols = [
     { letter: "&", phonetic: "and"},
     { letter: "@", phonetic: "at"},
     { letter: "%", phonetic: "percent"},
-    { letter: ":", phonetic: "colon"}
+    { letter: ":", phonetic: "colon"},
+    { letter: "+", phonetic: "plus"},
+    { letter: "$", phonetic: "dollars"}
 ]
 
 /**
@@ -125,7 +127,7 @@ function Start() {
     })
 }
 
-function ConvertFFMPEG(AudioFileName) {
+function ConvertFFMPEG(AudioFileName, AdditionalSettings = undefined) {
     return new Promise(res => {
         const OutputName = `./${AudioFileName}.wav`;
         // First convert auto to .wav with specifications required by the embedding AI.
@@ -133,7 +135,10 @@ function ConvertFFMPEG(AudioFileName) {
 
         // Special options for dealing with Opus audio.
         if (AudioFileName.includes(".pcm")) options = options.concat(`-f s16le -ar 48k -ac 2 -i ${AudioFileName}`.split(" "))
-        else options = options.concat([`-i`, AudioFileName, `-ar`, `16000`, `-ac`, `1`, /* `-af`, `silenceremove=1:0:-30dB` */])
+        else options = options.concat([`-i`, AudioFileName, `-ar`, `16000`, `-ac`, `1`])
+
+        // Add any extra options if they're passed.
+        if (AdditionalSettings != undefined) options = options.concat(AdditionalSettings)
 
         // Finally, add output stuff.
         options = options.concat([OutputName, `-y`]);
@@ -162,7 +167,7 @@ function ListEmbeddings() {
 }
 
 /** Acceptable audio types for Embedding. */
-const NonSplitTypes = "wav, mp3, mp4, avi, m4a, ogg, ogx";
+const NonSplitTypes = "wav, mp3, mp4, avi, m4a, ogg, ogx, flac, amr, mpga";
 const AudioTypes = NonSplitTypes.split(", ");
 
 function FileIsAudio(name) {
@@ -266,9 +271,12 @@ module.exports = {
     EmbedDirectory: VoiceDir,
     DefaultEmbedding,
 
-    Embed(AudioFileName, EmbedName) {
+    Embed(AudioFileName, EmbedName, SilenceRemove = true) {
         return new Promise(res => {
-            ConvertFFMPEG(AudioFileName).then(async (name) => {
+            // Remove silence if requested.
+            const ExtraOptions = SilenceRemove ? [`-af`, `silenceremove=1:0:-30dB`] : undefined;
+
+            ConvertFFMPEG(AudioFileName, ExtraOptions).then(async (name) => {
                 if (!Started) await Start();
 
                 // Make sure that Voice Embeds land in the Voice Embeddings directory.
