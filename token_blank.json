@@ -4,5 +4,6 @@
     "openweathermap": "",
     "serpapi": "",
     "clicksendauthorization": "Basic YOURCODEHERE",
-    "x-rapidapi-key": ""
+    "x-rapidapi-key": "",
+    "devDiscordID": ""
 }
