@@ -129,7 +129,7 @@ function ConvertFFMPEG(AudioFileName) {
 
         // Special options for dealing with Opus audio.
         if (AudioFileName.includes(".pcm")) options = options.concat(`-f s16le -ar 48k -ac 2 -i ${AudioFileName}`.split(" "))
-        else options = options.concat([`-i`, AudioFileName, `-ar`, `16000`, `-ac`, `1`, `-af`, `silenceremove=1:0:-30dB`])
+        else options = options.concat([`-i`, AudioFileName, `-ar`, `16000`, `-ac`, `1`, /* `-af`, `silenceremove=1:0:-30dB` */])
 
         // Finally, add output stuff.
         options = options.concat([OutputName, `-y`]);
