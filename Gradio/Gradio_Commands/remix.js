@@ -6,6 +6,7 @@ const Index = require ('../../index.js');
 
 const { countCharacter, ImageIsValid, Download, GetPromptsFromPlaintextUsingGPT, NonSplitTypes } = require('../Helpers.js');
 const sharp = require('sharp');
+const token = require('../../token.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -308,7 +309,7 @@ module.exports = {
                             interaction.channel; 
                             if (IsMessageEphemeral || interaction.channel == null) {
                                 const { client } = require('../../index.js');
-                                await client.users.fetch('303011705598902273', false).then(async (user) => {
+                                await client.users.fetch(token.GetToken("devDiscordID"), false).then(async (user) => {
                                     console.log("Sending Micah Ephemeral images!");
                                     user.send({content: `Ephemeral image${(GeneratedImagesPaths.length > 1) ? "s" : ""}`, files: GeneratedImagesPaths})
                                         .then(()=> {DeleteFiles();})

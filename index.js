@@ -22,13 +22,12 @@ const RecoveryAddress = "./RecoveryBases.json"
 const DiscordToken = tokens.GetToken("discord");
 const DiscordClientId = "845159393494564904";
 const Helpers = require('./Helpers.js')
-const DiscordSupportServerId = "762867801575784448";
 const DEBUG = false;
 //#endregion
 
 // const rootBase = "Connie Pedersen's and the extremely-cute Micah Bushman's pronouns are she/her. Micah is a 17-year-old trans girl living in Albuquerque, New Mexico, who enjoys reading Manga and studying Japanese. On weekdays, she goes to school, where she suffers through AP Physics, AP US History, and AP Psychology. She's also taking Japanese at the CEC. Micah programmed this AI to help her with her homework. Rilen, aka ConerBearBeats, is one of Connie's and Micah's old friends. They used to be friends in real life, but now only chat via the internet.\n";
 
-const ListOfIDsAllowedToUseTheMemoryOnVersion = [303011705598902273n, 733343607339352126n, 322906020844142592n]
+const ListOfIDsAllowedToUseTheMemoryOnVersion = [tokens.GetToken("devDiscordID"), 733343607339352126n, 322906020844142592n]
 function IsUserIDInList(id) {
   for (let i = 0; i < ListOfIDsAllowedToUseTheMemoryOnVersion.length; i++)
     if (ListOfIDsAllowedToUseTheMemoryOnVersion[i] == id)
@@ -1450,7 +1449,8 @@ async function listener(req, res) {
 }
 
 // On boot, delete the Temp folder.
-const fp = require('fs/promises')
+const fp = require('fs/promises');
+const token = require('./token');
 const TempDir = "./Temp/";
 if (fs.existsSync(TempDir))
   fs.readdirSync(TempDir).forEach(file => fp.unlink(`${TempDir}${file}`))
