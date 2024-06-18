@@ -55,56 +55,50 @@ module.exports = {
 
     OnConfigureSecurity() {
         // Add subcommands based off of Security policy lists. 
-        this.data = this.data.addSubcommandGroup(o => {
-            // Add options. 
-            for (let i = 0; i < Security.policies.length; i++) {
-                o = o.addSubcommand(s => {
-                    s.setName(Security.policies[i].toLowerCase())
-                        .setDescription(Security.policyHelp[i]);
+        for (let i = 0; i < Security.policies.length; i++) {
+            this.data = this.data.addSubcommand(s => {
+                s.setName(Security.policies[i].toLowerCase())
+                    .setDescription(Security.policyHelp[i]);
 
-                    /**
-                     * @param {SlashCommandBooleanOption} j 
-                     */
-                    function CommonConfigure(j) {
-                        return j.setName(CommonConfigureValueName)
-                            .setDescription("Aformentioned option.")
-                            .setRequired(true);
+                /**
+                 * @param {SlashCommandBooleanOption} j 
+                 */
+                function CommonConfigure(j) {
+                    return j.setName(CommonConfigureValueName)
+                        .setDescription("Aformentioned option.")
+                        .setRequired(true);
+                
+                }
+
+                // Add options.
+                const type = Security.policyTypes[i];
+                switch (type) {
+                    case "boolean":
+                        s = s.addBooleanOption(op => {
+                            return CommonConfigure(op);
+                        });
+                        break;
+                
+                    case "RoleID":
+                        s = s.addRoleOption(op => {
+                            return CommonConfigure(op);
+                        });
+                        break;
                     
-                    }
+                    case "ChannelID":
+                        s = s.addChannelOption(op => {
+                            return CommonConfigure(op)
+                                .addChannelTypes([ChannelType.GuildText, ChannelType.PrivateThread, ChannelType.PublicThread]);
+                        });
+                        break;
 
-                    // Add options.
-                    const type = Security.policyTypes[i];
-                    switch (type) {
-                        case "boolean":
-                            s = s.addBooleanOption(op => {
-                                return CommonConfigure(op);
-                            });
-                            break;
-                    
-                        case "RoleID":
-                            s = s.addRoleOption(op => {
-                                return CommonConfigure(op);
-                            });
-                            break;
-                        
-                        case "ChannelID":
-                            s = s.addChannelOption(op => {
-                                return CommonConfigure(op)
-                                    .addChannelTypes([ChannelType.GuildText, ChannelType.PrivateThread, ChannelType.PublicThread]);
-                            });
-                            break;
+                    default:
+                        break;
+                }
 
-                        default:
-                            break;
-                    }
-
-                    return s;
-                })
-            }
-
-            return o.setName("policy")
-                .setDescription("The policy to use.")
-        });
+                return s;
+            })
+        }
     },
 
     /** 
