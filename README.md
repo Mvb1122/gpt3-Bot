@@ -11,10 +11,11 @@ I also added call transcription via OpenAI's Whisper Large V3 model.
 If you want to try the bot, you can [join the discord server](https://discord.com/invite/JNSdRSPBQ4)
 
 # Example videos:
+You may have to download the video to see it.
 - [A video of generating from plain words](./Example%20Videos/testing_thread____MicahB.Dev_-_Discord_2023-09-16_11-51-12.mp4)
 - [A video of generating from conversation](./Example%20Videos/TextToImageBridge-C1.mp4)
-- [A video of generating Text-To-Speech](./Example%20Videos/#Voice-Demo%20%20%20Micahb.Dev%20-%20Discord%202024-06-18%2015-16-37-C.mp4)
-- [A video of transcribing a voice call and file.](./Example%20Videos/#Transcribe-Demo%20%20%20Micahb.Dev%20-%20Discord%202024-06-18%2015-23-57-C.mp4)
+- [A video of generating Text-To-Speech](./Example%20Videos/Voice-Demo%20%20%20Micahb.Dev%20-%20Discord%202024-06-18%2015-16-37-C.mp4)
+- [A video of transcribing a voice call and file.](./Example%20Videos/Transcribe-Demo%20%20%20Micahb.Dev%20-%20Discord%202024-06-18%2015-23-57-C.mp4)
 
 # Setup: 
 1. Copy the Repo.
