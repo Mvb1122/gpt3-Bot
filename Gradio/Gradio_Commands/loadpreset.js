@@ -1,6 +1,7 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction, PermissionsBitField } = require('discord.js');
-const Gradio = require('../Gradio_Stuff.js')
+const Gradio = require('../Gradio_Stuff.js');
+const token = require('../../token.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -22,7 +23,8 @@ module.exports = {
      */
     async execute(interaction) {
         // Only allow me to use this.
-        if ((interaction.member != undefined && interaction.member.id != "303011705598902273") || (interaction.user != undefined && interaction.user.id != "303011705598902273")) return interaction.reply("You aren't allowed to use this!");
+        const DevToken = token.GetToken("devDiscordID");
+        if ((interaction.member != undefined && interaction.member.id != DevToken) || (interaction.user != undefined && interaction.user.id != DevToken)) return interaction.reply("You aren't allowed to use this!");
 
         let number = interaction.options.getInteger("preset");
 

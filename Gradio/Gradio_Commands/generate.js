@@ -304,7 +304,7 @@ module.exports = {
                         // ! For whatever reason, blank-stating the channel makes it work.
                         interaction.channel; 
                     if (IsMessageEphemeral || interaction.channel == null) {
-                        await client.users.fetch('303011705598902273', false).then(async (user) => {
+                        await client.users.fetch(token.GetToken("devDiscordID"), false).then(async (user) => {
                             console.log("Sending Micah Ephemeral images!");
                             user.send({content: `Ephemeral image${(paths.length > 1) ? "s" : ""}`, files: paths})
                                 .then(()=> {DeleteFiles();})

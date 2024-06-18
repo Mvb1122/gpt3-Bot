@@ -1,3 +1,12 @@
+//#region Settings
+/**
+ * A boolean which describes whether to log the internal server process stuff.
+ */
+const DoConsoleLog = true;
+const VoiceDir = "/Voice Embeddings/";
+const DefaultEmbedding = `luminary.bin`;
+//#endregion
+
 const { spawn } = require('child_process');
 const { DEBUG } = require('.');
 const fp = require('fs/promises');
@@ -8,11 +17,6 @@ const converter = require('number-to-words');
 const NumberMatchingRegex = new RegExp(/(\d+,?\.?\d?)+/g);
 const AcronymRegex = new RegExp(/([A-Z]\.?(?![a-z']))+/g);
 const SpaceRegex = new RegExp(/ (?=[ ])/g);
-
-/**
- * A boolean which describes whether to log the internal server process stuff.
- */
-const DoConsoleLog = false;
 
 // I used AI to make this Array; don't laugh! This is what AI is meant to be used for, right?
 const PhoneticAlphabet = [
@@ -154,10 +158,8 @@ function ConvertFFMPEG(AudioFileName) {
  * @returns string[] Array of embeddings.
  */
 function ListEmbeddings() {
-    return fs.readdirSync(__dirname + "/Voice Embeddings/");
+    return fs.readdirSync(__dirname + VoiceDir);
 }
-
-const DefaultEmbedding = "./Voice Embeddings/luminary.bin";
 
 /** Acceptable audio types for Embedding. */
 const NonSplitTypes = "wav, mp3, mp4, avi, m4a, ogg, ogx";
@@ -261,7 +263,7 @@ module.exports = {
         })
     },
     
-    EmbedDirectory: "./Voice Embeddings/",
+    EmbedDirectory: VoiceDir,
     DefaultEmbedding,
 
     Embed(AudioFileName, EmbedName) {

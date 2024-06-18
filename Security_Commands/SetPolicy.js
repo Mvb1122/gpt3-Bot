@@ -25,9 +25,7 @@ module.exports = {
         await interaction.deferReply();
         
         // Check that user either has mod role or owns the server.
-        const isUserOwner = interaction.guild.ownerId == interaction.user.id 
-        //    || interaction.user.id == "303011705598902273"; // Debug for letting me always use it.
-
+        const isUserOwner = interaction.guild.ownerId == interaction.user.id;
 
         // Check if they have the mod role.
             // Ensure modrole is set. 

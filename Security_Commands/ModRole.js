@@ -1,6 +1,7 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction, PermissionFlagsBits, Role } = require('discord.js');
 const { SetPolicy } = require('../Security');
+const token = require('../token');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -22,7 +23,7 @@ module.exports = {
         await interaction.deferReply();
 
         const isUserOwner = interaction.guild.ownerId == interaction.user.id 
-        || interaction.user.id == "303011705598902273"; // Debug for letting me always use it.
+        || interaction.user.id == token.GetToken("devDiscordID"); // Debug for letting me always use it.
 
         if (!isUserOwner) return interaction.editReply("Only the owner of the server can use this command!");
         else {

@@ -25,7 +25,7 @@ module.exports = {
      */
     async execute(interaction) {
         // Only allow me to use this.
-        if (interaction.member.id != "303011705598902273") return interaction.reply("You aren't allowed to use this!");
+        if (interaction.member.id != token.GetToken("devDiscordID")) return interaction.reply("You aren't allowed to use this!");
 
         const address = interaction.options.getString("address");
         const port = interaction.options.getInteger("port") ?? 7860;
