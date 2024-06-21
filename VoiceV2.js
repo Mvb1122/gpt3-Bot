@@ -357,6 +357,27 @@ module.exports = {
     },
 
     /**
+     * Generates music using the server's music AI.
+     * @param {string} prompt What you want to listen to.
+     * @param {string} output Path to save to.
+     * @param {string} length The length in seconds of the outputted audio.
+     * @returns {Promise<string>} Path to output.
+     */
+    MakeMusic(prompt, output, length = 5) {
+        return new Promise(async res => {
+            if (!Started) await Start();
+
+            postJSON("http://127.0.0.1:4963/gen_music", {
+                prompt: prompt,
+                output: output,
+                length: length
+            }).then(() => {
+                res(output);
+            });
+        })
+    },
+
+    /**
      * Preloads the transcription stuff.
      * @returns {Promise}
      */

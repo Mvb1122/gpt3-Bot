@@ -1,9 +1,9 @@
 //Ignore ts(80001)
-const { SlashCommandBuilder, CommandInteraction, AutocompleteInteraction } = require('discord.js');
+const { SlashCommandBuilder, CommandInteraction, AutocompleteInteraction, ChannelType, Message } = require('discord.js');
 const fs = require('fs');
-const { GetEmbeddingsToChoices, Voice } = require('../VoiceV2');
+const { GetEmbeddingsToChoices, Voice, } = require('../VoiceV2');
 const { WriteToLogChannel } = require('../Security');
-const Path = require('path')
+const Path = require('path');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -65,5 +65,5 @@ module.exports = {
 		
         // Send back our response.
         await interaction.respond(filtered);
-    }
+    },
 };

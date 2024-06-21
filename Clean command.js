@@ -30,6 +30,14 @@ module.exports = {
     },
 
     // Below here is not required; should be deleted if not needed.
+    /**
+     * Executes code when message is recieved.
+     * @param {Message} message The inputted message. 
+     */
+    async OnMessageRecieved(message) {
+        
+    },
+
     OnConfigureSecurity() {
         // Configure some security stuff, eg; 
         // this.data.setDefaultMemberPermissions(PermissionFlagsBits.Administrator)

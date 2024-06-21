@@ -4,6 +4,7 @@ const { VoiceConnectionStatus, createAudioPlayer, NoSubscriberBehavior, joinVoic
 const { Voice, GetEmbeddingsToChoices, DefaultEmbedding } = require('../VoiceV2');
 const { client } = require('../index');
 const fs = require('fs');
+const fp = require('fs/promises');
 const { WriteToLogChannel, HasPolicy, GetPolicy } = require('../Security');
 const { HasLog, LogTo } = require('../TranscriptionLogger');
 const VoiceV2 = require('../VoiceV2');
@@ -49,11 +50,9 @@ function PlayAudioToVC(path, set) {
 /**
  * A function which ensures that a set's player is hooked up to a connection to its specified OutputID channel.
  * @param {{
-    UserID: number;
-    InputID: number;
     OutputID: number;
     OutputGuildID: number;
-    Player: AudioPlayer;
+    Player: AudioPlayer | undefined;
 }} set Set information.
  * @returns {Promise<VoiceConnection>} Promise which resolves when connected.
  */
@@ -110,6 +109,30 @@ function LoadSets() {
             VCSets[i].Player = getPlayer();
         }
     }
+}
+
+let ReadingList = [{
+    channelId: 1234,
+    outputId: 1234,
+    guildId: 1234,
+    members: {
+        1234: "Luminary.bin"
+    }
+}];
+
+ReadingList = [];
+
+const ReadingListsFile = "./ReadingSets.json";
+
+// Read in the list if it exists.
+if (fs.existsSync(ReadingListsFile)) {
+    ReadingList = JSON.parse(fs.readFileSync(ReadingListsFile));
+}
+
+function GetRandomVoice() {
+    const embeddings = VoiceV2.ListEmbeddings();
+    let index = Math.floor(Math.random() * embeddings.length);
+    return embeddings[index];
 }
 
 const VCSetsFile = "./VCSets.json";
@@ -182,27 +205,69 @@ function WriteVCSets(sets = VCSets) {
     }
 }
 
+function TextToVC(text, VCID, GuildID, model) {
+    const path = __dirname + `/../Temp/${Math.floor(Math.random() * 100000)}_chat_tts.wav`
+    return new Promise(res => {
+        Voice(text, path, model).then(() => {
+            PlayAudioToVC(path, {OutputID: VCID, OutputGuildID: GuildID, Player: getPlayer()})
+                // Delete audio after it has finished playing.
+                .then(() => {
+                    fs.unlinkSync(path);
+                    res();
+                })
+            })
+    })
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('starttts')
         .setDescription("Voices your messages in a channel to a voice call.")
-        .addChannelOption(o => {
-            return o.setName("output")
-                .setDescription("The VC to voice into. If blank, uses current.")
-                .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
-                .setRequired(false);
+        .addSubcommand(o => {
+            return o.setName("self")
+                .setDescription("Voices your own messages.")
+                .addChannelOption(o => {
+                    return o.setName("output")
+                        .setDescription("The VC to voice into. If blank, uses current.")
+                        .addChannelTypes(ChannelType.GuildVoice, ChannelType.GuildStageVoice)
+                        .setRequired(false);
+                })
+                .addChannelOption(o => {
+                    return o.setName("input")
+                        .setDescription("The channel to read. If left blank, uses current.")
+                        .addChannelTypes(ChannelType.GuildText, ChannelType.PublicThread, ChannelType.PrivateThread, ChannelType.AnnouncementThread)
+                        .setRequired(false);
+                })
+                .addStringOption(o => {
+                    return o.setName("model")
+                        .setDescription("The Model to use.")
+                        .setAutocomplete(true)
+                        .setRequired(false);
+                })
         })
-        .addChannelOption(o => {
-            return o.setName("input")
-                .setDescription("The channel to read. If left blank, uses current.")
-                .addChannelTypes(ChannelType.GuildText, ChannelType.PublicThread, ChannelType.PrivateThread, ChannelType.AnnouncementThread)
-                .setRequired(false);
+        .addSubcommand(o => {
+            return o.setName("conversation")
+                .setDescription("Reads a conversation to a call.")
+                .addChannelOption(b => {
+                    return b.setName("input")
+                        .setDescription("The channel to read.")
+                        .setRequired(false)
+                })
+                .addChannelOption(b => {
+                    return b.setName("output")
+                        .setDescription("The call to voice into.")
+                        .setRequired(false)
+                        .addChannelTypes(ChannelType.GuildVoice);
+                })
         })
-        .addStringOption(o => {
-            return o.setName("model")
-                .setDescription("The Model to use.")
-                .setAutocomplete(true)
-                .setRequired(false);
+        .addSubcommand(o => {
+            return o.setName("stopconvo")
+                .setDescription("Stops reading a conversation.")
+                .addChannelOption(b => {
+                    return b.setName("input")
+                        .setDescription("The channel to stop reading.")
+                        .setRequired(false)
+                })
         }),
 
     Register,
@@ -213,26 +278,69 @@ module.exports = {
      */
     async execute(interaction) {
         // Defer for safety.
-        await interaction.deferReply();
-        // Get inputs.
-        const input = interaction.options.getChannel("input") ?? interaction.channel;
-        const model = interaction.options.getString("model") ?? DefaultEmbedding;
-        const UserVoiceChannelID = interaction.member.voice.channelId;
-        const output = interaction.options.getChannel("output") ?? (UserVoiceChannelID != null ? await client.channels.fetch(UserVoiceChannelID) : null) ?? null;
-        if (output == null) return await interaction.editReply("Please join or select a voice channel!");;
-
-        const set = {
-            UserID: interaction.user.id,
-            InputID: input.id,
-            OutputID: output.id,
-            OutputGuildID: interaction.guildId,
-            Player: getPlayer(), // Use a generic new player.
-            Model: model
-        };
+        const subcommand = interaction.options.getSubcommand();
+        const ephemeral = subcommand == "conversation" || subcommand == "stopconvo";
+        await interaction.deferReply({ephemeral: ephemeral});
         
-        Register(set);
+        if (subcommand == "self") {
+            // Get inputs.
+            const input = interaction.options.getChannel("input") ?? interaction.channel;
+            const model = interaction.options.getString("model") ?? DefaultEmbedding;
+            const UserVoiceChannelID = interaction.member.voice.channelId;
+            const output = interaction.options.getChannel("output") ?? (UserVoiceChannelID != null ? await client.channels.fetch(UserVoiceChannelID) : null) ?? null;
+            if (output == null) return await interaction.editReply("Please join or select a voice channel!");;
 
-        await interaction.editReply(`Link created! Just send messages in <#${input.id}> to test!`);
+            const set = {
+                UserID: interaction.user.id,
+                InputID: input.id,
+                OutputID: output.id,
+                OutputGuildID: interaction.guildId,
+                Player: getPlayer(), // Use a generic new player.
+                Model: model
+            };
+            
+            Register(set);
+
+            await interaction.editReply(`Link created! Just send messages in <#${input.id}> to test!`);
+        } else if (subcommand == "conversation") {
+            // Add to the reading list
+            const input = interaction.options.getChannel("input") ?? interaction.channel;
+            const output = (interaction.options.getChannel("output") != null ? interaction.options.getChannel("output").id : null) ?? interaction.member.voice.channelId ?? null;
+            if (output == null) return interaction.editReply("Please join or select a voice channel!");
+
+            ReadingList.push({
+                channelId: input.id,
+                outputId: output,
+                guildId: interaction.guildId,
+                members: []
+            });
+
+            interaction.editReply({
+                content: `Added to list! Join <#${output}> to hear it.`,
+            })
+
+            ConnectToChannel({OutputGuildID: interaction.guildId, OutputID: output})
+
+            // Write the lists out.
+            fp.writeFile(ReadingListsFile, JSON.stringify(ReadingList));
+        } else if (subcommand == "stopconvo") {
+            const input = interaction.options.getChannel("input") ?? interaction.channel;
+            
+            // Remove it from the list.
+            for (let i = 0; i < ReadingList.length; i++) {
+                if (ReadingList[i].channelId == input.id) {
+                    ReadingList.splice(i, 1);
+
+                    // Try to leave call.
+                    const connection = getVoiceConnection(interaction.guildId);
+                    if (connection != undefined)
+                        connection.destroy();
+
+                    return interaction.editReply("Stopped reading!");
+                }
+            }
+            interaction.editReply("Convo not found.")
+        }
     },
 
     /**
@@ -242,6 +350,22 @@ module.exports = {
     async OnMessageRecieved(message) {
         // Ignore bots and empty messages
         if (message.author.bot || (message.content ?? "").trim().length == 0) return;
+
+        // Check if the message is within a chat we're reading all of.
+        for (let i = 0; i < ReadingList.length; i++) {
+            const CurrentList = ReadingList[i];
+            if (CurrentList.channelId == message.channelId) {
+                // See if they have a voice.
+                let voice = CurrentList.members[message.author.id] ?? GetRandomVoice();
+
+                // Assign that voice and write out the file.
+                ReadingList[i].members[message.author.id] = voice;
+                fp.writeFile(ReadingListsFile, JSON.stringify(ReadingList));
+                
+                // Voice it to VC.
+                TextToVC(message.content, CurrentList.outputId, CurrentList.guildId, voice);
+            }
+        }
 
         // Check if it matches an input.
         for (let i = 0; i < VCSets.length; i++) {
@@ -317,7 +441,7 @@ module.exports = {
     },
 
     // Also share voice sets and useful voice information.
-    VCSets, PlayAudioToVC, WriteVCSets, ConnectToChannel,
+    VCSets, PlayAudioToVC, WriteVCSets, ConnectToChannel, TextToVC,
 
     /**
      * @param {AutocompleteInteraction} interaction The Autocomplete request.

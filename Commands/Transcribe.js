@@ -176,22 +176,27 @@ module.exports = {
             // return interaction.editReply("You provided a non-supported image. Here are the supported types: ```" + "Actually I'm not sure what's supported, but if it broke, then it's probably not supported." + "```")
             try {
                 let TimeTaken = performance.now();
-                TranscribeURL(url, name).then(val => {
+                TranscribeURL(url, name).then(async val => {
                     TimeTaken = ((performance.now() - TimeTaken) / 1000).toFixed(2);
-                    if (val.length >= 2000) {
-                        do {
-                            let end = val.length >= 2000 ? 2000 : val.length
-                            interaction.channel.send(val.substring(0, end));
-                            val = val.substring(end);
-                        } while (val.length != 0)
-
-                        interaction.editReply({
+                    const NormalContent = "```" + val + "```\nTime Taken: " + TimeTaken + " seconds";
+                    if (NormalContent.length >= 2000) {
+                        await interaction.editReply({
                             content: "```See below!```\nTime Taken: " + TimeTaken + " seconds",
                             files: [url]
                         });
+
+                        let NumMessages = 1;
+                        do {
+                            let end = val.length >= 2000 ? 2000 : val.length
+                            if (NumMessages == 1)
+                                await interaction.followUp(val.substring(0, end));
+                            else await interaction.channel.send(val.substring(0, end));
+                            val = val.substring(end);
+                            NumMessages++;
+                        } while (val.length != 0)
                     } else
                         interaction.editReply({
-                            content: "```" + val + "```\nTime Taken: " + TimeTaken + " seconds",
+                            content: NormalContent,
                             files: [url]
                         });
                 })

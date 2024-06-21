@@ -34,7 +34,7 @@ module.exports = {
             if (DEBUG)
                 console.log(`\nEvaluating: ${parameters.CODE}\n`);
 
-            SendMessage(message, "Evaluating: ```js\n" + parameters.CODE + "```")
+            const ResponseMessage = SendMessage(message, "Evaluating: ```js\n" + parameters.CODE + "```")
             try {
                 response.response = await eval(parameters.CODE);
             } catch (e) {
@@ -44,7 +44,9 @@ module.exports = {
                 })
             }
             if (typeof response.response === 'object') response.response = JSON.stringify(response.response);
-            SendMessage(message, "Response: " + response.response);
+            ResponseMessage.then(v => {
+                if (v.editable) v.edit(v.content + "\nResponse: " + response.response)
+            })
             response.sucessful = true;
         } catch (e) {
             response.response = e.toString();

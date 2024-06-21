@@ -859,7 +859,7 @@ const DiscordMessageLengthLimit = 1900;
  * Splits up the response into 1900 character blocks and sends each of them.
  * @param {Discord.Message} Message The message to send in the channel of.
  * @param {String} Content The content to be sent.
- * @returns {String} A promise which resolves when the message is complete.
+ * @returns {Promise<Message>} A promise which resolves when the message is complete.
  */
 async function SendMessage(Message, StringContent) {
   if (StringContent.trim() == "") {
@@ -868,6 +868,7 @@ async function SendMessage(Message, StringContent) {
 
   async function SendString(part) {
     return new Promise(async resolve => {
+      let lastMessage = null;
       if (DEBUG)
         console.log("Message content: " + part)
       if (part.length >= 20000) return Message.channel.send("More than 10 messages would be sent! Thus, I've decided to cut it short. Also, the AI is probably gonna crash immediately right now, LOL.")
@@ -876,11 +877,11 @@ async function SendMessage(Message, StringContent) {
           const SplitPoint = part.length > DiscordMessageLengthLimit ? DiscordMessageLengthLimit : part.length;
           const chunk = part.substring(0, SplitPoint);
           part = part.substring(SplitPoint);
-          await Message.channel.send(chunk)
+          lastMessage = await Message.channel.send(chunk)
         } while (part.length > 0)
-      } else Message.channel.send(part);
+      } else lastMessage = Message.channel.send(part);
 
-      resolve();
+      resolve(lastMessage);
     })
   }
 
