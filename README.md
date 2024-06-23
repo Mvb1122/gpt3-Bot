@@ -22,4 +22,5 @@ You may have to download the video to see it.
 2. `npm i package.json` or whatever
 3. Fill up `token_blank.json` and rename it to `token.json`
 4. Run `pip install -r requirements.txt` to get stuff for AI voicing.
-5. Run start.bat or `node index.js`
+6. Install Pytorch. If you've gotten this far, I'm sure you can figure out how to do that via Google. (Good luck!)
+7. Run start.bat or `node index.js`
