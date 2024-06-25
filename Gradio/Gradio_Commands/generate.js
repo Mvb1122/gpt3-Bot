@@ -284,6 +284,12 @@ module.exports = {
                 (await EndResponse).awaitMessageComponent().then(v => {
                     // Spoof what information is needed.
                     v.options = interaction.options;
+
+                    // Reuse the same prompt and prevent autotagging.
+                    for (let i = 0; i < v.options._hoistedOptions.length; i++) 
+                        if (v.options._hoistedOptions[i].name == 'prompts') v.options._hoistedOptions[i].value = settings.prompt;
+                        else if (v.options._hoistedOptions[i].name == 'autotag') v.options._hoistedOptions[i].value = false;
+
                     v.reply = interaction.followUp;
 
                     this.execute(v);
