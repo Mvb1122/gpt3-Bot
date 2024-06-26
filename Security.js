@@ -1,3 +1,29 @@
+/**
+ * An array of the policies that the Security manager accepts.
+ * @type {String[]}
+ */
+const policies = ["promptnsfw", "modrole","modchannel","allvoiceinvc","readjoinless"];
+/**
+ * An array of strings that define what type each policy accepts.
+ * @type {"boolean" | "RoleID" | "ChannelID"}
+ */
+const policyTypes = ["boolean", "RoleID", "ChannelID", "boolean", "boolean"];
+const policyHelp = [
+    "Enable NSFW Filtering",
+    "The role who can bypass NSFW.",
+    "The channel to log messages to.",
+    "Whether or not to read all voice chat text messages in voice chat",
+    "Whether or not to read voice messages from people who aren't in chat."
+];
+
+const PolicyDefaults = {
+    "promptnsfw": true,
+    "modrole": undefined,
+    "modchannel": undefined,
+    "allvoiceinvc": true,
+    "readjoinless": true
+}
+
 // Module for simplifying access to security policies.
 const fp = require('fs/promises');
 const fs = require('fs');
@@ -50,36 +76,12 @@ function ReloadSecurity(backup = true) {
 // Reload on boot.
 ReloadSecurity(false);
 
-/**
- * An array of the policies that the Security manager accepts.
- * @type {String[]}
- */
-const policies = ["promptnsfw", "modrole","modchannel","allvoiceinvc"];
-/**
- * An array of strings that define what type each policy accepts.
- * @type {"boolean" | "RoleID" | "ChannelID"}
- */
-const policyTypes = ["boolean", "RoleID", "ChannelID", "boolean"];
-const policyHelp = [
-    "Enable NSFW Filtering",
-    "The role who can bypass NSFW.",
-    "The channel to log messages to.",
-    "Whether or not to read all voice chat text messages in voice chat"
-];
-
-const PolicyDefaults = {
-    "promptnsfw": true,
-    "modrole": undefined,
-    "modchannel": undefined,
-    "allvoiceinvc": true
-}
-
 if (!(policies.length == policyTypes.length && policies.length == policyHelp.length)) throw new Error("Security Policy type, Policy name, Policy help array length mismatch!");
 
 /**
  * Fetches a policy from the security.
  * @param {string} gid GuildID
- * @param {"promptnsfw" | "modrole" | "modchannel" | "allvoiceinvc"} policy PolicyName
+ * @param {"promptnsfw" | "modrole" | "modchannel" | "allvoiceinvc" | "readjoinless"} policy PolicyName
  * @returns {Promise<*>}
  */
 async function GetPolicy(gid, policy) {
@@ -97,7 +99,7 @@ async function GetPolicy(gid, policy) {
 /**
  * Says whether a guild has a policy or not.
  * @param {string} gid GuildID
- * @param {"promptnsfw" | "modrole" | "modchannel" | "allvoiceinvc"} policy PolicyName
+ * @param {"promptnsfw" | "modrole" | "modchannel" | "allvoiceinvc" | "readjoinless"} policy PolicyName
  * @returns {Promise<boolean>}
  */
 async function HasPolicy(gid, policy) {

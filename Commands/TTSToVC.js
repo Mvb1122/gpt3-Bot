@@ -308,6 +308,10 @@ module.exports = {
             const output = (interaction.options.getChannel("output") != null ? interaction.options.getChannel("output").id : null) ?? interaction.member.voice.channelId ?? null;
             if (output == null) return interaction.editReply("Please join or select a voice channel!");
 
+            // Check that there's no preexisting reading going on.
+            for (let i = 0; i < ReadingList.length; i++) if (ReadingList[i].channelId == input.id || ReadingList[i].outputId == output) 
+                return interaction.editReply("This set already exists! Run `/startts stopconvo` to stop.")
+
             ReadingList.push({
                 channelId: input.id,
                 outputId: output,
@@ -336,6 +340,9 @@ module.exports = {
                     if (connection != undefined)
                         connection.destroy();
 
+                    // Write the file out.
+                    fp.writeFile(ReadingListsFile, JSON.stringify(ReadingList));
+
                     return interaction.editReply("Stopped reading!");
                 }
             }
@@ -351,21 +358,8 @@ module.exports = {
         // Ignore bots and empty messages
         if (message.author.bot || (message.content ?? "").trim().length == 0) return;
 
-        // Check if the message is within a chat we're reading all of.
-        for (let i = 0; i < ReadingList.length; i++) {
-            const CurrentList = ReadingList[i];
-            if (CurrentList.channelId == message.channelId) {
-                // See if they have a voice.
-                let voice = CurrentList.members[message.author.id] ?? GetRandomVoice();
-
-                // Assign that voice and write out the file.
-                ReadingList[i].members[message.author.id] = voice;
-                fp.writeFile(ReadingListsFile, JSON.stringify(ReadingList));
-                
-                // Voice it to VC.
-                TextToVC(message.content, CurrentList.outputId, CurrentList.guildId, voice);
-            }
-        }
+        // Just straight up give up if it has a link in it. 
+        if (message.content.includes("http")) return;
 
         // Check if it matches an input.
         for (let i = 0; i < VCSets.length; i++) {
@@ -376,7 +370,7 @@ module.exports = {
                  * @type {VoiceChannel}
                  */
                 const output = await client.channels.fetch(set.OutputID);
-                const inCall = output.members.has(message.author.id)
+                const inCall = GetPolicy(message.guildId, "readjoinless") ? true : output.members.has(message.author.id)
 
                 const path = Path.normalize(__dirname + `\\..\\Temp\\${message.author.id}_tts.wav`); // Prevent error when speaking too fast by randomly naming tts wavs.
                 if (inCall) {
@@ -397,10 +391,35 @@ module.exports = {
                         WriteToLogChannel(message.guildId, `${message.author.displayName} in <#${set.OutputID}> voiced:\`\`\`` + message.content + "```")
                     })
                 }
-
+                
                 // Since this considered voicing, we're done.
                 return;
             };
+        }
+
+        // Check if the message is within a chat we're reading all of.
+        for (let i = 0; i < ReadingList.length; i++) {
+            const CurrentList = ReadingList[i];
+            if (CurrentList.channelId == message.channelId) {
+                if (!GetPolicy(message.guildId, "readjoinless")) {
+                    const inCall = (await client.channels.fetch(CurrentList.outputId)).members.has(message.author.id)
+                    if (!inCall) return; // Don't read the message if they aren't in call.
+                }
+
+                // See if they have a voice.
+                let voice = CurrentList.members[message.author.id] ?? GetRandomVoice();
+
+                // Assign that voice and write out the file.
+                ReadingList[i].members[message.author.id] = voice;
+                fp.writeFile(ReadingListsFile, JSON.stringify(ReadingList));
+                
+                // Voice it to VC.
+                TextToVC(message.content, CurrentList.outputId, CurrentList.guildId, voice);
+                WriteToLogChannel(message.guildId, `${message.author.displayName} in <#${message.channelId}> voiced:\`\`\`` + message.content + "```");
+                
+                // Since this voiced, we're done.
+                return;
+            }
         }
 
         const HasAllVoiceInVC = await HasPolicy(message.guildId, "allvoiceinvc");

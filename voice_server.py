@@ -79,7 +79,7 @@ def voice(Text, Embedding, File = "./Temp/Whatever.wav"):
   # Get speaker embeddings.
   speaker_embedding = GetEmbedding(Embedding)
 
-  speech = synthesiser(Text, forward_params={"speaker_embeddings": speaker_embedding})
+  speech = synthesiser(Text, forward_params={"speaker_embeddings": speaker_embedding, "threshold": 0.4})
   
   # Write to file.
   sf.write(File, speech["audio"], samplerate=speech["sampling_rate"])

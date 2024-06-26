@@ -6,12 +6,13 @@
 
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
-const { AudioTypes } = require('../VoiceV2');
+const { AudioTypes, DefaultEmbedding } = require('../VoiceV2');
+const { SendMessage } = require('..');
 
 const text = `
 # Starting TTS:
 - You can either use the premade voices or make your own voices.
-- Just run \`/starttts\` to set it up.
+- Just run \`/starttts self\` to set it up.
 	- \`output\` is the voice channel you want to speak in.
 	
 	- \`input\` is the text channel you want to write in. This defaults to the channel your run the command in.
@@ -29,6 +30,12 @@ const text = `
 - Just run \`/stoptts\` to stop it.
 - \`/stoptts\` only works in channels which are actively reading your mesages.
 	- Run it in the channel you ran \`/starttts\` to stop.
+
+# Reading whole channels:
+- By default, all messages sent in a voice channel's text chat will be read aloud using the default voice, \`${DefaultEmbedding.substring(0, DefaultEmbedding.indexOf(".bin"))}\`.
+- You can add additional linkages between channels with the \`/starttts conversation\` command.
+	- The parameters, \`input\` and \`output\` are the same as with \`/starttts self\`.
+	- Voices will be assigned randomly, but can be overridden via \`/starttts self\`
 
 # Creating Models:
 - Use \`/clonevoice\` to clone a person's voice.
@@ -48,7 +55,7 @@ const text = `
 	- \`model\` is the voice you want to use. Default uses "Girl".
 - Output from the AI may contain extra words on extra long or extra short lines.
 - There is a word cap. I haven't bothered to test it, but it's like 1500 characters or so.
-`
+`.split("\n#");
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -60,7 +67,8 @@ module.exports = {
 	 * @param {CommandInteraction} interaction 
 	 */
 	async execute(interaction) {
-		interaction.reply("Check your DMs!");
-		interaction.user.send(text);
+		interaction.reply({content: "Check your DMs!", ephemeral: true});
+		
+		for (let i = 0; i < text.length; i++) if (text[i].trim() != "") await interaction.user.send("# " + text[i]);
 	}
 }
