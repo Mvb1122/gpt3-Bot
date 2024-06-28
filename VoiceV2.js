@@ -349,6 +349,9 @@ module.exports = {
                         ; // Do nothing.
                     }
                     rej(e);
+                })
+                .catch(e => {
+                    rej(e);
                 });
             });
         });
@@ -393,6 +396,31 @@ module.exports = {
                     res();
                 });
             else res();
+        })
+    },
+
+    /**
+     * Translates text to a language.
+     * @param {string} from BCP-47 code for the source langauge.
+     * @param {string} natural Text to translate.
+     * @param {string} to BCP-47 code for the target language.
+     * @returns {Promise<{translation_text: string, from_lang: string}>}
+     */
+    Translate(natural, to, from) {
+        return new Promise(async res => {
+            // Starts up the transcribe stuff.
+            if (!Started) await Start();
+
+            const data = {
+                natural: natural,
+                to: to,
+                from: from
+            };
+
+            postJSON("http://127.0.0.1:4963/translate", data)
+                .then((v) => {
+                    res(v);
+                });
         })
     }
 }

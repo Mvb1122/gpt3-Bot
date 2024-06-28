@@ -1,8 +1,11 @@
 transcription_model_id = "openai/whisper-large-v3"
 musicgen_model_id = "facebook/musicgen-stereo-small"
 tts_model_id = "microsoft/speecht5_tts"
+language_classifier_model_id = "papluca/xlm-roberta-base-language-detection"
+whisper_model_id = "openai/whisper-large-v3"
+translation_model_id = "facebook/nllb-200-distilled-600M"
 
-from transformers import pipeline, MusicgenForConditionalGeneration, AutoProcessor
+from transformers import pipeline
 from transformers.utils import is_flash_attn_2_available
 from transformers.utils import is_torch_sdpa_available
 import soundfile as sf
@@ -10,6 +13,7 @@ import torch
 import time
 import torchaudio
 from audio_denoiser.AudioDenoiser import AudioDenoiser
+from threading import Timer
 
 used_time = time.time()
 embedding_file_name = "./Voice Embeddings/New_Embedding.bin"
@@ -35,7 +39,7 @@ def MakeTranscriber():
   global transcriber
   from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
   torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
-  model_id = "openai/whisper-large-v3"
+  model_id = whisper_model_id
   model = AutoModelForSpeechSeq2Seq.from_pretrained(
     model_id, torch_dtype=torch_dtype, 
     low_cpu_mem_usage=True, 
@@ -68,6 +72,40 @@ def transcribe(path):
     transcriber = MakeTranscriber()
     
   return transcriber(path)
+
+translator = None
+last_trans_to = None
+last_trans_from = None
+def MakeTranslator(to_lang, from_lang):
+  # Even though this could be done by Whisper, I'm using a seperate model for simplicity's sake.
+  global translator, last_trans_to, last_trans_from
+  
+  if not (type(translator) is type(None)): del translator
+  
+  translator = pipeline('translation',model=translation_model_id, device=device, src_lang=from_lang, tgt_lang=to_lang)
+  last_trans_to = to_lang
+  last_trans_from = from_lang
+
+def Translate(natural, from_lang, to_lang):
+  global transtokenizer, translator, last_trans_from, last_trans_to
+  
+  if (from_lang == "auto"): from_lang = DetermineLanguage(natural)
+  if (to_lang == "auto"): to_lang = 'eng_Latn'
+  
+  if (type(translator) is type(None)) or not ((to_lang is last_trans_to) or (from_lang is last_trans_from)): MakeTranslator(to_lang, from_lang)
+  
+  natural = str(natural)
+  translation = translator(natural, max_length=len(natural) * 10)[0] # Set a ridiculously high maximum length in order to avoid cutting stuff off.
+  translation['from_lang'] = from_lang
+  return translation
+
+LanguageDeterminer = None
+def DetermineLanguage(text):
+  global LanguageDeterminer
+  if type(LanguageDeterminer) is type(None): 
+    LanguageDeterminer = pipeline("text-classification", model=language_classifier_model_id, device=device)
+    
+  return LanguageDeterminer(text, top_k=1, truncation=True)[0]['label']
 
 def GetEmbedding(location):
   with open(location, "rb") as f:
@@ -208,6 +246,18 @@ def music_function():
       if 'prompt' in data:
           Make_Music(data['prompt'], output, length)
           return jsonify({'message': True}), 200
+      else:
+          return jsonify({'error': 'Invalid JSON structure', 'data': data}), 400
+  else:
+      return jsonify({'error': 'Request must be JSON', 'data': request.form }), 400
+    
+@app.route("/translate", methods=['POST'])
+def translate_function():
+  if request.is_json:
+      data = request.get_json()
+        
+      if ('natural' in data) and ('to' in data) and ('from' in data):
+          return jsonify(Translate(data['natural'], data['from'], data['to'])), 200
       else:
           return jsonify({'error': 'Invalid JSON structure', 'data': data}), 400
   else:
