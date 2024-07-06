@@ -28,6 +28,7 @@ elif is_torch_sdpa_available(): attn_implementation = "sdpa"
 print("Running audio synth on " + device)
 print("Attn mode: " + str(attn_implementation))
 synthesiser = pipeline("text-to-speech", tts_model_id, device=device)
+synthesiser.model.compile() # Compile the model for just an ounce more performance.
 
 # Also load denoiser.
 denoiser = AudioDenoiser(device=torch.device(device))

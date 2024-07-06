@@ -1,6 +1,8 @@
+const { Message, Channel } = require("discord.js");
 const { client } = require(".");
 
-const Logs = {}; // GuildId: ChannelId.
+const Logs = {1234: {ChannelId: 1234, Listeners: [(t, n, c) => {}]}};
+delete Logs[1234];
 const UsernameSeperator = ` | `
 
 /**
@@ -10,6 +12,21 @@ const UsernameSeperator = ` | `
 */
 function HasLog(GuildId) {
     return Logs[GuildId] != undefined;
+}
+
+/**
+ * Gets the last message and the selected logging channel in the given guild.
+ * @param {string} GuildId GuildID to get.
+ * @returns {Promise<{last: Message, output: Channel}>}
+ */
+async function GetLastMessageAndOutputChannel(GuildId) {
+    const output = await client.channels.fetch(Logs[GuildId].ChannelId);
+    /**
+     * Force reload of the message in order to avoid breaking command responses by preventing them from properly being responded to.
+     * @type {Message}
+     */
+    const last = await output.messages.fetch(output.lastMessageId);
+    return { last, output };
 }
 
 module.exports = {
@@ -26,7 +43,7 @@ module.exports = {
     /**
      * Logs to a guild using a specified event type
      * @param {string} GuildId 
-     * @param {"TTS" | "STT" | "Join" | "Leave" | "Mute" | "Unmute"} Type Type of Transcription Event
+     * @param {"TTS" | "STT" | "Join" | "Leave" | "Mute" | "Unmute" | "AI"} Type Type of Transcription Event
      * @param {string} Name Name of the user.
      * @param {string | undefined} NewLogContent Text content. (Not necessary for events other than TTS/STT.)
      */
@@ -34,7 +51,9 @@ module.exports = {
         // Get log.
         if (Logs[GuildId] == undefined) return;
 
-        const output = await client.channels.fetch(Logs[GuildId]);
+        // Run OnLog things.
+        for (let i = 0; i < Logs[GuildId].Listeners.length; i++) Logs[GuildId].Listeners[i](Type, Name, NewLogContent);
+
         let TranscriptionMessageContent = `${Name}${UsernameSeperator}${NewLogContent}`;
 
         switch (Type) {
@@ -61,6 +80,10 @@ module.exports = {
             case "Unmute":
                 TranscriptionMessageContent = `:speaking_head: ${Name} unmuted!`
                 break;
+            
+            case "AI":
+                TranscriptionMessageContent = `:robot: ${TranscriptionMessageContent}`
+                break;
 
             default:
                 break;
@@ -68,11 +91,7 @@ module.exports = {
 
         // Decide whether to send a message or to edit one.
         try {
-            /**
-             * Force reload of the message in order to avoid breaking command responses by preventing them from properly being responded to.
-             * @type {Message}
-             */
-            const last = await output.messages.fetch(output.lastMessageId)
+            const { last, output } = await GetLastMessageAndOutputChannel(GuildId);
 
             // If the last message was written by us, and we can squeeze in our continued transcription, add onto it.
             const MessageContent = last.content;
@@ -96,7 +115,7 @@ module.exports = {
         }
     },
 
-    HasLog,
+    HasLog, GetLastMessageAndOutputChannel,
 
     /**
      * Links the log up to a channel, updating it if needed.
@@ -106,8 +125,22 @@ module.exports = {
      */
     StartLog(GuildId, ChannelId) {
         const HadLogBefore = HasLog(GuildId);
-        Logs[GuildId] = ChannelId;
+        Logs[GuildId] = {
+            ChannelId: ChannelId,
+            Listeners: []
+        };
         return HadLogBefore;
+    },
+
+    /**
+     * Adds a function to run whenever a message is logged.
+     * @param {string} GuildId GuildID to subscribe to.
+     * @param {(type: "TTS" | "STT" | "Join" | "Leave" | "Mute" | "Unmute" | "AI", name: string, content: string) => {}} f Function listener.
+     */
+    AddOnLog(GuildId, f) {
+        if (Logs[GuildId] == undefined) return;
+
+        else return Logs[GuildId].Listeners.push(f);
     },
 
     StopLog(Guilid) {

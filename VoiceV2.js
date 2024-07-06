@@ -7,7 +7,7 @@ const VoiceDir = "/Voice Embeddings/";
 const DefaultEmbedding = `luminary.bin`;
 //#endregion
 
-const { spawn } = require('child_process');
+const { spawn, ChildProcess } = require('child_process');
 const { DEBUG } = require('.');
 const fp = require('fs/promises');
 const fs = require('fs');
@@ -97,13 +97,18 @@ function postJSON(URL, data) {
 }
 
 /**
+ * @type {ChildProcess}
+ */
+let pythonProcess;
+
+/**
  * Starts the AI embedding and voicing server process.
  * @returns {Promise} A promise which resolves when the AI is running.
  */
 function Start() {
     return new Promise(res => {
         // Run the python server.
-        const pythonProcess = spawn('python', ['voice_server.py']);
+        pythonProcess = spawn('python', ['voice_server.py']);
 
         // Handle process exit events to ensure the Python server is killed when Node.js exits
         process.on('exit', () => {
@@ -125,6 +130,23 @@ function Start() {
                     console.log(data.toString());
             });
     })
+}
+
+function Stop() {
+    transcribe_loaded = false;
+    LastTranscribe = null;
+    Started = false; 
+
+    return new Promise((res, rej) => {
+        if (pythonProcess == undefined) return res();
+        if (pythonProcess.kill()) res();
+        else rej();
+    })
+}
+
+async function Restart() {
+    await Stop();
+    return Start();
 }
 
 function ConvertFFMPEG(AudioFileName, AdditionalSettings = undefined) {
@@ -296,7 +318,7 @@ module.exports = {
         })
     },
 
-    Preload: Start,
+    Preload: Start, Restart, Stop,
 
     AudioTypes, NonSplitTypes, FileIsAudio,
 
@@ -422,7 +444,32 @@ module.exports = {
                     res(v);
                 });
         })
+    },
+
+    /**
+     * Generates a sound effect.
+     * @param {string} prompt What to generate.
+     * @param {string} path Where to generate.
+     * @returns {Promise<{path: path}>} Resolves when generation is complete.
+     */
+    /*
+    SFX(prompt) {
+        return new Promise(async res => {
+            // Starts up the transcribe stuff.
+            if (!Started) await Start();
+
+            const data = {
+                prompt: prompt,
+                path: path
+            };
+
+            postJSON("http://127.0.0.1:4963/sfx", data)
+                .then((v) => {
+                    res(v);
+                });
+        })
     }
+    */
 }
 // Debug.
 /*

@@ -1301,6 +1301,13 @@ client.on("voiceStateUpdate", (old, newState) => {
     if ('OnVoiceStateUpdate' in module) 
       module.OnVoiceStateUpdate(old, newState);
   }
+
+  // If there's nobody in the call and we're connected, then disconnect.
+  const disconnecting = newState.channelId == null && old.channelId != null;
+  let connection = getVoiceConnection(newState.guild.id)
+  if (disconnecting && old.channel.members.size == 1) {
+    if (connection != undefined && connection.joinConfig.channelId == old.channelId) connection.destroy()
+  }
 })
 
 async function AskChatGPTAndSendResponse(content, message) {
@@ -1452,6 +1459,7 @@ async function listener(req, res) {
 // On boot, delete the Temp folder.
 const fp = require('fs/promises');
 const token = require('./token');
+const { getVoiceConnection } = require('@discordjs/voice');
 const TempDir = "./Temp/";
 if (fs.existsSync(TempDir))
   fs.readdirSync(TempDir).forEach(file => fp.unlink(`${TempDir}${file}`))

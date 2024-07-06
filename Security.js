@@ -17,14 +17,13 @@ const policyHelp = [
 ];
 
 const PolicyDefaults = {
-    "promptnsfw": true,
+    "promptnsfw": false,
     "modrole": undefined,
     "modchannel": undefined,
     "allvoiceinvc": true,
     "readjoinless": true
 }
 
-// Module for simplifying access to security policies.
 const fp = require('fs/promises');
 const fs = require('fs');
 const Index = require('./index');
@@ -126,6 +125,7 @@ async function SetPolicy(gid, policy, value) {
 
 /**
  * Log for all servers.
+ * @type {{GuildID: [string]}}
  */
 let UniLog = {};
 if (fs.existsSync(FileNames.UniLog))
@@ -133,28 +133,57 @@ if (fs.existsSync(FileNames.UniLog))
         UniLog = JSON.parse(d);
     });
 
-async function WriteToLogChannel(guildId, message) {
+/**
+ * Writes a message to the universal log and to a guild's log.
+ * @param {string} guildId Discord GuildID to log to.
+ * @param {string} message Message to write to the log.
+ * @returns {Promise<[undefined, Message | undefined]>} A promise which resolves when the log has completed.
+ */
+function WriteToLogChannel(guildId, message) {
     console.log(`[${guildId}] ${message.replaceAll("\`\`\`", "\n")} `);
 
-    const logChannel = await GetPolicy(guildId, "modchannel");
-    if (logChannel != undefined) {
-        const Log = await Index.client.channels.fetch(logChannel);
-        // Send text while preventing mentions from pinging.
-        Log.send(message, {
-            "allowed_mentions": { 
-                users: ['0'], 
-                roles: ['0'] 
-            }
+    const UnilogPromise = new Promise(res => {
+        // Write to the UniLog. 
+        if (UniLog[guildId] == undefined) UniLog[guildId] = [];
+        UniLog[guildId].push(message);
+        
+        // Warning: May cause file corruption during times of high usage/when file cannot be written fast enough. (If Node is on Linux/a Multithreaded-writing system.)
+        fp.writeFile("./UniLog.json", JSON.stringify(UniLog)).then(() => {
+            res();
         });
-    }
+    })
 
-    // Write to the UniLog. 
-    if (UniLog[guildId] == undefined) UniLog[guildId] = [];
-    UniLog[guildId].push(message);
-    
-    // Warning: May cause file corruption during times of high usage/when file cannot be written fast enough.
-    fp.writeFile("./UniLog.json", JSON.stringify(UniLog));
+    const ServerLogPromise = new Promise(async res => {
+        // Write to the server's log channel.
+        const logChannel = await GetPolicy(guildId, "modchannel");
+        if (logChannel != undefined) {
+            const Log = await Index.client.channels.fetch(logChannel);
+            // Send text while preventing mentions from pinging.
+            const message = await Log.send(message, {
+                "allowed_mentions": { 
+                    users: [], 
+                    roles: [] 
+                }
+            })
+
+            res(message);
+        } else res();
+    })
+
+    return new Promise(v => {
+        Promise.all([UnilogPromise, ServerLogPromise]).then(x => {
+            v(x);
+        })
+    })
 }
+
+// If we're on debug, test the logging after a little while.
+if (Index.DEBUG)
+    setTimeout(() => {
+        WriteToLogChannel("762867801575784448", "Bot rebooted.").then(v => {
+            console.log("Log test finished!");
+        })
+    }, 1000);
 
 async function WriteToLogChannel(guildId, message) {
     const logChannel = await GetPolicy(guildId, "modchannel");

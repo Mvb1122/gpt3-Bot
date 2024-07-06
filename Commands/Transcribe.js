@@ -6,9 +6,9 @@ const fp = require('fs/promises');
 const fs = require('fs');
 const { ConnectToChannel } = require('./TTSToVC');
 const { getVoiceConnection, VoiceConnection, EndBehaviorType } = require('@discordjs/voice');
-const { client } = require('..');
+const { client, DEBUG } = require('..');
 const prism = require('prism-media');
-const { LogTo, StartLog, StopLog, HasLog, GetLogId } = require('../TranscriptionLogger');
+const { LogTo, StartLog, StopLog, HasLog, GetLogId, AddOnLog } = require('../TranscriptionLogger');
 
 /**
  * Ensures that a voice connection to a channel exists.
@@ -233,18 +233,25 @@ module.exports = {
             TranscribingSets.push(set);
 
             // Because this will make lots of calls to transcribe, force it to be preloaded before we actually start transcribing anything.
-            PreloadTranscribe().then(() => {
-                // Join voice call, subscribe to all people.
-                    // EnsureHasConnectionTo(input);
+            await PreloadTranscribe()
+            
+            // Join voice call, subscribe to all people.
+                // EnsureHasConnectionTo(input);
+            // Start the logger thing.
+            StartLog(interaction.guildId, set.Output);
 
-                // Start the logger thing.
-                StartLog(interaction.guildId, set.Output);
-
-                input.members.forEach(member => {
-                    if (!member.user.bot) // Only transcribe people.
-                        SubscribeTranscribe(member, set);
+            // If we're in DEBUG mode, log all transcriptions.
+            if (DEBUG)
+                AddOnLog(interaction.guildId, (f, n, c) => {
+                    console.log(`[${f}] ${n}: ${c}`);
                 })
+
+            input.members.forEach(member => {
+                if (!member.user.bot) // Only transcribe people.
+                    SubscribeTranscribe(member, set);
             });
+
+            return;
         } else if (subcommand == "stopcall") {
             const VoiceID = interaction.member.voice.channelId ?? null;
             if (VoiceID == null) return interaction.editReply("Please join the call you wish to stop transcribing.");

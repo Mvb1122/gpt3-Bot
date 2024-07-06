@@ -401,6 +401,10 @@ module.exports = {
         for (let i = 0; i < ReadingList.length; i++) {
             const CurrentList = ReadingList[i];
             if (CurrentList.channelId == message.channelId) {
+                const VoiceChannel = await client.channels.fetch(CurrentList.outputId)
+                if (VoiceChannel.memberCount == 0) return; // Don't do anything if there's nobody in call.
+
+                // If ReadJoinLess is disabled, then check if the person is in call.
                 if (!GetPolicy(message.guildId, "readjoinless")) {
                     const inCall = (await client.channels.fetch(CurrentList.outputId)).members.has(message.author.id)
                     if (!inCall) return; // Don't read the message if they aren't in call.

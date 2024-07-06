@@ -256,13 +256,13 @@ module.exports = {
                 .addStringOption(p => {
                     return p.setName("to")
                         .setDescription("langauge to translate to")
-                        .setRequired(true)
+                        .setRequired(false)
                         .setAutocomplete(true);
                 })
                 .addStringOption(p => {
                     return p.setName("from")
                         .setDescription("langauge to translate from")
-                        .setRequired(true)
+                        .setRequired(false)
                         .setAutocomplete(true);
                 })
         })
@@ -316,8 +316,8 @@ module.exports = {
         const subcommand = await interaction.options.getSubcommand();
 
         // Get common options.
-        const to = interaction.options.getString("to");
-        const from = interaction.options.getString("from");
+        const to = interaction.options.getString("to") ?? languageData[0].value;
+        const from = interaction.options.getString("from") ?? languageData[0].value;
 
         if (subcommand == "text") {
             const text = interaction.options.getString("text");
@@ -367,15 +367,12 @@ module.exports = {
         // Ignore bots and empty messages
         if (message.author.bot || (message.content ?? "").trim().length == 0) return;
 
-        // Just straight up give up if it has a link in it. 
-        if (message.content.includes("http")) return;
-
         for (let i = 0; i < TranslatingLists.length; i++) {
             const CurrentList = TranslatingLists[i];
             if (message.channelId == CurrentList.inputId) {
                 // Translate it to the list's langauge and send it.
                 Translate(message.content, CurrentList.to, CurrentList.from).then(async v => {
-                    (await client.channels.fetch(CurrentList.outputId)).send(`${message.author.displayName} | ${v.message}`);
+                    (await client.channels.fetch(CurrentList.outputId)).send(`${message.author.displayName} | ${v.translation_text}`);
                 })
             }
         }

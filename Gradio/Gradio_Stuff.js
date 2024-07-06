@@ -170,7 +170,7 @@ async function FetchApp() {
     
 }
 
- function IsConnected() {
+function IsConnected() {
     return apps.length != 0;
 }
 

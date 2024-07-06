@@ -144,7 +144,6 @@ module.exports = {
         // Write to log what was drawn.
         WriteToLogChannel(interaction.guildId, `${interaction.user.displayName} generated images with tags:` + "```\n" + prompts + "```");
 
-
         let count = interaction.options.getInteger("count") ?? 1;
         // count = Number.parseInt(count);
         if (count <= 0) count = 1;
@@ -281,7 +280,7 @@ module.exports = {
                 const EndResponse = interaction.editReply(InteractionContent);
                 
                 // Make more images if requested by calling this function again recursively.
-                (await EndResponse).awaitMessageComponent().then(v => {
+                (await EndResponse).awaitMessageComponent().then(async v => {
                     // Spoof what information is needed.
                     v.options = interaction.options;
 
@@ -291,8 +290,18 @@ module.exports = {
                         else if (v.options._hoistedOptions[i].name == 'autotag') v.options._hoistedOptions[i].value = false;
 
                     v.reply = interaction.followUp;
-
+                    
                     this.execute(v);
+                    
+                    // Remove the button from the original message.
+                    const reply = await interaction.fetchReply();
+                    InteractionContent.components = [];
+                    
+                    // Don't overwrite files or text content I guess.
+                    delete InteractionContent.files;
+                    delete InteractionContent.content;
+
+                    (reply).edit(InteractionContent);
                 })
                 
                 EndResponse.then(async () => {
