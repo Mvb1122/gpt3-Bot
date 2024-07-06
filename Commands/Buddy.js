@@ -7,7 +7,7 @@ const AIThinkingMessage = ":robot: The AI is thinking of a response...";
 const AIVoiceBin = "Biden.bin";
 
 /**
- * @type {[{Messages: [{role: "System" | "User" | "Function" | "Assistant"; content: string;}], LastMessageTime: number, ChannelId: string, GuildId: string}]}
+ * @type {[{Messages: [{role: "System" | "User" | "Function" | "Assistant"; content: string;}], LastMessageTime: number, ChannelId: string, GuildId: string, AlwaysListening: boolean, Bypass: boolean}]}
  */
 const Conversations = [];
 
@@ -28,6 +28,9 @@ new Promise(async ()=> {
                         } else {
                             messageDetails.last.edit(`${messageDetails.last.content}\n${AIThinkingMessage}`);
                         }
+
+                            // Stop listening for new words until awoken again.
+                        Conversations[convoKey].Bypass = false;
 
                         RequestChatGPT(convo.Messages, messageDetails.last).then(async v => {
                             await messageDetails.last.edit(messageDetails.last.content.replace(`\n${AIThinkingMessage}`, ""));
@@ -66,6 +69,11 @@ module.exports = {
                                 .addChannelTypes(ChannelType.GuildText, ChannelType.PublicThread, ChannelType.PrivateThread, ChannelType.AnnouncementThread)
                                 .setRequired(false);
                         })
+                        .addBooleanOption(op => {
+                            return op.setName("alwayslistening")
+                                .setDescription("Whether to always listen. Defaults to false, wakes on \"computer\"")
+                                .setRequired(false)
+                        })
                 })
                 .addSubcommand(s => {
                     return s.setName("stopcall")
@@ -89,20 +97,28 @@ module.exports = {
             const inputId = (ChannelInput != null ? ChannelInput.id : null) ?? interaction.member.voice.channelId ?? null;
             const OutputID = (interaction.options.getChannel("output") ?? {id: null}).id ?? interaction.channelId;
             if (inputId == null) return interaction.editReply("Please join or select a voice channel!");
+            
+            const AlwaysListening = interaction.options.getBoolean("alwayslistening") ?? false;
 
             // Register the Conversation.
             Conversations[inputId] = {
                 "ChannelId": OutputID,
                 "GuildId": interaction.guildId,
                 "LastMessageTime": undefined,
-                "Messages": NewMessage("System", fetchUserBase(interaction.user.id))
+                "Messages": NewMessage("System", fetchUserBase(interaction.user.id)),
+                "AlwaysListening": AlwaysListening,
+                "Bypass": false
             }
 
             // Now, add a listener.
             AddOnLog(interaction.guildId, (type, name, content) => {
                 if (type == "STT" || type == "TTS") {
-                    Conversations[inputId].Messages = Conversations[inputId].Messages.concat(NewMessage("User", `(${name}) ${content}`));
-                    Conversations[inputId].LastMessageTime = performance.now();
+                    if (content.toLowerCase().includes("computer")) Conversations[inputId].Bypass = true;
+    
+                    if (AlwaysListening || Conversations[inputId].Bypass) {
+                        Conversations[inputId].Messages = Conversations[inputId].Messages.concat(NewMessage("User", `(${name}) ${content}`));
+                        Conversations[inputId].LastMessageTime = performance.now();
+                    }
                 }
             })
         } else {
