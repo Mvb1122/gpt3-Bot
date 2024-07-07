@@ -37,7 +37,7 @@ const SubscribedMembers = [];
 /**
  * Subscribes transcription onto a user.
  * @param {GuildMember} user User to subscribe transcription onto.
- * @param {{ Output: number; Input: number }} Set to transcribe to. 
+ * @param {{ Output: number; Input: number }} set to transcribe to. 
  */
 async function SubscribeTranscribe(user, set, bypassSubscribedMembers = false) {
     // Prevent subscribing to a user twice.
@@ -89,17 +89,16 @@ async function SubscribeTranscribe(user, set, bypassSubscribedMembers = false) {
                 const Name = user.nickname ?? user.displayName;
                 if (val.toLowerCase() == "you" || val == "") return;
 
+                // const channel = client.channels.fetch(set.Output);
                 LogTo(user.guild.id, "STT", Name, val);
 
                 // Always delete file.
-                await fp.unlink(path);
+                fp.unlink(path);
             }, () => {
                 // If the transcription fails, just unlink the audio file, I guess.
                 try {
                     fp.unlink(path);
-                } catch {
-                    ; // Do nothing.
-                }
+                } catch { ; } // Do nothing.
             })
 
         else // Just delete the file.

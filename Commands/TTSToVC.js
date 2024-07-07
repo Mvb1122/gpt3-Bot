@@ -219,6 +219,47 @@ function TextToVC(text, VCID, GuildID, model) {
     })
 }
 
+/**
+ * Very similar to TextToVC, except it generates and plays when callback functions are called.
+ * @param {string} text 
+ * @param {string} VCID 
+ * @param {string} GuildID 
+ * @param {string} model 
+ * @returns {{
+    voice: () => Promise<{
+        text: string;
+        message: boolean;
+    }>;
+    Play: () => Promise<any>;
+}}
+ */
+function TextToVCWithCallback(text, VCID, GuildID, model) {
+    const path = __dirname + `/../Temp/${Math.floor(Math.random() * 100000)}_chat_tts.wav`
+    
+    let hasVoiced = false;
+    const voice = () => {
+        hasVoiced = true;
+        return Voice(text, path, model);
+    }
+    
+    function Play() {
+        return new Promise(async res => {
+            if (!hasVoiced)
+                await voice();
+
+            PlayAudioToVC(path, { OutputID: VCID, OutputGuildID: GuildID, Player: getPlayer() })
+                // Delete audio after it has finished playing.
+                .then(() => {
+                    fs.unlinkSync(path);
+                    res();
+                });
+        })
+    }
+
+    const x = { voice, Play }
+    return x;
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('starttts')
@@ -464,7 +505,7 @@ module.exports = {
     },
 
     // Also share voice sets and useful voice information.
-    VCSets, PlayAudioToVC, WriteVCSets, ConnectToChannel, TextToVC,
+    VCSets, PlayAudioToVC, WriteVCSets, ConnectToChannel, TextToVC, TextToVCWithCallback,
 
     /**
      * @param {AutocompleteInteraction} interaction The Autocomplete request.

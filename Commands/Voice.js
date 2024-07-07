@@ -18,6 +18,11 @@ module.exports = {
             return o.setName("model")
                 .setDescription("The Model to use.")
                 .setAutocomplete(true)
+        })
+        .addBooleanOption(o => {
+            return o.setName("fixtext")
+                .setDescription("Whether to turn everything into letters. eg; 1 -> \"one\"")
+                .setRequired(false)
         }),
 
     /**
@@ -28,11 +33,12 @@ module.exports = {
         await interaction.deferReply();
         const line = interaction.options.getString("line");
         const model = interaction.options.getString("model") ?? null;
+        const fixtext = interaction.options.getBoolean("fixtext") ?? true;
 
         const path = Path.normalize(__dirname + `\\..\\Temp\\${interaction.user.id}_tts.wav`);
         let time = performance.now();
         try {
-            Voice(line, path, model).then((val) => {
+            Voice(line, path, model, fixtext).then((val) => {
                 // Save to temp folder and then send it off.
                 time = performance.now() - time;
     

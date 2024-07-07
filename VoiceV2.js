@@ -90,6 +90,9 @@ function postJSON(URL, data) {
             try {
                 res(JSON.parse(text));
             } catch {
+                // If something goes wrong, let's restart the server before moving on.
+                await Restart();
+
                 rej(text);
             }
         });
@@ -144,9 +147,34 @@ function Stop() {
     })
 }
 
+/**
+ * Preloads the transcription stuff.
+ * @returns {Promise}
+ */
+function PreloadTranscribe() {
+    return new Promise(async res => {
+        // Starts up the transcribe stuff.
+        if (!Started) await Start();
+
+        if (!transcribe_loaded)
+            postJSON("http://127.0.0.1:4963/preload_transcribe", {})
+            .then(() => {
+                transcribe_loaded = true;
+                res();
+            });
+        else res();
+    })
+}
+
 async function Restart() {
+    const transcribe_loaded_before = transcribe_loaded;
     await Stop();
-    return Start();
+    const start = Start();
+    if (transcribe_loaded_before) {
+        await start;
+        await PreloadTranscribe();
+    }
+    return start;
 }
 
 function ConvertFFMPEG(AudioFileName, AdditionalSettings = undefined) {
@@ -189,7 +217,7 @@ function ListEmbeddings() {
 }
 
 /** Acceptable audio types for Embedding. */
-const NonSplitTypes = "wav, mp3, mp4, avi, m4a, ogg, ogx, flac, amr, mpga";
+const NonSplitTypes = "wav, mp3, mp4, avi, m4a, ogg, ogx, flac, amr, mpga, mov";
 const AudioTypes = NonSplitTypes.split(", ");
 
 function FileIsAudio(name) {
@@ -209,9 +237,10 @@ module.exports = {
      * @param {String} text Text to voice.
      * @param {String} location File location to write to.
      * @param {String} model Embedding Model to use.
+     * @param {boolean} [MakeAllLetters=true] Whether to fix characters; eg turn / to 'slash'
      * @returns {Promise<{ text: string, message: boolean}>} Promise which resolves when generation is complete. `text` is the voiced text.
      */
-    Voice(text, location, model) {
+    Voice(text, location, model, MakeAllLetters = true) {
         return new Promise(async res => {
             if (!Started) await Start();
 
@@ -223,56 +252,58 @@ module.exports = {
             if (!model.endsWith(".bin")) model += ".bin";
 
             // Reformat text to replace numbers with words.
-            const numbers = text.match(NumberMatchingRegex);
-            try {
-                if (numbers != null) {
-                    // Go through each one and replace it.
-                    for (let i = 0; i < numbers.length; i++) {
-                        /**
-                         * @type {string}
-                         */
-                        const sub = numbers[i].replaceAll(",", "");
-                        const hasPoint = sub.includes(".")
-                        const pointIndex = hasPoint ? sub.indexOf(".") : sub.length;
-                        const beforePoint = sub.substring(0, pointIndex);
+            if (MakeAllLetters) {
+                const numbers = text.match(NumberMatchingRegex);
+                try {
+                    if (numbers != null) {
+                        // Go through each one and replace it.
+                        for (let i = 0; i < numbers.length; i++) {
+                            /**
+                             * @type {string}
+                             */
+                            const sub = numbers[i].replaceAll(",", "");
+                            const hasPoint = sub.includes(".")
+                            const pointIndex = hasPoint ? sub.indexOf(".") : sub.length;
+                            const beforePoint = sub.substring(0, pointIndex);
+        
+                            let converted = converter.toWords(beforePoint);
+                            if (hasPoint) try {
+                                let afterPoint = sub.substring(pointIndex + 1);
+                                converted += " point " + converter.toWords(afterPoint);
+                            } catch { ; } // Do nothing.
+        
+                            text = text.replace(numbers[i], converted);
+                        }
+                    }
+                } catch {
+                    ; // Do nothing.
+                }
     
-                        let converted = converter.toWords(beforePoint);
-                        if (hasPoint) try {
-                            let afterPoint = sub.substring(pointIndex + 1);
-                            converted += " point " + converter.toWords(afterPoint);
-                        } catch { ; } // Do nothing.
-    
-                        text = text.replace(numbers[i], converted);
+                // Fix acronyms, only if the message isn't in all caps.
+                const acronyms = text.match(AcronymRegex);
+                if (acronyms != null && text.toUpperCase() != text) {
+                    // Replace them.
+                    for (let i = 0; i < acronyms.length; i++) {
+                        const OGLowerCase = acronyms[i].toLowerCase();
+                        let converted = (" " + OGLowerCase); // Force deep copy.
+                        PhoneticAlphabet.forEach(letter => {
+                            if (OGLowerCase.includes(letter.letter.toLowerCase()))
+                                converted = converted.replaceAll(letter.letter.toLowerCase(), letter.phonetic + " ");
+                        });
+                        converted = converted.replaceAll(".", " ").trim();
+                        text = text.replace(acronyms[i], converted)
                     }
                 }
-            } catch {
-                ; // Do nothing.
+    
+                // Replace phonetic symbols.
+                PhoneticSymbols.forEach(symbol => {
+                    if (text.includes(symbol.letter))
+                        text = text.replaceAll(symbol.letter, ` ${symbol.phonetic} `);
+                });
+    
+                // Fix multiple spaces.
+                text = text.replace(SpaceRegex, "");
             }
-
-            // Fix acronyms, only if the message isn't in all caps.
-            const acronyms = text.match(AcronymRegex);
-            if (acronyms != null && text.toUpperCase() != text) {
-                // Replace them.
-                for (let i = 0; i < acronyms.length; i++) {
-                    const OGLowerCase = acronyms[i].toLowerCase();
-                    let converted = (" " + OGLowerCase); // Force deep copy.
-                    PhoneticAlphabet.forEach(letter => {
-                        if (OGLowerCase.includes(letter.letter.toLowerCase()))
-                            converted = converted.replaceAll(letter.letter.toLowerCase(), letter.phonetic + " ");
-                    });
-                    converted = converted.replaceAll(".", " ").trim();
-                    text = text.replace(acronyms[i], converted)
-                }
-            }
-
-            // Replace phonetic symbols.
-            PhoneticSymbols.forEach(symbol => {
-                if (text.includes(symbol.letter))
-                    text = text.replaceAll(symbol.letter, ` ${symbol.phonetic} `);
-            });
-
-            // Fix multiple spaces.
-            text = text.replace(SpaceRegex, "");
 
             const Data = {
                 location: location,
@@ -402,24 +433,7 @@ module.exports = {
         })
     },
 
-    /**
-     * Preloads the transcription stuff.
-     * @returns {Promise}
-     */
-    PreloadTranscribe() {
-        return new Promise(async res => {
-            // Starts up the transcribe stuff.
-            if (!Started) await Start();
-
-            if (!transcribe_loaded)
-                postJSON("http://127.0.0.1:4963/preload_transcribe", {})
-                .then(() => {
-                    transcribe_loaded = true;
-                    res();
-                });
-            else res();
-        })
-    },
+    PreloadTranscribe,
 
     /**
      * Translates text to a language.

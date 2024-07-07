@@ -16,7 +16,7 @@ module.exports = {
           },
           "ShowUser": {
             "type": "boolean",
-            "description": "If true, the user is shown the search results. If left empty, the user will not be shown the result."
+            "description": "If true, the user is shown the search results. If left empty, the user will not be shown the result. Don't show them unless asked!"
           }
         }
       },

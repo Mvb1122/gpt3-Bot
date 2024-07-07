@@ -2,9 +2,11 @@ const { SlashCommandBuilder, CommandInteraction, ChannelType, Message } = requir
 const { execute: TranscribeExecute } = require("./Transcribe");
 const { AddOnLog, LogTo, GetLastMessageAndOutputChannel } = require('../TranscriptionLogger');
 const { NewMessage, fetchUserBase, client, RequestChatGPT } = require('..');
-const { TextToVC } = require('./TTSToVC');
+const { TextToVC, TextToVCWithCallback } = require('./TTSToVC');
+const { getVoiceConnection } = require('@discordjs/voice');
 const AIThinkingMessage = ":robot: The AI is thinking of a response...";
-const AIVoiceBin = "Biden.bin";
+const AIVoiceBin = "Luminary.bin";
+const AIWakePhrase = "computer"
 
 /**
  * @type {[{Messages: [{role: "System" | "User" | "Function" | "Assistant"; content: string;}], LastMessageTime: number, ChannelId: string, GuildId: string, AlwaysListening: boolean, Bypass: boolean}]}
@@ -20,7 +22,7 @@ new Promise(async ()=> {
                     const convo = Conversations[convoKey];
                     const messageDetails = (await GetLastMessageAndOutputChannel(convo.GuildId));
                     const voiceChannel = client.channels.fetch(convo.ChannelId);
-                    if (convo.Messages[convo.Messages.length - 1].role != "assistant" && performance.now() - convo.LastMessageTime > (await voiceChannel).memberCount * 2000) { // Wait longer if there are more people.
+                    if (convo.Messages[convo.Messages.length - 1].role != "assistant" && performance.now() - convo.LastMessageTime > 2000) { // Wait longer if there are more people. (await voiceChannel).memberCount * 
                         // Respond and then voice to call.
                             // Send thinking message.
                         if (messageDetails.last.author.id != client.user.id || (messageDetails.last != undefined && messageDetails.last.content.length > 1800) || messageDetails.last == undefined) {
@@ -32,11 +34,42 @@ new Promise(async ()=> {
                             // Stop listening for new words until awoken again.
                         Conversations[convoKey].Bypass = false;
 
+                        // I'm aware that this following section of code is vastly overcomplicated; I could generate in one go. 
+                        // However, this way feels smoother to the user and also avoids running out of length on the TTS component.
                         RequestChatGPT(convo.Messages, messageDetails.last).then(async v => {
                             await messageDetails.last.edit(messageDetails.last.content.replace(`\n${AIThinkingMessage}`, ""));
-                            // Log the message.
-                            LogTo(convo.GuildId, "AI", "AI", v[v.length - 1].content)
-                            TextToVC(v[v.length - 1].content, convo.ChannelId, convo.GuildId, AIVoiceBin)
+                            
+                            // First, Generate all audio.
+                            const VoicePlaySections = [], GenerationCalls = [];
+                            let content = v[v.length - 1].content;
+                            const BottomEndLength = 100;
+                            do {
+                                // Split to a minimum length plus to next space.
+                                const SplitSize = content.length > BottomEndLength ? BottomEndLength + content.substring(BottomEndLength).indexOf(" ") + 1 : content.length;
+                                const thisRoundText = content.length > SplitSize ? content.substring(0, SplitSize) : content;
+                                content = content.length > SplitSize ? content.substring(SplitSize) : "";
+
+                                // Wait for both logging and voicing before continuing on.
+                                const x = TextToVCWithCallback(thisRoundText, convo.ChannelId, convo.GuildId, AIVoiceBin);
+                                
+                                function Play() {
+                                    return Promise.all([
+                                        x.Play(),
+                                        LogTo(convo.GuildId, "AI", "AI", thisRoundText)
+                                    ])
+                                }
+
+                                VoicePlaySections.push(Play); GenerationCalls.push(x.voice);
+                            } while (content.length != 0)
+
+                            // Now that all voices are queued for generation, play them sucessively while generating the next chunk.
+                                // This means that audio is generated during the previous section's playback.
+                            await GenerationCalls[0]();
+                            for (let i = 0; i < VoicePlaySections.length; i++) {
+                                const x = VoicePlaySections[i]();
+                                if (VoicePlaySections[i + 1] != undefined) GenerationCalls[i + 1]();
+                                await x;
+                            }
                         })
                     }
                 })
@@ -71,7 +104,7 @@ module.exports = {
                         })
                         .addBooleanOption(op => {
                             return op.setName("alwayslistening")
-                                .setDescription("Whether to always listen. Defaults to false, wakes on \"computer\"")
+                                .setDescription(`Whether to always listen. Defaults to false, wakes on "${AIWakePhrase}"`)
                                 .setRequired(false)
                         })
                 })
@@ -113,7 +146,7 @@ module.exports = {
             // Now, add a listener.
             AddOnLog(interaction.guildId, (type, name, content) => {
                 if (type == "STT" || type == "TTS") {
-                    if (content.toLowerCase().includes("computer")) Conversations[inputId].Bypass = true;
+                    if (content.toLowerCase().includes(AIWakePhrase)) Conversations[inputId].Bypass = true;
     
                     if (AlwaysListening || Conversations[inputId].Bypass) {
                         Conversations[inputId].Messages = Conversations[inputId].Messages.concat(NewMessage("User", `(${name}) ${content}`));
@@ -124,6 +157,10 @@ module.exports = {
         } else {
             // Remove the convo. 
             delete Conversations[interaction.channelId]
+
+            // Force disconnect.
+            const connection = getVoiceConnection(interaction.guildId);
+            if (connection != undefined) connection.destroy()
         }
     },
 
