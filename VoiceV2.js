@@ -15,7 +15,7 @@ const fs = require('fs');
 // Text formatting reqs.
 const converter = require('number-to-words');
 const NumberMatchingRegex = new RegExp(/(\d+,?\.?\d?)+/g);
-const AcronymRegex = new RegExp(/([A-Z]\.?(?![a-z']))+/g);
+const AcronymRegex = new RegExp(/([A-Z]\.?(?![a-z' ]))+/g);
 const SpaceRegex = new RegExp(/ (?=[ ])/g);
 
 // I used AI to make this Array; don't laugh! This is what AI is meant to be used for, right?
@@ -109,7 +109,9 @@ let pythonProcess;
  * @returns {Promise} A promise which resolves when the AI is running.
  */
 function Start() {
-    return new Promise(res => {
+    return new Promise(async res => {
+        if (Started) await Stop();
+
         // Run the python server.
         pythonProcess = spawn('python', ['voice_server.py']);
 

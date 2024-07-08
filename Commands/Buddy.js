@@ -2,14 +2,14 @@ const { SlashCommandBuilder, CommandInteraction, ChannelType, Message } = requir
 const { execute: TranscribeExecute } = require("./Transcribe");
 const { AddOnLog, LogTo, GetLastMessageAndOutputChannel } = require('../TranscriptionLogger');
 const { NewMessage, fetchUserBase, client, RequestChatGPT } = require('..');
-const { TextToVC, TextToVCWithCallback } = require('./TTSToVC');
+const { TextToVCWithCallback } = require('./TTSToVC');
 const { getVoiceConnection } = require('@discordjs/voice');
 const AIThinkingMessage = ":robot: The AI is thinking of a response...";
 const AIVoiceBin = "Luminary.bin";
 const AIWakePhrase = "computer"
 
 /**
- * @type {[{Messages: [{role: "System" | "User" | "Function" | "Assistant"; content: string;}], LastMessageTime: number, ChannelId: string, GuildId: string, AlwaysListening: boolean, Bypass: boolean}]}
+ * @type {[{Messages: [{role: "System" | "User" | "Function" | "Assistant"; content: string;}], LastMessageTime: number, ChannelId: string, GuildId: string, AlwaysListening: boolean, Bypass: boolean, CurrentlySpeaking: boolean}]}
  */
 const Conversations = [];
 
@@ -20,9 +20,10 @@ new Promise(async ()=> {
             setTimeout(() => {
                 const processing = Object.keys(Conversations).map(async (convoKey) => {
                     const convo = Conversations[convoKey];
-                    const messageDetails = (await GetLastMessageAndOutputChannel(convo.GuildId));
+                    let messageDetails = (await GetLastMessageAndOutputChannel(convo.GuildId));
                     const voiceChannel = client.channels.fetch(convo.ChannelId);
-                    if (convo.Messages[convo.Messages.length - 1].role != "assistant" && performance.now() - convo.LastMessageTime > 2000) { // Wait longer if there are more people. (await voiceChannel).memberCount * 
+                    // Only speak if we weren't the last one to speak, an amount of time has passed, and we aren't already currently speaking.
+                    if (convo.Messages[convo.Messages.length - 1].role != "assistant" && performance.now() - convo.LastMessageTime > 2000 && !Conversations[convoKey].CurrentlySpeaking) { // Wait longer if there are more people. (await voiceChannel).memberCount * 
                         // Respond and then voice to call.
                             // Send thinking message.
                         if (messageDetails.last.author.id != client.user.id || (messageDetails.last != undefined && messageDetails.last.content.length > 1800) || messageDetails.last == undefined) {
@@ -36,13 +37,12 @@ new Promise(async ()=> {
 
                         // I'm aware that this following section of code is vastly overcomplicated; I could generate in one go. 
                         // However, this way feels smoother to the user and also avoids running out of length on the TTS component.
-                        RequestChatGPT(convo.Messages, messageDetails.last).then(async v => {
-                            await messageDetails.last.edit(messageDetails.last.content.replace(`\n${AIThinkingMessage}`, ""));
-                            
+                        Conversations[convoKey].CurrentlySpeaking = true;
+                        RequestChatGPT(convo.Messages, messageDetails.last).then(async v => {                            
                             // First, Generate all audio.
                             const VoicePlaySections = [], GenerationCalls = [];
                             let content = v[v.length - 1].content;
-                            const BottomEndLength = 100;
+                            const BottomEndLength = 250;
                             do {
                                 // Split to a minimum length plus to next space.
                                 const SplitSize = content.length > BottomEndLength ? BottomEndLength + content.substring(BottomEndLength).indexOf(" ") + 1 : content.length;
@@ -64,12 +64,15 @@ new Promise(async ()=> {
 
                             // Now that all voices are queued for generation, play them sucessively while generating the next chunk.
                                 // This means that audio is generated during the previous section's playback.
+                            messageDetails = (await GetLastMessageAndOutputChannel(convo.GuildId)); // Because some time may pass, refresh log info.
                             await GenerationCalls[0]();
+                            await messageDetails.last.edit(messageDetails.last.content.replace(`\n${AIThinkingMessage}`, ""));
                             for (let i = 0; i < VoicePlaySections.length; i++) {
                                 const x = VoicePlaySections[i]();
                                 if (VoicePlaySections[i + 1] != undefined) GenerationCalls[i + 1]();
                                 await x;
                             }
+                            Conversations[convoKey].CurrentlySpeaking = false;
                         })
                     }
                 })
@@ -140,7 +143,8 @@ module.exports = {
                 "LastMessageTime": undefined,
                 "Messages": NewMessage("System", fetchUserBase(interaction.user.id)),
                 "AlwaysListening": AlwaysListening,
-                "Bypass": false
+                "Bypass": false,
+                "CurrentlySpeaking": false
             }
 
             // Now, add a listener.
@@ -149,7 +153,11 @@ module.exports = {
                     if (content.toLowerCase().includes(AIWakePhrase)) Conversations[inputId].Bypass = true;
     
                     if (AlwaysListening || Conversations[inputId].Bypass) {
-                        Conversations[inputId].Messages = Conversations[inputId].Messages.concat(NewMessage("User", `(${name}) ${content}`));
+                        if (!Conversations[inputId].Messages[Conversations[inputId].Messages.length - 1].content.startsWith(`(${name})`))
+                            Conversations[inputId].Messages = Conversations[inputId].Messages.concat(NewMessage("User", `(${name}) ${content}`));
+                        else
+                            Conversations[inputId].Messages[Conversations[inputId].Messages.length - 1].content += content
+
                         Conversations[inputId].LastMessageTime = performance.now();
                     }
                 }
