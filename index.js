@@ -263,7 +263,16 @@ function GetFunctions(messages) {
       for (let j = 0; j < FunctionKeywords.length; j++) {
         // If all of the messages contained the function's keyword, include it.
         if (AllContent.includes(FunctionKeywords[j].trim())) {
-          ApplicableFunctions.push(FunctionList[i]);
+          const toolParams = FunctionList[i];
+          const type = toolParams.toolType ?? "function"
+          delete toolParams.type;
+
+          const tool = {
+            function: toolParams,
+            type: type
+          }
+
+          ApplicableFunctions.push(tool);
           continue FunctionLoop;
         }
       }
@@ -439,8 +448,8 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
         functions = []
       
       if (functions.length > 0) {
-        requestData.function_call = "auto";
-        requestData.functions = functions;
+        requestData.tool_choice = "auto";
+        requestData.tools = functions;
       }
     
       const data = await openai.createChatCompletion(requestData)
@@ -644,49 +653,68 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
     let ReturnedMessages = InputMessages;
     // If the message has a function call, run it.
     async function ProcessFunctionCall(newMessage) {
-      if (newMessage.function_call != null) {
-        // Find function.
-        console.log("looking for " + JSON.stringify(newMessage.function_call))
-        let func;
-        for (let i = 0; i < functions.length; i++) {
-          if (FunctionList[i].name == newMessage.function_call.name) {
-            func = functions[i];
-            break;
+      if (newMessage.tool_calls != null) {
+        /**
+         * @type {[{name: string, arguments: string}]}
+         */
+        const tool_calls = newMessage.tool_calls.map((v) => {
+          return v.function
+        })
+
+        console.log(tool_calls);
+
+        // Process all function calls.
+        for (let i = 0; i < tool_calls.length; i++) {
+          const call = tool_calls[i];
+
+          // Find function.
+          console.log("looking for " + call.name)
+          let func;
+          for (let i = 0; i < functions.length; i++) {
+            if (FunctionList[i].name == call.name) {
+              func = functions[i];
+              break;
+            }
           }
+    
+          if (DEBUG) {
+            console.log(func);
+            console.log(`Running ${func.name} with parameters:`)
+            console.log(call.arguments);
+          }
+    
+          let params = {}, returnedFromFunction;
+          try {
+            params = JSON.parse(call.arguments);
+            returnedFromFunction = await (func(params, DiscordMessage));
+    
+            messages.push({
+              role: "function",
+              name: call.name,
+              content: returnedFromFunction
+            })
+          } catch (error) {
+            returnedFromFunction = "{\"successful\": false, \"reason\":\"Invalid JSON passed! Please retry.\"}";
+            messages.push({
+              role: "function",
+              name: call.name,
+              content: returnedFromFunction
+            })
+          }
+          /*
+          console.log("Returned from function:");
+          console.log(returnedFromFunction);
+          */
+          ReturnedMessages += `\n${call.name}: ${returnedFromFunction}`;
+    
         }
-  
-        if (DEBUG) {
-          console.log(func);
-          console.log(`Running ${func.name} with parameters:`)
-          console.log(newMessage.function_call.arguments);
-        }
-  
-        let params = {}, returnedFromFunction;
-        try {
-          params = JSON.parse(newMessage.function_call.arguments);
-          returnedFromFunction = await (func(params, DiscordMessage));
-  
-          messages.push({
-            role: "function",
-            name: newMessage.function_call.name,
-            content: returnedFromFunction
-          })
-        } catch (error) {
-          returnedFromFunction = "{\"successful\": false, \"reason\":\"Invalid JSON passed! Please retry.\"}";
-          messages.push({
-            role: "function",
-            name: newMessage.function_call.name,
-            content: returnedFromFunction
-          })
-        }
-        /*
-        console.log("Returned from function:");
-        console.log(returnedFromFunction);
-        */
-        ReturnedMessages += `\n${newMessage.function_call.name}: ${returnedFromFunction}`;
-  
+        
         // Push the data to the AI if it's not clearing the memory.
-        if (func.name != "ClearAll" && func.name != "Recover") {
+        const names = tool_calls.map(x => {
+          return x.name;
+        })
+        
+        if (names.indexOf("ClearAll") == -1 && names.indexOf("Recover") == -1) {
           const functionCallResponse = await GetSafeChatGPTResponse(messages, DiscordMessage);
           const functionMessage = (await functionCallResponse).data.choices[0].message
           // ReturnedMessages += `\nAI: ${functionMessage.content}`;
