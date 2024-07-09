@@ -505,7 +505,7 @@ module.exports = {
     },
 
     // Also share voice sets and useful voice information.
-    VCSets, PlayAudioToVC, WriteVCSets, ConnectToChannel, TextToVC, TextToVCWithCallback,
+    VCSets, PlayAudioToVC, WriteVCSets, ConnectToChannel, TextToVC, TextToVCWithCallback, GetRandomVoice,
 
     /**
      * @param {AutocompleteInteraction} interaction The Autocomplete request.

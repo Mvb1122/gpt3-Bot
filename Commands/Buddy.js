@@ -40,38 +40,11 @@ new Promise(async ()=> {
                         Conversations[convoKey].CurrentlySpeaking = true;
                         RequestChatGPT(convo.Messages, messageDetails.last).then(async v => {                            
                             // First, Generate all audio.
-                            const VoicePlaySections = [], GenerationCalls = [];
                             let content = v[v.length - 1].content;
-                            const BottomEndLength = 250;
-                            do {
-                                // Split to a minimum length plus to next space.
-                                const SplitSize = content.length > BottomEndLength ? BottomEndLength + content.substring(BottomEndLength).indexOf(" ") + 1 : content.length;
-                                const thisRoundText = content.length > SplitSize ? content.substring(0, SplitSize) : content;
-                                content = content.length > SplitSize ? content.substring(SplitSize) : "";
-
-                                // Wait for both logging and voicing before continuing on.
-                                const x = TextToVCWithCallback(thisRoundText, convo.ChannelId, convo.GuildId, AIVoiceBin);
-                                
-                                function Play() {
-                                    return Promise.all([
-                                        x.Play(),
-                                        LogTo(convo.GuildId, "AI", "AI", thisRoundText)
-                                    ])
-                                }
-
-                                VoicePlaySections.push(Play); GenerationCalls.push(x.voice);
-                            } while (content.length != 0)
-
-                            // Now that all voices are queued for generation, play them sucessively while generating the next chunk.
-                                // This means that audio is generated during the previous section's playback.
-                            messageDetails = (await GetLastMessageAndOutputChannel(convo.GuildId)); // Because some time may pass, refresh log info.
-                            await GenerationCalls[0]();
-                            await messageDetails.last.edit(messageDetails.last.content.replace(`\n${AIThinkingMessage}`, ""));
-                            for (let i = 0; i < VoicePlaySections.length; i++) {
-                                const x = VoicePlaySections[i]();
-                                if (VoicePlaySections[i + 1] != undefined) GenerationCalls[i + 1]();
-                                await x;
-                            }
+                            const GuildId = convo.GuildId;
+                            const ChannelId = convo.ChannelId;
+                            
+                            await VoiceLong(GuildId, content, ChannelId);
                             Conversations[convoKey].CurrentlySpeaking = false;
                         })
                     }
@@ -178,4 +151,56 @@ module.exports = {
      * @default {true}
      */
     CanExternal: false,
+
+    VoiceLong
+}
+
+/**
+ * Voices long blocks of text with a mind for performance.
+ * @param {string} GuildId Guild to voice into.
+ * @param {string} content Long content to voice.
+ * @param {string} ChannelId Voice channel to voice into.
+ * @param {string} [Voice=AIVoiceBin] Voice to read as.
+ * @param {boolean} [log=true] Whether to log or not.
+ * @returns {Promise<>} Resolves when voiceing is complete.
+ */
+async function VoiceLong(GuildId, content, ChannelId, Voice = AIVoiceBin, log = true) {
+    let messageDetails = (await GetLastMessageAndOutputChannel(GuildId));
+    const VoicePlaySections = [], GenerationCalls = [];
+    const BottomEndLength = 250;
+    do {
+        // Split to a minimum length plus to next space.
+        const SplitSize = content.length > BottomEndLength ? BottomEndLength + content.substring(BottomEndLength).indexOf(" ") + 1 : content.length;
+        const thisRoundText = content.length > SplitSize ? content.substring(0, SplitSize) : content;
+        content = content.length > SplitSize ? content.substring(SplitSize) : "";
+
+        // Wait for both logging and voicing before continuing on.
+        const x = TextToVCWithCallback(thisRoundText, ChannelId, GuildId, Voice);
+
+        function Play() {
+            const Promises = [
+                x.Play(),
+            ];
+
+            if (log) Promises.push(LogTo(GuildId, "AI", "AI", thisRoundText));
+
+            return Promise.all(Promises);
+        }
+
+        VoicePlaySections.push(Play); GenerationCalls.push(x.voice);
+    } while (content.length != 0);
+
+    // Now that all voices are queued for generation, play them sucessively while generating the next chunk.
+    // This means that audio is generated during the previous section's playback.
+    messageDetails = (await GetLastMessageAndOutputChannel(GuildId)); // Because some time may pass, refresh log info.
+    await GenerationCalls[0]();
+    if (log)
+        await messageDetails.last.edit(messageDetails.last.content.replace(`\n${AIThinkingMessage}`, ""));
+
+    for (let i = 0; i < VoicePlaySections.length; i++) {
+        const x = VoicePlaySections[i]();
+        if (VoicePlaySections[i + 1] != undefined) GenerationCalls[i + 1]();
+        await x;
+    }
+    return;
 }

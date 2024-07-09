@@ -315,7 +315,7 @@ function GetFunctionFromStart(message) {
   // Types: System, User Function
   /**
    * Creates a message object from the content.
-   * @param {"System" | "User" | "Function" | "Assistant"} Role System || User || Function || Assistant <- For AI only, will be appended automatically.
+   * @param {"System" | "User" | "Function" | "Tool" | "Assistant"} Role System || User || Function || Assistant <- For AI only, will be appended automatically.
    * @param {String} Content 
    * @param {String | undefined} Username
    * @returns {[{role: String, content: String}]}
@@ -634,7 +634,7 @@ async function SummarizeConvo(messages, DiscordMessage) {
 //#region RequestChatGPT
 /**
  * Gets the AI's next message.
- * @param {String} InputMessages The messages in this conversation, in Object with the last message in string.
+ * @param {[{role: string;content: string;name: string;}]} InputMessages The messages in this conversation.
  * @param {Discord.Message} DiscordMessage The Discord Message calling this request.
  * @returns {Promise<[{role: String, content: String, name: String}]>} The complete conversation, including a new response from the AI.
  */
