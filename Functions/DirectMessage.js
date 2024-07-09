@@ -1,6 +1,7 @@
 const Discord = require('discord.js')
 const { SendMessage, DEBUG, client, RequestChatGPT, NewMessage, fetchUserBase } = require('../index');
 const Path = require('path');
+const token = require('../token');
 
 let LastCall = null;
 module.exports = {
@@ -84,9 +85,9 @@ module.exports = {
                 const message = await SendMessage({ channel: (user.dmChannel ?? await user.createDM()) }, "```java\n// Passed information: " + text + "```");
                 
                 // Use original user's base, not the user we're sending to's base.
-                const Base = fetchUserBase((DiscordMessage.author ?? DiscordMessage.user).id);
+                const Base = fetchUserBase((DiscordMessage.author ?? DiscordMessage.user ?? {id: token.GetToken("devDiscordID")}).id);
                 
-                const messages = NewMessage("system", Base)
+                const messages = NewMessage("System", Base)
                     .concat(NewMessage("User", text));
                     
                 RequestChatGPT(messages, message).then(async (v) => {

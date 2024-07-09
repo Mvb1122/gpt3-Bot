@@ -75,7 +75,9 @@ module.exports = {
           if (StartLength < 10000) {
             return JSON.stringify({sucessful: true, text: text});
           } else {
-            DiscordMessage.channel.send("That page is too long! The AI would crash with that much text! (The page was not actually read.)")
+            if (DiscordMessage)
+              DiscordMessage.channel.send("That page is too long! The AI would crash with that much text! (The page was not actually read.)")
+            
             return JSON.stringify({ sucessful: false, reason: "Page is too long." })
           }
         } else {

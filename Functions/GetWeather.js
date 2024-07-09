@@ -9,7 +9,7 @@ module.exports = {
     json: 
     {
       "name": "GetWeather",
-      "description": "Returns a JSON object representing the weather at a supplied location.",
+      "description": "Returns a JSON object representing the weather at a supplied location. Temperatures are in Fahrenheit.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -41,7 +41,9 @@ module.exports = {
       }
     
       let output = JSON.stringify(jsonifiedOutput)
-      message.channel.send("Getting weather at " + town);
+
+      if (message)
+        message.channel.send("Getting weather at " + town);
       // message.channel.send("Weather: ```" + output + "```");
       return output;
     }

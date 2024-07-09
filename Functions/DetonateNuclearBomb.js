@@ -29,9 +29,12 @@ module.exports = {
       if (parameters.town) {
         prepend = parameters.town + "で"
       }
-      DiscordMessage.channel.send(prepend + "エクスプロージョン!!!!!!!!");
-      DiscordMessage.channel.send("https://tenor.com/view/konosuba-megumim-explosion-magic-anime-gif-16686316");
-    
+
+      if (DiscordMessage) {
+        DiscordMessage.channel.send(prepend + "エクスプロージョン!!!!!!!!");
+        DiscordMessage.channel.send("https://tenor.com/view/konosuba-megumim-explosion-magic-anime-gif-16686316");
+      }
+      
       return "Nuclear bomb sucessfully detonated."
     }
 }

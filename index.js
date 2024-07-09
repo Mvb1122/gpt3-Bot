@@ -229,6 +229,8 @@ const functionPath = "./Functions/";
 fs.readdir(functionPath, (err, paths) => {
   let commands = ""
   paths.forEach(file => {
+    if (file.includes("DISABLED")) return; // Don't include disabled functions.
+    
     /**
      * @type {{keywords: String, json: String, execute: Function}}
      */
