@@ -30,8 +30,9 @@ module.exports = {
      */
     async execute(parameters, DiscordMessage = null) {
         if (parameters.ShowUser == undefined) parameters.ShowUser = false;
+        let message = null;
         if (DiscordMessage != null) {
-          SendMessage(DiscordMessage, "Searching Wikipedia for: " + parameters.Query);
+          message = await SendMessage(DiscordMessage, "Searching Wikipedia for: " + parameters.Query);
         }
       
         return new Promise(res => {
@@ -41,8 +42,16 @@ module.exports = {
               if (Object.keys(json.query.pages).length > 0) {
                 let Data = json.query.pages;
                 Data = Data[Object.keys(Data)[0]]
-                if (DiscordMessage != null && parameters.ShowUser) {
-                  SendMessage(DiscordMessage, `Response from Wikipedia:\n# ${Data.title}\n> *${Data.extract}*`);
+                if (message != null && parameters.ShowUser) {
+                  const Content = `Response from Wikipedia:\n# ${Data.title}\n\`\`\`*${Data.extract}*\`\`\``;
+                  if (Content.length + message.content.length > 1900)
+                    SendMessage(DiscordMessage, Content);
+                  else 
+                    try {
+                      message.edit(message.content + "\n" + Content);
+                    } catch {
+                      SendMessage(DiscordMessage, Content);
+                    }
                 }
                 if (DEBUG) console.log(Data);
                 res(JSON.stringify(Data));

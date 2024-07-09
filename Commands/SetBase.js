@@ -23,7 +23,7 @@ module.exports = {
         const id = interaction.author ? interaction.author.id : interaction.user.id;
         Index.UpdateUserBase(id, userBase);
         interaction.editReply({
-            content: "Base set!",
+            content: "Base set! ```" + userBase + "```",
         });
     }
 };

@@ -32,13 +32,12 @@ module.exports = {
         let port = interaction.options.getInteger("port") ?? 7860;
         port = Number.parseInt(port);
 
-        if (Gradio.isConnected()) {
-            try {
-                await Gradio.ConnectTo(address);
-                interaction.reply({content: "Connected!", ephemeral: true})
-            } catch {
-                interaction.reply({content: "Unable to connect!", ephemeral: true});
-            }
-        } else interaction.reply({content: "Unable to connect!", ephemeral: true});
+        try {
+            await Gradio.ConnectTo(address);
+            interaction.reply({content: "Connected!", ephemeral: true})
+        } catch (e) {
+            interaction.reply({content: "Unable to connect! ```" + e.toString() + "```", ephemeral: true});
+        }
+        
     },
 };

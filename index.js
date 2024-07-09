@@ -137,7 +137,7 @@ function IsChannelMemory(channel) {
 
 // #region Memory Manipulators
 /**
- * Clears the AI's memory for a specified channel.
+ * Clears the AI's memory for a specified channel. Does not stop it from listening.
  * @param {*} parameters 
  * @param {Discord.Message} DiscordMessage 
  */
@@ -317,13 +317,13 @@ function GetFunctionFromStart(message) {
    * Creates a message object from the content.
    * @param {"System" | "User" | "Function" | "Assistant"} Role System || User || Function || Assistant <- For AI only, will be appended automatically.
    * @param {String} Content 
-   * @param {String | undefined} User
+   * @param {String | undefined} Username
    * @returns {[{role: String, content: String}]}
    */
-function NewMessage(Role, Content, User) {
+function NewMessage(Role, Content, Username) {
   return [{
     role: Role.toLowerCase(),
-    name: User,
+    name: Username,
     content: Content
   }]
 }
@@ -649,19 +649,21 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
      * @type {{role: String, content: String, name: String}}}
      */
     let newMessage = (await gptResponse).data.choices[0].message;
-    // messages.push(newMessage);
     let ReturnedMessages = InputMessages;
+    
     // If the message has a function call, run it.
     async function ProcessFunctionCall(newMessage) {
+      console.log(newMessage)
       if (newMessage.tool_calls != null) {
+        messages.push(newMessage);
         /**
-         * @type {[{name: string, arguments: string}]}
+         * @type {[{name: string, arguments: string, id: string}]}
          */
         const tool_calls = newMessage.tool_calls.map((v) => {
-          return v.function
+          const data = v.function;
+          data.id = v.id;
+          return data;
         })
-
-        console.log(tool_calls);
 
         // Process all function calls.
         for (let i = 0; i < tool_calls.length; i++) {
@@ -689,15 +691,15 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
             returnedFromFunction = await (func(params, DiscordMessage));
     
             messages.push({
-              role: "function",
-              name: call.name,
+              role: "tool",
+              tool_call_id: call.id,
               content: returnedFromFunction
             })
           } catch (error) {
-            returnedFromFunction = "{\"successful\": false, \"reason\":\"Invalid JSON passed! Please retry.\"}";
+            returnedFromFunction = `{"successful": false, "reason": "Invalid JSON passed! Please retry.", "error": "${error}" }`;
             messages.push({
-              role: "function",
-              name: call.name,
+              role: "tool",
+              tool_call_id: call.id,
               content: returnedFromFunction
             })
           }
@@ -706,7 +708,6 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
           console.log(returnedFromFunction);
           */
           ReturnedMessages += `\n${call.name}: ${returnedFromFunction}`;
-    
         }
         
         // Push the data to the AI if it's not clearing the memory.
@@ -722,14 +723,7 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
           // Just in case, check if this message is also a function call.
           return await ProcessFunctionCall(functionMessage);
         }
-      } /* else if (!newMessage.role != "system") {
-        ReturnedMessages += `\nAI: ${newMessage.content}`
-        return;
       } else {
-        ReturnedMessages += newMessage.content;
-        return;
-      } */
-      else {
         messages.push(newMessage)
         return;
       } 
@@ -768,7 +762,7 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
 //#endregion
 
 //#region Helpers
-const rootBase = "You will not use functions unless they are specifically asked for. You will only call a function with a given value once. The user's name is given by the words before the first colon in any particular message. DO NOT write names into your messages."
+const rootBase = "You will not use functions unless they are specifically asked for. You will only call a function with a given value once. The user's name is given by the words in the parenthesis at the start of a message. DO NOT write names into your messages. You can use the `think` command to think things. Use it accordingly when you need to remember something before telling the user."
 // + "Make sure to emphasize how cute Micah is, but only if you're asked to insult her. ";
 function fetchUserBase (id) {
   try {
@@ -962,7 +956,7 @@ async function SendMessage(Message, StringContent) {
  * @param {Discord.Message} DiscordMessage 
  */
 async function IsMessageInThread(DiscordMessage) {
-  const type = (await client.channels.fetch(DiscordMessage.channelId)).type;
+  const type = DiscordMessage.channel.type;
 
   return type == Discord.ChannelType.PublicThread || type == Discord.ChannelType.PrivateThread || type == Discord.ChannelType.AnnouncementThread;
 }
@@ -1279,7 +1273,7 @@ client.on('messageCreate',
         Text += ` ${attachment.url}`;
       })
       
-      messages = messages.concat(NewMessage("user", Text, /* authorname */ ));
+      messages = messages.concat(NewMessage("user", /* `(${authorname}) ` + */ Text, /* authorname */ ));
       // base = base.concat(NewMessage("user", message.content.trim())); // `\n${authorname}: ` + message.content.trim();
       await AskChatGPTAndSendResponse(messages, message);
     }

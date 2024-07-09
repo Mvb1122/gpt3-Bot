@@ -1,0 +1,38 @@
+const Discord = require('discord.js')
+const { SendMessage, DEBUG, client } = require('../index');
+const Path = require('path');
+
+let LastCall = null;
+module.exports = {
+  keywords: "",
+  json:
+  {
+    "name": "think",
+    "description": "Keeps text content private from the user. Use this to remember things without telling them! Do not tell the user what you have thought if they don't ask. YOU MAY USE ONLY THIS FUNCTION WITHOUT PERMISSION!",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "The specified message to send"
+        },
+      }
+    },
+    "required": ["text"]
+  },
+
+  /**
+   * Code run when the module is executed.
+   * @param {{}} parameters Parameters from AI.
+   * @param {Discord.Message | Discord.CommandInteraction} DiscordMessage 
+   */
+  async execute(parameters, DiscordMessage = null) {
+    if (DEBUG) {
+      // Secretly show this to the user.
+      DiscordMessage.channel.send("```java\n// " + parameters.text + "```");
+      console.log(parameters.text);
+    }
+
+    return parameters.text;
+  }
+}

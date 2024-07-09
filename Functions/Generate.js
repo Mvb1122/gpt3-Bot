@@ -4,6 +4,8 @@ const GetTags = require("../Gradio/Helpers").GetPromptsFromPlaintextUsingGPT
 const fs = require('fs')
 const { client } = require('..')
 const Gradio_Stuff = require('../Gradio/Gradio_Stuff')
+const { WriteToLogChannel, GetPolicy } = require('../Security')
+const { JudgeNSFWTags } = require('../Helpers')
 
 module.exports = {
   keywords: "generate, draw, image",
@@ -48,7 +50,19 @@ module.exports = {
     // Get tags.
     new Promise((resolve) => {
       GetTags(parameters.content, DiscordMessage.user != null ? DiscordMessage.user.id : undefined).then(async tags => {
-        let generating = await (channel.send(`Generating ${parameters.count} image${(parameters.count > 1) ? "s" : ""}` + "... Tags: ```" + tags + "```"));
+        if (await GetPolicy(DiscordMessage.guildId, "promptnsfw") && (await JudgeNSFWTags(tags))[0].label == "NSFW") {
+          WriteToLogChannel(DiscordMessage.guildId, `The AI, on behalf of ${(DiscordMessage.user ?? {displayName: "a user"}).displayName}, tried to generate images in <#${DiscordMessage.channelId}> in volation of NSFW security policy!` + "```\n" + tags + "```")
+          DiscordMessage.channel.send(`I couldn't generate image${(parameters.count > 1) ? "s" : ""}` + "... What I came up with was too lewd! Tags: ```\n" + tags + "```");
+          return JSON.stringify({ 
+            sucessful: false, 
+            reason: `That prompt was too lewd! If you're asked to rerun this command, please do so with an emphasis on how not-lewd the image should be!` 
+          });
+        }
+        
+        let generating = await (channel.send(`Generating ${parameters.count} image${(parameters.count > 1) ? "s" : ""}` + "... Tags: ```\n" + tags + "```"));
+
+        // Log it. 
+        WriteToLogChannel(DiscordMessage.guildId, `The AI generated images on behalf of ${(DiscordMessage.user ?? {displayName: "a user"}).displayName}:` + "```\n" + tags + "```");
 
         /**
          * @type {[Promise<String>]}
