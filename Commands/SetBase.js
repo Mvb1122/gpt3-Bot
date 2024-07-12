@@ -1,6 +1,6 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
-const Index = require ('../index.js');
+const { GetUserFile } = require('../User.js');
 
 
 module.exports = {
@@ -21,7 +21,11 @@ module.exports = {
         await interaction.deferReply({ephemeral: true});
         let userBase = interaction.options.getString("text");
         const id = interaction.author ? interaction.author.id : interaction.user.id;
-        Index.UpdateUserBase(id, userBase);
+        
+        const x = await GetUserFile(id)
+        x.base = userBase;
+        x.sync();
+
         interaction.editReply({
             content: "Base set! ```" + userBase + "```",
         });

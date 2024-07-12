@@ -20,7 +20,9 @@ function HasLog(GuildId) {
  * @returns {Promise<{last: Message, output: Channel}>}
  */
 async function GetLastMessageAndOutputChannel(GuildId) {
-    const output = await client.channels.fetch(Logs[GuildId].ChannelId);
+    const logs = Logs[GuildId];
+    const output = await client.channels.fetch(logs.ChannelId);
+    
     /**
      * Force reload of the message in order to avoid breaking command responses by preventing them from properly being responded to.
      * @type {Message}

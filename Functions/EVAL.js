@@ -11,7 +11,7 @@ module.exports = {
             "properties": {
                 "CODE": {
                     "type": "string",
-                    "description": "Javascript code to be evaluated. It must be surrounded by quotes (\")",
+                    "description": "Javascript code to be evaluated.",
                 }
             },
             "required": ["CODE"],

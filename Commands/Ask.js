@@ -1,6 +1,7 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
 const Index = require ('../index.js');
+const { GetUserFile } = require('../User.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -39,7 +40,9 @@ module.exports = {
             UserQuestion += ` ${interaction.options.getAttachment("text").url}`
         }
 
-        let messages = Index.NewMessage("system", Index.fetchUserBase(interaction.member.id))
+        const user = await GetUserFile(interaction.member.id);
+
+        let messages = Index.NewMessage("system", user.base)
             .concat(Index.NewMessage("user", UserQuestion))
         
         await Index.RequestChatGPT(messages, interaction)

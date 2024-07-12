@@ -94,12 +94,18 @@ async function GetPromptsFromPlaintextUsingGPT(Plain, id = undefined) {
      */
     let response = ResponseFromGPT.message.content;
 
+    // Charge them.
+    if (id)
+        AddCostOfGPTTokens(id, encode(response).length);
+
     console.log(ResponseFromGPT);
     
     return response.replaceAll("\n", ", ");
 }
 
 const {countCharacter} = require("../Helpers.js");
+const { AddCostOfGPTTokens } = require('../User.js');
+const { encode } = require('gpt-3-encoder');
 
 module.exports = {
     ImageIsValid, Download, countCharacter, GetPromptsFromPlaintextUsingGPT,

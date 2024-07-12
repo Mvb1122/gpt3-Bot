@@ -27,6 +27,7 @@ const PolicyDefaults = {
 const fp = require('fs/promises');
 const fs = require('fs');
 const Index = require('./index');
+const path = require('path');
 
 const FileNames = {
     Security: "./Security.json",

@@ -205,18 +205,22 @@ function WriteVCSets(sets = VCSets) {
     }
 }
 
+let VoiceRequests = [];
 function TextToVC(text, VCID, GuildID, model) {
     const path = __dirname + `/../Temp/${Math.floor(Math.random() * 100000)}_chat_tts.wav`
-    return new Promise(res => {
-        Voice(text, path, model).then(() => {
-            PlayAudioToVC(path, {OutputID: VCID, OutputGuildID: GuildID, Player: getPlayer()})
-                // Delete audio after it has finished playing.
-                .then(() => {
-                    fs.unlinkSync(path);
-                    res();
-                })
-            })
-    })
+    const requestBefore = VoiceRequests[GuildID];
+    const req = new Promise(async res => {
+        if (requestBefore != null) await requestBefore;
+
+        await Voice(text, path, model)
+        await PlayAudioToVC(path, {OutputID: VCID, OutputGuildID: GuildID, Player: getPlayer()})
+        // Delete audio after it has finished playing.
+        VoiceRequests[GuildID] = null;
+        fs.unlinkSync(path);
+        res();  
+    });
+
+    VoiceRequests[GuildID] = req;
 }
 
 /**
@@ -411,7 +415,7 @@ module.exports = {
                  * @type {VoiceChannel}
                  */
                 const output = await client.channels.fetch(set.OutputID);
-                const inCall = GetPolicy(message.guildId, "readjoinless") ? true : output.members.has(message.author.id)
+                const inCall = GetPolicy(message.guildId, "readjoinless") ? true : output.members.has(message.author.id);
 
                 const path = Path.normalize(__dirname + `\\..\\Temp\\${message.author.id}_tts.wav`); // Prevent error when speaking too fast by randomly naming tts wavs.
                 if (inCall) {

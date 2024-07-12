@@ -47,7 +47,7 @@ module.exports = {
         const conversation = new Conversation(topic);
         
         // Temporary testing code.
-        interaction.editReply("Conversing in log. Watch there for now.")
+        interaction.editReply("Conversation loading... I'll join VC in a second! Prompt: ```\n" + topic + "```");
         StartLog(interaction.guildId, interaction.channelId);
         do {
             await new Promise(async res => {
@@ -58,7 +58,7 @@ module.exports = {
                 ]).then(() => {
                     setTimeout(() => {
                         res();
-                    }, 1500);
+                    }, 300);
                 });
             });
         } while (true);

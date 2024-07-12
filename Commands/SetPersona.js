@@ -1,6 +1,7 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
 const Index = require ('../index.js');
+const { GetUserFile } = require('../User.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -18,9 +19,16 @@ module.exports = {
      */
     async execute(interaction) {
         await interaction.deferReply({ephemeral: true});
-        Index.UpdateUserPersona(interaction.user.id, interaction.options.getString("persona"))
-            .then(() => {
-                interaction.editReply("Persona updated! People can mention you via Global Name, Nickname, or Discord UserID.")
-            })
+
+        let persona = interaction.options.getString("persona");
+        const id = interaction.author ? interaction.author.id : interaction.user.id;
+        
+        const x = await GetUserFile(id)
+        x.persona = persona;
+        x.sync();
+
+        interaction.editReply({
+            content: "Persona set! ```" + persona + "```",
+        });
     },
 };

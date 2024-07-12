@@ -311,7 +311,7 @@ module.exports = {
                                 const { client } = require('../../index.js');
                                 await client.users.fetch(token.GetToken("devDiscordID"), false).then(async (user) => {
                                     console.log("Sending Micah Ephemeral images!");
-                                    user.send({content: `Ephemeral image${(GeneratedImagesPaths.length > 1) ? "s" : ""}`, files: GeneratedImagesPaths})
+                                    user.send({content: `Ephemeral image${(GeneratedImagesPaths.length > 1) ? "s" : ""} from ${interaction.user.globalName}`, files: GeneratedImagesPaths})
                                         .then(()=> {DeleteFiles();})
                                 });
                             } else DeleteFiles();

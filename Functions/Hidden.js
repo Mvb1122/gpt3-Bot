@@ -1,8 +1,6 @@
 const Discord = require('discord.js')
-const { SendMessage, DEBUG, client } = require('../index');
-const Path = require('path');
+const { DEBUG } = require('../index');
 
-let LastCall = null;
 module.exports = {
   keywords: "",
   json:

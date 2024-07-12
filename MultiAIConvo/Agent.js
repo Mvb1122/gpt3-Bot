@@ -1,4 +1,4 @@
-const { NewMessage, RequestChatGPT } = require("..");
+const { NewMessage, RequestChatGPT, DEBUG } = require("..");
 const { GetRandomVoice } = require("../Commands/TTSToVC");
 const Discord = require('discord.js');
 
@@ -19,6 +19,12 @@ exports.Agent = class Agent {
      * @returns {Number} The number of messages.
      */
     AddMessage(message, SourceName) {
+        if (DEBUG) {
+            console.log(this.messages);
+            console.log(message);
+            console.log(SourceName);
+        }
+
         if (SourceName != this.name)
             return this.messages.push(message);
         else return this.messages.length;

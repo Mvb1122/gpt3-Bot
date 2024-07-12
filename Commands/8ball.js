@@ -21,7 +21,7 @@ async function Preload() {
         BallBuffer = d;
 
         // Test making image.
-        if (DEBUG) {
+        if (DEBUG && fs.existsSync("../Temp/test.png")) {
             const sentiment = all[Math.floor(Math.random() * all.length)]
             const answer = sentiment[Math.floor(Math.random() * sentiment.length)];
             const path = "../Temp/test.png";

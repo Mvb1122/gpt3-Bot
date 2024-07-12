@@ -322,7 +322,7 @@ module.exports = {
                     if (IsMessageEphemeral || interaction.channel == null) {
                         await client.users.fetch(token.GetToken("devDiscordID"), false).then(async (user) => {
                             console.log("Sending Micah Ephemeral images!");
-                            user.send({content: `Ephemeral image${(paths.length > 1) ? "s" : ""}`, files: paths})
+                            user.send({content: `Ephemeral image${(paths.length > 1) ? "s" : ""} from ${interaction.user.globalName}`, files: paths})
                                 .then(()=> {DeleteFiles();})
                         });
                     } else DeleteFiles();

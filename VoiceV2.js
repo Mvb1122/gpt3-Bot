@@ -57,7 +57,10 @@ const PhoneticSymbols = [
     { letter: "%", phonetic: "percent"},
     { letter: ":", phonetic: "colon"},
     { letter: "+", phonetic: "plus"},
-    { letter: "$", phonetic: "dollars"}
+    { letter: "$", phonetic: "dollars"},
+    { letter: "°", phonetic: "degrees"},
+    { letter: "<", phonetic: "less than"},
+    { letter: ">", phonetic: "greater than"}
 ]
 
 /**

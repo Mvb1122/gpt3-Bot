@@ -2,8 +2,6 @@
 const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
 const Index = require ('../index.js');
 
-
-
 module.exports = {
 	data: new SlashCommandBuilder()
         .setName('recover')

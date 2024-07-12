@@ -65,32 +65,15 @@ function GetBaseIdFromChannel(channel) {
   }
 }
 
-function FetchUserBaseJSON(id) {
-  let basic = {
-    base: "",
-    persona: ""
-  }
-
-  if (fs.existsSync(`./users/${id}_Base.json`)) {
-    basic = JSON.parse(fs.readFileSync(`./users/${id}_Base.json`));
-  }
-
-  return basic;
+async function UpdateUserBase(id, text) {
+  const v = await GetUserFile(id);
+  v.base = text;
+  return v.sync();
 }
 
-function UpdateUserBase(id, text) {
+async function UpdateUserPersona(id, text, Nickname = undefined) {
   // Get preexisting data.
-  let Persist = FetchUserBaseJSON(id);
-
-  // Update it with the new base and write it.
-  Persist.base = text
-  fs.writeFile(`./users/${id}_Base.json`, JSON.stringify(Persist), (e) => { });
-  return;
-}
-
-function UpdateUserPersona(id, text, Nickname = undefined) {
-  // Get preexisting data.
-  let Persist = FetchUserBaseJSON(id);
+  let Persist = await GetUserFile(id);
 
   // Update it with the new base and write it.
   Persist.persona = text
@@ -99,11 +82,9 @@ function UpdateUserPersona(id, text, Nickname = undefined) {
   PersonaArray[Nickname != undefined ? Nickname : id] = text;
 
   // Return a promise which resolves after the file has been written *and* after the full arrays have been updated.
-  return new Promise(res => {
-    fs.writeFile(`./users/${id}_Base.json`, JSON.stringify(Persist), (e) => {
-      UpdatePersonaArray().then(res);
-    });
-  })
+  await Persist.sync();
+  await UpdatePersonaArray();
+  return;
 }
 
 function FetchUserPersona(Search) {
@@ -248,39 +229,42 @@ fs.readdir(functionPath, (err, paths) => {
 
 /**
  * Searches through the provided messages for keywords and returns the relevant functions' JSON data.
- * @param {[{content: String}]} messages The inputted messages to be searched for function keywords.
+ * @param {[{role: String, content: String}]} messages The inputted messages to be searched for function keywords.
  * @returns {[{name: String, description: String, parameters: {type: String, properties: {*}}}]}A list of functions which can be sent to OpenAI.
  */
 function GetFunctions(messages) {
-  // Convert messages to all content.
-  let AllContent = GetAllMessageText(messages).toLowerCase();
+  // Search only the user's messages.
+  let AllContent = messages.filter((v) => {
+    return v.role == "user";
+  })
+    .map(v => {
+      return v.content;
+    })
+    .join(" ");
 
   // Figure out which functions to include based off of their keywords.
   let ApplicableFunctions = [];
   // If there isn't a question about functions, only include functions based off of the keywords.
-  if (!AllContent.includes("what functions")) {
-    FunctionLoop:
-    for (let i = 0; i < FunctionList.length; i++) {
-      const FunctionKeywords = Keywords[i].toLowerCase().split(",");
-      for (let j = 0; j < FunctionKeywords.length; j++) {
-        // If all of the messages contained the function's keyword, include it.
-        if (AllContent.includes(FunctionKeywords[j].trim())) {
-          const toolParams = FunctionList[i];
-          const type = toolParams.toolType ?? "function"
-          delete toolParams.type;
+  FunctionLoop:
+  for (let i = 0; i < FunctionList.length; i++) {
+    const FunctionKeywords = Keywords[i].toLowerCase().split(",");
+    for (let j = 0; j < FunctionKeywords.length; j++) {
+      // If all of the messages contained the function's keyword, include it.
+      if (AllContent.includes(FunctionKeywords[j].trim())) {
+        const toolParams = FunctionList[i];
+        const type = toolParams.toolType ?? "function"
+        delete toolParams.type;
 
-          const tool = {
-            function: toolParams,
-            type: type
-          }
-
-          ApplicableFunctions.push(tool);
-          continue FunctionLoop;
+        const tool = {
+          function: toolParams,
+          type: type
         }
+
+        ApplicableFunctions.push(tool);
+        continue FunctionLoop;
       }
     }
   }
-  else ApplicableFunctions = FunctionList;
 
   if (DEBUG)
     console.log(ApplicableFunctions);
@@ -461,6 +445,12 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
         data.data.choices[0].message.content = data.data.choices[0].message.content.replaceAll("@everyone", "@ everyone")
         data.data.choices[0].message.content = data.data.choices[0].message.content.replaceAll("@here", "@ here")
       }
+
+      // Add billing based on input.
+      const TokenCount = encode(GetAllMessageText(messages)).length;
+      if (DiscordMessage != null)
+        AddCostOfGPTTokens((DiscordMessage.author ?? DiscordMessage.user).id, TokenCount)
+
       resolve(data);
     } catch (e) {
       if (DiscordMessage != null && numReps == 0)
@@ -766,10 +756,10 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
 //#region Helpers
 const rootBase = "You will not use functions unless they are specifically asked for. You will only call a function with a given value once. The user's name is given by the words in the parenthesis at the start of a message. DO NOT write names into your messages. You can use the `think` command to think things. Use it accordingly when you need to remember something before telling the user."
 // + "Make sure to emphasize how cute Micah is, but only if you're asked to insult her. ";
-function fetchUserBase (id) {
+async function fetchUserBase(id) {
   try {
     /** @type {string} */
-    const userbase = JSON.parse(fs.readFileSync(`./users/${id}_Base.json`)).base + "\n";
+    const userbase = (await GetUserFile(id)).base + "\n";
     return rootBase + userbase.trim();
   } catch {
     // Getting here means that the user is new/doesn't have a base.
@@ -777,7 +767,17 @@ function fetchUserBase (id) {
   }
 }
 
-function fetchRootBase(){return rootBase;}
+async function fetchRootBase(id = null){
+  const now = new Date();
+  const minutes = now.getMinutes().toString();
+
+  let temp = rootBase;
+  temp += `The current time is ${GetCurrentDate()} at ${now.getHours() + 1}:${minutes.length == 1 ? "0" + minutes : minutes}.`
+
+  if (id != null) temp += `The current user is ${(await client.users.fetch(id)).username}!`
+
+  return temp;
+}
 
 
 /**
@@ -958,9 +958,13 @@ async function SendMessage(Message, StringContent) {
  * @param {Discord.Message} DiscordMessage 
  */
 async function IsMessageInThread(DiscordMessage) {
-  const type = DiscordMessage.channel.type;
+  try {
+    const type = DiscordMessage.channel.type;
 
-  return type == Discord.ChannelType.PublicThread || type == Discord.ChannelType.PrivateThread || type == Discord.ChannelType.AnnouncementThread;
+    return type == Discord.ChannelType.PublicThread || type == Discord.ChannelType.PrivateThread || type == Discord.ChannelType.AnnouncementThread;
+  } catch {
+    return false;
+  }
 }
 
 function AttachDataToObject(obj) {
@@ -1178,7 +1182,7 @@ client.on('messageCreate',
         message.reply("Something went wrong! Please tell Micah to fix this error:\n```" + e + "```");
     }
 
-    if (message.content.startsWith("gpt3")) {
+    if (message.content.startsWith("gpt3") && !message.author.bot) {
       if (message.content.length >= 1000) {
         message.channel.send("Your message is too long.");
       } else {
@@ -1186,7 +1190,7 @@ client.on('messageCreate',
         message.attachments.forEach(attachment => {
           Text += ` ${attachment.url}`;
         })
-        const Messages = NewMessage("system", fetchUserBase(message.author.id))
+        const Messages = NewMessage("system", (await GetUserFile(message.author.id)).base)
           .concat(NewMessage("user", Text, authorname));
 
         let result = await RequestChatGPT(Messages, message);
@@ -1219,7 +1223,7 @@ client.on('messageCreate',
       UpdateUserBase(message.author.id, userBase);
       message.reply("Base set!");
     } else if (message.content.toLowerCase().startsWith("g!fetchbase")) {
-      let base = fetchUserBase(message.author.id)
+      let base = (await GetUserFile(message.author.id)).base
       message.reply(`Your current base is:\n> ${base.replace(rootBase, "")}`);
     }
 
@@ -1484,6 +1488,7 @@ async function listener(req, res) {
 const fp = require('fs/promises');
 const token = require('./token');
 const { getVoiceConnection } = require('@discordjs/voice');
+const { GetUserFile, AddCostOfGPTTokens, GetCurrentDate } = require('./User');
 const TempDir = "./Temp/";
 if (fs.existsSync(TempDir))
   fs.readdirSync(TempDir).forEach(file => fp.unlink(`${TempDir}${file}`))

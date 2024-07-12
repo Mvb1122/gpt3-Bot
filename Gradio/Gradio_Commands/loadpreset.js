@@ -9,10 +9,10 @@ module.exports = {
         .setDescription('Connects Gradio to the given API **preset**! (Dev only)')
         .addIntegerOption(option => {
             return option.setName("preset")
-                .setDescription("The preset number to connect to. 1: Main PC both, 2: Server, 3: All, 4: Main PC Main")
+                .setDescription("The preset number to connect to. 1: MPC both, 2: Server, 3: All, 4: MPC Main 4: MPC Secondary")
                 .setRequired(true)
                 .setMinValue(1)
-                .setMaxValue(4);
+                .setMaxValue(5);
         })
         // Make it so only admin can see this command.
         .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),

@@ -1,11 +1,12 @@
 const { SlashCommandBuilder, CommandInteraction, ChannelType, Message } = require('discord.js');
 const { execute: TranscribeExecute } = require("./Transcribe");
 const { AddOnLog, LogTo, GetLastMessageAndOutputChannel } = require('../TranscriptionLogger');
-const { NewMessage, fetchUserBase, client, RequestChatGPT } = require('..');
+const { NewMessage, client, RequestChatGPT } = require('..');
 const { TextToVCWithCallback } = require('./TTSToVC');
 const { getVoiceConnection } = require('@discordjs/voice');
+const { GetUserFile } = require('../User');
 const AIThinkingMessage = ":robot: The AI is thinking of a response...";
-const AIVoiceBin = "Luminary.bin";
+const AIVoiceBin = "girl.bin";
 const AIWakePhrase = "computer"
 
 /**
@@ -114,7 +115,7 @@ module.exports = {
                 "ChannelId": OutputID,
                 "GuildId": interaction.guildId,
                 "LastMessageTime": undefined,
-                "Messages": NewMessage("System", fetchUserBase(interaction.user.id)),
+                "Messages": NewMessage("System", (await GetUserFile(interaction.member.id)).base),
                 "AlwaysListening": AlwaysListening,
                 "Bypass": false,
                 "CurrentlySpeaking": false
@@ -125,11 +126,11 @@ module.exports = {
                 if (type == "STT" || type == "TTS") {
                     if (content.toLowerCase().includes(AIWakePhrase)) Conversations[inputId].Bypass = true;
     
-                    if (AlwaysListening || Conversations[inputId].Bypass) {
-                        if (!Conversations[inputId].Messages[Conversations[inputId].Messages.length - 1].content.startsWith(`(${name})`))
-                            Conversations[inputId].Messages = Conversations[inputId].Messages.concat(NewMessage("User", `(${name}) ${content}`));
-                        else
+                    if (AlwaysListening || Conversations[inputId].Bypass || content.toLowerCase().includes(AIWakePhrase)) {
+                        if (Conversations[inputId].Messages[Conversations[inputId].Messages.length - 1].content.startsWith(`(${name})`))
                             Conversations[inputId].Messages[Conversations[inputId].Messages.length - 1].content += content
+                        else
+                            Conversations[inputId].Messages = Conversations[inputId].Messages.concat(NewMessage("User", `(${name}) ${content}`));
 
                         Conversations[inputId].LastMessageTime = performance.now();
                     }
@@ -167,7 +168,7 @@ module.exports = {
 async function VoiceLong(GuildId, content, ChannelId, Voice = AIVoiceBin, log = true) {
     let messageDetails = (await GetLastMessageAndOutputChannel(GuildId));
     const VoicePlaySections = [], GenerationCalls = [];
-    const BottomEndLength = 250;
+    const BottomEndLength = 200;
     do {
         // Split to a minimum length plus to next space.
         const SplitSize = content.length > BottomEndLength ? BottomEndLength + content.substring(BottomEndLength).indexOf(" ") + 1 : content.length;
