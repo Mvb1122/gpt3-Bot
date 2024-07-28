@@ -50,7 +50,9 @@ module.exports = {
         await Security.SetPolicy(interaction.guildId, policyName, value);
 
         // Respond
-        interaction.editReply(`Policy ${policyName} set to \`${value}\`!`);
+        const policyText = `Policy ${policyName} set to \`${value}\``;
+        interaction.editReply(policyText + "!");
+        Security.WriteToLogChannel(interaction.guildId, `${policyText} by ${interaction.user.displayName}!`)
     },
 
     OnConfigureSecurity() {
@@ -90,6 +92,12 @@ module.exports = {
                             return CommonConfigure(op)
                                 .addChannelTypes([ChannelType.GuildText, ChannelType.PrivateThread, ChannelType.PublicThread]);
                         });
+                        break;
+                    
+                    case "Number":
+                        s = s.addNumberOption(op => {
+                            return CommonConfigure(op)
+                        })
                         break;
 
                     default:

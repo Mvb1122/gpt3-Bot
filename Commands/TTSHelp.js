@@ -35,6 +35,7 @@ const text = `
 - By default, all messages sent in a voice channel's text chat will be read aloud using the default voice, \`${DefaultEmbedding.substring(0, DefaultEmbedding.indexOf(".bin"))}\`.
 - You can add additional linkages between channels with the \`/starttts conversation\` command.
 	- The parameters, \`input\` and \`output\` are the same as with \`/starttts self\`.
+	
 	- Voices will be assigned randomly, but can be overridden via \`/starttts self\`
 
 # Creating Models:
@@ -55,6 +56,39 @@ const text = `
 	- \`model\` is the voice you want to use. Default uses "Girl".
 - Output from the AI may contain extra words on extra long or extra short lines.
 - There is a word cap. I haven't bothered to test it, but it's like 1500 characters or so.
+- Voicing runs at about 4x real speed.
+
+# Transcribing Audio
+- You can transcribe a file with \`/transcribe mode file\` and then adding a file as \`voice\`.
+	- Can be any common voice/video file.
+	
+	- When first calling this function, it may take an extra long time to load, but after about a minute or so, it'll load up. From there, requests should transcribe relatively quickly.
+	
+	- Transcription also runs at about 4x real speed.
+- You can transcribe a discord call with \`/transcribe mode call\`
+	- \`input\` is the call to transcribe.
+	
+	- \`output\` is the text channel to send the transcription into.
+	
+	- Both \`input\` and \`output\` can be automatically inferred based on your current channel and if you're in a voice channel.
+	
+	- Can be stopped with \`/transcribe mode stopcall\`
+
+# Talking to the AI in voice chat
+- There are two modes: \`/buddy\` and \`/podcast\`:
+	- In \`/buddy\` you talk directly with the AI.
+		- \`/buddy mode call\` to start. \`/buddy mode stopcall\` to stop.
+		
+		- There are input and output parameters with the same meanings as \`/transcribe\`
+		
+		- You have to stop the call and restart it to clear the AI's memory. It uses your text base to start.
+	- In \`/podcast\` you listen to a panel of AIs talk to each other about whatever \`topic\` you choose.
+		- \`/podcast action call\` to start.
+		
+		- For now, these AI are locked as whatever Micah was testing with last.
+		
+		- This mode is kinda expensive so don't leave it running.
+			- \`/podcast action stopcall\` to stop.
 `.split("\n#");
 
 module.exports = {

@@ -1,12 +1,16 @@
+const AIThinkingMessage = ":robot: The AI is thinking of a response...";
+module.exports.AIThinkingMessage = AIThinkingMessage;
+const AIVoiceBin = "girl.bin";
+module.exports.AIVoiceBin = AIVoiceBin;
+
 const { SlashCommandBuilder, CommandInteraction, ChannelType, Message } = require('discord.js');
 const { execute: TranscribeExecute } = require("./Transcribe");
-const { AddOnLog, LogTo, GetLastMessageAndOutputChannel } = require('../TranscriptionLogger');
+const { AddOnLog, GetLastMessageAndOutputChannel } = require('../TranscriptionLogger');
 const { NewMessage, client, RequestChatGPT } = require('..');
-const { TextToVCWithCallback } = require('./TTSToVC');
+const { PlayAudioToVC } = require('./TTSToVC');
 const { getVoiceConnection } = require('@discordjs/voice');
 const { GetUserFile } = require('../User');
-const AIThinkingMessage = ":robot: The AI is thinking of a response...";
-const AIVoiceBin = "girl.bin";
+const { VoiceLong } = require('../VoiceLong');
 const AIWakePhrase = "computer"
 
 /**
@@ -24,8 +28,14 @@ new Promise(async ()=> {
                     let messageDetails = (await GetLastMessageAndOutputChannel(convo.GuildId));
                     const voiceChannel = client.channels.fetch(convo.ChannelId);
                     // Only speak if we weren't the last one to speak, an amount of time has passed, and we aren't already currently speaking.
-                    if (convo.Messages[convo.Messages.length - 1].role != "assistant" && performance.now() - convo.LastMessageTime > 2000 && !Conversations[convoKey].CurrentlySpeaking) { // Wait longer if there are more people. (await voiceChannel).memberCount * 
+                    if (convo.Messages[convo.Messages.length - 1].role != "assistant" && performance.now() - convo.LastMessageTime > 1000 && !Conversations[convoKey].CurrentlySpeaking) { // Wait longer if there are more people. (await voiceChannel).memberCount * 
                         // Respond and then voice to call.
+                            // Play notification stop sound.
+                        PlayAudioToVC(__dirname + "/Notification Sounds/notification stop.mp3", {
+                            OutputID: Conversations[convoKey].ChannelId,
+                            OutputGuildID: Conversations[convoKey].GuildId
+                        })
+                        
                             // Send thinking message.
                         if (messageDetails.last.author.id != client.user.id || (messageDetails.last != undefined && messageDetails.last.content.length > 1800) || messageDetails.last == undefined) {
                             messageDetails.last = messageDetails.output.send(AIThinkingMessage);
@@ -124,7 +134,15 @@ module.exports = {
             // Now, add a listener.
             AddOnLog(interaction.guildId, (type, name, content) => {
                 if (type == "STT" || type == "TTS") {
-                    if (content.toLowerCase().includes(AIWakePhrase)) Conversations[inputId].Bypass = true;
+                    if (content.toLowerCase().includes(AIWakePhrase)) {
+                        Conversations[inputId].Bypass = true;
+
+                        // Play the notification sound.
+                        PlayAudioToVC(__dirname + "/Notification Sounds/notification start.mp3", {
+                            OutputID: Conversations[inputId].ChannelId,
+                            OutputGuildID: Conversations[inputId].GuildId
+                        })
+                    }
     
                     if (AlwaysListening || Conversations[inputId].Bypass || content.toLowerCase().includes(AIWakePhrase)) {
                         if (Conversations[inputId].Messages[Conversations[inputId].Messages.length - 1].content.startsWith(`(${name})`))
@@ -133,6 +151,8 @@ module.exports = {
                             Conversations[inputId].Messages = Conversations[inputId].Messages.concat(NewMessage("User", `(${name}) ${content}`));
 
                         Conversations[inputId].LastMessageTime = performance.now();
+
+                        console.log(Conversations[inputId].Messages);
                     }
                 }
             })
@@ -153,55 +173,5 @@ module.exports = {
      */
     CanExternal: false,
 
-    VoiceLong
-}
-
-/**
- * Voices long blocks of text with a mind for performance.
- * @param {string} GuildId Guild to voice into.
- * @param {string} content Long content to voice.
- * @param {string} ChannelId Voice channel to voice into.
- * @param {string} [Voice=AIVoiceBin] Voice to read as.
- * @param {boolean} [log=true] Whether to log or not.
- * @returns {Promise<>} Resolves when voiceing is complete.
- */
-async function VoiceLong(GuildId, content, ChannelId, Voice = AIVoiceBin, log = true) {
-    let messageDetails = (await GetLastMessageAndOutputChannel(GuildId));
-    const VoicePlaySections = [], GenerationCalls = [];
-    const BottomEndLength = 200;
-    do {
-        // Split to a minimum length plus to next space.
-        const SplitSize = content.length > BottomEndLength ? BottomEndLength + content.substring(BottomEndLength).indexOf(" ") + 1 : content.length;
-        const thisRoundText = content.length > SplitSize ? content.substring(0, SplitSize) : content;
-        content = content.length > SplitSize ? content.substring(SplitSize) : "";
-
-        // Wait for both logging and voicing before continuing on.
-        const x = TextToVCWithCallback(thisRoundText, ChannelId, GuildId, Voice);
-
-        function Play() {
-            const Promises = [
-                x.Play(),
-            ];
-
-            if (log) Promises.push(LogTo(GuildId, "AI", "AI", thisRoundText));
-
-            return Promise.all(Promises);
-        }
-
-        VoicePlaySections.push(Play); GenerationCalls.push(x.voice);
-    } while (content.length != 0);
-
-    // Now that all voices are queued for generation, play them sucessively while generating the next chunk.
-    // This means that audio is generated during the previous section's playback.
-    messageDetails = (await GetLastMessageAndOutputChannel(GuildId)); // Because some time may pass, refresh log info.
-    await GenerationCalls[0]();
-    if (log)
-        await messageDetails.last.edit(messageDetails.last.content.replace(`\n${AIThinkingMessage}`, ""));
-
-    for (let i = 0; i < VoicePlaySections.length; i++) {
-        const x = VoicePlaySections[i]();
-        if (VoicePlaySections[i + 1] != undefined) GenerationCalls[i + 1]();
-        await x;
-    }
-    return;
+    VoiceLong, AIWakePhrase
 }

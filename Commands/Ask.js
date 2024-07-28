@@ -25,8 +25,8 @@ module.exports = {
     async execute(interaction) {
         await interaction.deferReply();
         if (interaction.member == null) interaction.member = interaction.user;
-        let username;
         
+        let username;
         try {
             username = interaction.member.nickname ?? interaction.user.globalName ?? interaction.user.username;
         } catch {
@@ -34,13 +34,13 @@ module.exports = {
         }
 
         let UserQuestion = interaction.options.getString("question");
-        interaction.member.id
+
         // If the user has sent a text document, attach it to our prompt so that ReadPage can be used.
         if (interaction.options.getAttachment("text") != undefined) {
             UserQuestion += ` ${interaction.options.getAttachment("text").url}`
         }
 
-        const user = await GetUserFile(interaction.member.id);
+        const user = await GetUserFile(interaction.user.id);
 
         let messages = Index.NewMessage("system", user.base)
             .concat(Index.NewMessage("user", UserQuestion))

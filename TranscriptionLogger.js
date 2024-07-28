@@ -1,8 +1,8 @@
 const { Message, Channel } = require("discord.js");
-const { client } = require(".");
+const { client, SendMessage } = require(".");
 
-const Logs = {1234: {ChannelId: 1234, Listeners: [(t, n, c) => {}]}};
-delete Logs[1234];
+const Logs = {"1234": {ChannelId: 1234, Listeners: [(t, n, c) => {}]}};
+delete Logs["1234"];
 const UsernameSeperator = ` | `
 
 /**
@@ -92,8 +92,9 @@ module.exports = {
         }
 
         // Decide whether to send a message or to edit one.
+        let { last, output } = await GetLastMessageAndOutputChannel(GuildId);
         try {
-            const { last, output } = await GetLastMessageAndOutputChannel(GuildId);
+            if (output == undefined) output = last.channel;
 
             // If the last message was written by us, and we can squeeze in our continued transcription, add onto it.
             const MessageContent = last.content;
@@ -110,10 +111,12 @@ module.exports = {
                     return await last.edit(MessageContent + "\n" + TranscriptionMessageContent);
             } else 
                 // If that didn't match up just send a new message.
-                await output.send(TranscriptionMessageContent);
-        } catch {
+                // return await SendMessage({channel: output}, TranscriptionMessageContent)
+                return await output.send(TranscriptionMessageContent);
+        } catch (e) {
             // If we error, send a new message.
-            await output.send(TranscriptionMessageContent);
+            console.log(e);
+            return await output.send(TranscriptionMessageContent);
         }
     },
 

@@ -16,7 +16,7 @@ module.exports = {
      */
     async execute(interaction) {
         // Only allow me to use this.
-        if (interaction.member.id != token.GetToken("devDiscordID")) return interaction.reply("You aren't allowed to use this!");
+        if (interaction.user.id != token.GetToken("devDiscordID")) return interaction.reply("You aren't allowed to use this!");
 
         let output = ""
         Gradio.GetServers().forEach(server => {

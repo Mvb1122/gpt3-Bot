@@ -5,7 +5,7 @@ function ToFahrenheit(tempInK) {
 }
 
 module.exports = {
-    keywords: "Weather, warm, cold, hot, Get the Weather",
+    keywords: "Weather, warm, cold, hot, Get the Weather, temperature",
     json: 
     {
       "name": "GetWeather",

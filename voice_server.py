@@ -1,5 +1,5 @@
 transcription_model_id = "openai/whisper-large-v3"
-musicgen_model_id = "facebook/musicgen-stereo-small"
+musicgen_model_id = "facebook/musicgen-small"
 tts_model_id = "microsoft/speecht5_tts"
 language_classifier_model_id = "papluca/xlm-roberta-base-language-detection"
 whisper_model_id = "openai/whisper-large-v3"

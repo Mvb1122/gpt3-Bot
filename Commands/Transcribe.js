@@ -89,11 +89,11 @@ async function SubscribeTranscribe(user, set, bypassSubscribedMembers = false) {
                 const Name = user.nickname ?? user.displayName;
                 if (val.toLowerCase() == "you" || val == "") return;
 
-                // const channel = client.channels.fetch(set.Output);
-                LogTo(user.guild.id, "STT", Name, val);
-
                 // Always delete file.
                 fp.unlink(path);
+                
+                // const channel = client.channels.fetch(set.Output);
+                await LogTo(user.guild.id, "STT", Name, val);
             }, () => {
                 // If the transcription fails, just unlink the audio file, I guess.
                 try {

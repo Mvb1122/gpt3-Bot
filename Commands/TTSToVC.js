@@ -8,9 +8,9 @@ const fp = require('fs/promises');
 const { WriteToLogChannel, HasPolicy, GetPolicy } = require('../Security');
 const { HasLog, LogTo } = require('../TranscriptionLogger');
 const VoiceV2 = require('../VoiceV2');
-const Path = require('path')
+const Path = require('path');
 
-function getPlayer() {
+function GetPlayer() {
     return createAudioPlayer(
         {
             behaviors: {
@@ -29,15 +29,25 @@ function getPlayer() {
     OutputGuildID: number;
     Player: AudioPlayer;
 }} set Set information.
+ * @param {number} [volume=1] The volume to play at.
  * @param {Number} guild GuildID
  */
-function PlayAudioToVC(path, set) {
+function PlayAudioToVC(path, set, volume = 1) {
     return new Promise(async res => {
+        // Add a player if there isn't one.
+        if (set.Player == null) set.Player = GetPlayer();
+        
         // Make sure we have a voice connection to the channel.
         await ConnectToChannel(set)
         
+        const UseVolume = volume != 1;
         // Now that we're sure we have a connection, play the thing.
-        const resource = createAudioResource(path);
+        const resource = createAudioResource(path, {
+            inlineVolume: UseVolume
+        });
+
+        if (UseVolume) resource.volume.setVolume(volume)
+
         set.Player.play(resource);
         
         // When the player has finished playing, resolve the promise.
@@ -106,7 +116,7 @@ function LoadSets() {
 
         // Add new players.
         for (let i = 0; i < VCSets.length; i++) {
-            VCSets[i].Player = getPlayer();
+            VCSets[i].Player = GetPlayer();
         }
     }
 }
@@ -213,7 +223,7 @@ function TextToVC(text, VCID, GuildID, model) {
         if (requestBefore != null) await requestBefore;
 
         await Voice(text, path, model)
-        await PlayAudioToVC(path, {OutputID: VCID, OutputGuildID: GuildID, Player: getPlayer()})
+        await PlayAudioToVC(path, {OutputID: VCID, OutputGuildID: GuildID, Player: GetPlayer()})
         // Delete audio after it has finished playing.
         VoiceRequests[GuildID] = null;
         fs.unlinkSync(path);
@@ -221,47 +231,6 @@ function TextToVC(text, VCID, GuildID, model) {
     });
 
     VoiceRequests[GuildID] = req;
-}
-
-/**
- * Very similar to TextToVC, except it generates and plays when callback functions are called.
- * @param {string} text 
- * @param {string} VCID 
- * @param {string} GuildID 
- * @param {string} model 
- * @returns {{
-    voice: () => Promise<{
-        text: string;
-        message: boolean;
-    }>;
-    Play: () => Promise<any>;
-}}
- */
-function TextToVCWithCallback(text, VCID, GuildID, model) {
-    const path = __dirname + `/../Temp/${Math.floor(Math.random() * 100000)}_chat_tts.wav`
-    
-    let hasVoiced = false;
-    const voice = () => {
-        hasVoiced = true;
-        return Voice(text, path, model);
-    }
-    
-    function Play() {
-        return new Promise(async res => {
-            if (!hasVoiced)
-                await voice();
-
-            PlayAudioToVC(path, { OutputID: VCID, OutputGuildID: GuildID, Player: getPlayer() })
-                // Delete audio after it has finished playing.
-                .then(() => {
-                    fs.unlinkSync(path);
-                    res();
-                });
-        })
-    }
-
-    const x = { voice, Play }
-    return x;
 }
 
 module.exports = {
@@ -340,7 +309,7 @@ module.exports = {
                 InputID: input.id,
                 OutputID: output.id,
                 OutputGuildID: interaction.guildId,
-                Player: getPlayer(), // Use a generic new player.
+                Player: GetPlayer(), // Use a generic new player.
                 Model: model
             };
             
@@ -419,6 +388,17 @@ module.exports = {
 
                 const path = Path.normalize(__dirname + `\\..\\Temp\\${message.author.id}_tts.wav`); // Prevent error when speaking too fast by randomly naming tts wavs.
                 if (inCall) {
+                    VoiceLong(message.guildId, message.content, set.OutputID, set.Model, false, message.member.id);
+                    // Log what was said, also log to transcriptions if needed.
+                    if (HasLog(message.guildId)) {
+                        const user = message.member;
+                        const Name = user.nickname ?? user.displayName;
+                        LogTo(message.guildId, "TTS", Name, message.content.trim())
+                    }
+    
+                    WriteToLogChannel(message.guildId, `${message.author.displayName} in <#${set.OutputID}> voiced:\`\`\`` + message.content + "```")
+
+                    /*
                     Voice(message.content, path, set.Model).then(() => {
                         PlayAudioToVC(path, set)
                             // Delete audio after it has finished playing.
@@ -435,6 +415,7 @@ module.exports = {
 
                         WriteToLogChannel(message.guildId, `${message.author.displayName} in <#${set.OutputID}> voiced:\`\`\`` + message.content + "```")
                     })
+                    */
                 }
                 
                 // Since this considered voicing, we're done.
@@ -463,7 +444,15 @@ module.exports = {
                 fp.writeFile(ReadingListsFile, JSON.stringify(ReadingList));
                 
                 // Voice it to VC.
-                TextToVC(message.content, CurrentList.outputId, CurrentList.guildId, voice);
+                VoiceLong(CurrentList.guildId, message.content, CurrentList.guildId, voice, false, message.member.id);
+
+                if (HasLog(message.guildId)) {
+                    const user = message.member;
+                    const Name = user.nickname ?? user.displayName;
+                    LogTo(message.guildId, "TTS", Name, message.content.trim())
+                }
+
+                // TextToVC(message.content, CurrentList.outputId, CurrentList.guildId, voice);
                 WriteToLogChannel(message.guildId, `${message.author.displayName} in <#${message.channelId}> voiced:\`\`\`` + message.content + "```");
                 
                 // Since this voiced, we're done.
@@ -485,10 +474,22 @@ module.exports = {
                 InputID: message.channelId,
                 OutputID: message.channelId,
                 OutputGuildID: message.guildId,
-                Player: getPlayer(), // Use a generic new player.
+                Player: GetPlayer(), // Use a generic new player.
                 Model: VoiceV2.DefaultEmbedding
             };
 
+            VoiceLong(message.guildId, message.content, set.OutputID, set.Model, false, message.member.id);
+
+            // Log what was said, also log to transcriptions if needed.
+            if (HasLog(message.guildId)) {
+                const user = message.member;
+                const Name = user.nickname ?? user.displayName;
+                LogTo(message.guildId, "TTS", Name, message.content.trim())
+            }
+
+            WriteToLogChannel(message.guildId, `${message.author.displayName} in <#${set.OutputID}> voiced:\`\`\`` + message.content + "```")
+
+            /*
             Voice(message.content, path, set.Model).then(() => {
                 PlayAudioToVC(path, set)
                     // Delete audio after it has finished playing.
@@ -505,11 +506,12 @@ module.exports = {
 
                 WriteToLogChannel(message.guildId, `${message.author.displayName} in <#${set.OutputID}> voiced:\`\`\`` + message.content + "```")
             })
+            */
         }
     },
 
     // Also share voice sets and useful voice information.
-    VCSets, PlayAudioToVC, WriteVCSets, ConnectToChannel, TextToVC, TextToVCWithCallback, GetRandomVoice,
+    VCSets, PlayAudioToVC, WriteVCSets, ConnectToChannel, TextToVC, GetRandomVoice, GetPlayer,
 
     /**
      * @param {AutocompleteInteraction} interaction The Autocomplete request.
@@ -536,3 +538,6 @@ module.exports = {
      */
     CanExternal: false,
 }
+
+// This import is moved down in order to prevent a circular dependancy issue.
+const { VoiceLong } = require('../VoiceLong');

@@ -11,6 +11,11 @@ module.exports = {
             return o.setName("user")
                 .setDescription("The user to check.")
                 .setRequired(false)
+        })
+        .addBooleanOption(o => {
+            return o.setName("hide")
+                .setDescription("Whether to hide the response. Useful for snooping.")
+                .setRequired(false);
         }),
 
     /**
@@ -19,7 +24,10 @@ module.exports = {
      */
     async execute(interaction) {
         // Defer for safety.
-        await interaction.deferReply();
+        const hide = interaction.options.getBoolean("hide") ?? false;
+        await interaction.deferReply({
+            ephemeral: hide
+        });
 
         /**
          * @type {User}
@@ -46,7 +54,8 @@ module.exports = {
         });
         
         interaction.editReply(`<@${user.id}>'s Costs:\n\`\`\`This Month: ${MonthlyCost.toPrecision(6)}\nThis Year: ${YearCost.toPrecision(6)}\nAll-time: ${AllCost.toPrecision(6)}\`\`\``);
-        SendMessage(interaction, "```" + lines.join("\n") + "```");
+        if (!hide)
+            SendMessage(interaction, "```" + lines.join("\n") + "```");
     },
 
     /** 

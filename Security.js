@@ -2,18 +2,22 @@
  * An array of the policies that the Security manager accepts.
  * @type {String[]}
  */
-const policies = ["promptnsfw", "modrole","modchannel","allvoiceinvc","readjoinless"];
+const policies = ["promptnsfw", "modrole","modchannel","allvoiceinvc","readjoinless","shoutrole","maxshoutcount","shoutperiod","judgeimages"];
 /**
  * An array of strings that define what type each policy accepts.
- * @type {"boolean" | "RoleID" | "ChannelID"}
+ * @type {"boolean" | "RoleID" | "ChannelID" | "Number"}
  */
-const policyTypes = ["boolean", "RoleID", "ChannelID", "boolean", "boolean"];
+const policyTypes = ["boolean", "RoleID", "ChannelID", "boolean", "boolean","RoleID","Number","Number","boolean"];
 const policyHelp = [
     "Enable NSFW Filtering",
     "The role who can bypass NSFW.",
     "The channel to log messages to.",
     "Whether or not to read all voice chat text messages in voice chat",
-    "Whether or not to read voice messages from people who aren't in chat."
+    "Whether or not to read voice messages from people who aren't in chat.",
+    "The role who can bypass shout limits.",
+    "How many shouts a user can use per period.",
+    "How long the shout period is in minutes.",
+    "Whether to check if images are NSFW or not."
 ];
 
 const PolicyDefaults = {
@@ -21,13 +25,16 @@ const PolicyDefaults = {
     "modrole": undefined,
     "modchannel": undefined,
     "allvoiceinvc": true,
-    "readjoinless": true
+    "readjoinless": true,
+    "shoutrole": undefined,
+    "maxshoutcount": 5,
+    "shoutperiod": 10,
+    "judgeimages": false
 }
 
 const fp = require('fs/promises');
 const fs = require('fs');
 const Index = require('./index');
-const path = require('path');
 
 const FileNames = {
     Security: "./Security.json",
@@ -81,7 +88,7 @@ if (!(policies.length == policyTypes.length && policies.length == policyHelp.len
 /**
  * Fetches a policy from the security.
  * @param {string} gid GuildID
- * @param {"promptnsfw" | "modrole" | "modchannel" | "allvoiceinvc" | "readjoinless"} policy PolicyName
+ * @param {"promptnsfw" | "modrole" | "modchannel" | "allvoiceinvc" | "readjoinless" | "shoutrole" | "maxshoutcount" | "shoutperiod", "judgeimages"} policy PolicyName
  * @returns {Promise<*>}
  */
 async function GetPolicy(gid, policy) {
@@ -99,7 +106,7 @@ async function GetPolicy(gid, policy) {
 /**
  * Says whether a guild has a policy or not.
  * @param {string} gid GuildID
- * @param {"promptnsfw" | "modrole" | "modchannel" | "allvoiceinvc" | "readjoinless"} policy PolicyName
+ * @param {"promptnsfw" | "modrole" | "modchannel" | "allvoiceinvc" | "readjoinless" | "shoutrole" | "maxshoutcount" | "shoutperiod", "judgeimages"} policy PolicyName
  * @returns {Promise<boolean>}
  */
 async function HasPolicy(gid, policy) {
@@ -109,7 +116,7 @@ async function HasPolicy(gid, policy) {
 /**
  * 
  * @param {number} gid GuildID
- * @param {String} policy PolicyName
+ * @param {"promptnsfw" | "modrole" | "modchannel" | "allvoiceinvc" | "readjoinless" | "shoutrole" | "maxshoutcount" | "shoutperiod", "judgeimages"} policy PolicyName
  * @param {*} value Policy value. Must be serializable.
  * @returns {Promise} Promise that resolves when entirely finished saving.
  */
@@ -160,14 +167,21 @@ function WriteToLogChannel(guildId, message) {
         if (logChannel != undefined) {
             const Log = await Index.client.channels.fetch(logChannel);
             // Send text while preventing mentions from pinging.
-            const message = await Log.send(message, {
-                "allowed_mentions": { 
-                    users: [], 
-                    roles: [] 
-                }
-            })
+            let LastMessage = null;
+            do {
+                const splitLength = message.length > 2000 ? 2000 : message.length;
+                const thisText = message.substring(0, splitLength);
+                message = message.substring(splitLength);
 
-            res(message);
+                LastMessage = await Log.send(message, {
+                    "allowed_mentions": { 
+                        users: [], 
+                        roles: [] 
+                    }
+                })
+            } while (message.length != 0)
+
+            res(LastMessage);
         } else res();
     })
 
@@ -184,7 +198,7 @@ if (Index.DEBUG)
         WriteToLogChannel("762867801575784448", "Bot rebooted.").then(v => {
             console.log("Log test finished!");
         })
-    }, 1000);
+    }, 10000);
 
 async function WriteToLogChannel(guildId, message) {
     const logChannel = await GetPolicy(guildId, "modchannel");

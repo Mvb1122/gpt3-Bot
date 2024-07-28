@@ -107,37 +107,43 @@ function postJSON(URL, data) {
  */
 let pythonProcess;
 
+let startPromise = null;
+
 /**
  * Starts the AI embedding and voicing server process.
  * @returns {Promise} A promise which resolves when the AI is running.
  */
 function Start() {
-    return new Promise(async res => {
-        if (Started) await Stop();
-
-        // Run the python server.
-        pythonProcess = spawn('python', ['voice_server.py']);
-
-        // Handle process exit events to ensure the Python server is killed when Node.js exits
-        process.on('exit', () => {
-            pythonProcess.kill();
-        });
-
-        pythonProcess.stderr.on('data', (data) => {
-            if (DoConsoleLog)    
-                console.log(data.toString());
-            
-            if (data.includes("Running on")) {
-                Started = true;
-                res();
-            }
-        });
-
-        if (DoConsoleLog)    
-            pythonProcess.stdout.on('data', (data) => {
-                    console.log(data.toString());
+    if (startPromise == null) {
+        startPromise = new Promise(async res => {
+            if (Started) await Stop();
+    
+            // Run the python server.
+            pythonProcess = spawn('python', ['voice_server.py']);
+    
+            // Handle process exit events to ensure the Python server is killed when Node.js exits
+            process.on('exit', () => {
+                pythonProcess.kill();
             });
-    })
+    
+            pythonProcess.stderr.on('data', (data) => {
+                if (DoConsoleLog)    
+                    console.log(data.toString());
+                
+                if (data.includes("Running on")) {
+                    Started = true;
+                    startPromise = null;
+                    res();
+                }
+            });
+    
+            if (DoConsoleLog)    
+                pythonProcess.stdout.on('data', (data) => {
+                        console.log(data.toString());
+                });
+        })
+        return startPromise;
+    } else return startPromise;
 }
 
 function Stop() {

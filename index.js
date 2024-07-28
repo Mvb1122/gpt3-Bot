@@ -1,3 +1,15 @@
+//#region Settings
+let AIParameters = {
+  model: 'gpt-4o-mini',
+  temperature: 0.8,
+  max_tokens: 1000,
+  // Keep n and stream set as they are.
+  n: 1, 
+  stream: false
+}
+const DEBUG = false;
+//#endregion
+
 //#region Imports and Constants
 const Discord = require('discord.js');
 const fs = require('fs');
@@ -20,9 +32,7 @@ const client = new Discord.Client({
 const BaseAddress = "./ActiveBases.json";
 const RecoveryAddress = "./RecoveryBases.json"
 const DiscordToken = tokens.GetToken("discord");
-const DiscordClientId = "845159393494564904";
 const Helpers = require('./Helpers.js')
-const DEBUG = false;
 //#endregion
 
 // const rootBase = "Connie Pedersen's and the extremely-cute Micah Bushman's pronouns are she/her. Micah is a 17-year-old trans girl living in Albuquerque, New Mexico, who enjoys reading Manga and studying Japanese. On weekdays, she goes to school, where she suffers through AP Physics, AP US History, and AP Psychology. She's also taking Japanese at the CEC. Micah programmed this AI to help her with her homework. Rilen, aka ConerBearBeats, is one of Connie's and Micah's old friends. They used to be friends in real life, but now only chat via the internet.\n";
@@ -234,13 +244,14 @@ fs.readdir(functionPath, (err, paths) => {
  */
 function GetFunctions(messages) {
   // Search only the user's messages.
-  let AllContent = messages.filter((v) => {
+  let AllContent = messages.filter(v => {
     return v.role == "user";
   })
     .map(v => {
       return v.content;
     })
-    .join(" ");
+    .join(" ")
+    .toLowerCase();
 
   // Figure out which functions to include based off of their keywords.
   let ApplicableFunctions = [];
@@ -388,20 +399,15 @@ function ConvertToMessageJSON(InputMessages) {
 async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps = 0, allowFunctions = true) {
   return new Promise(async (resolve, reject) => {
     try {
-      let requestData = {
-        model: 'gpt-3.5-turbo',
-        messages: messages,
-        temperature: 0.8,
-        n: 1,
-        max_tokens: 1000,
-        stream: false
-      }
-    
+      // Clone parameters object.
+      const params = JSON.parse(JSON.stringify(AIParameters));
+      params.messages = messages;
+
       // Check that the messages aren't too-too long.
       let AllMessageText = GetAllMessageText(messages);
       const tokencount = encode(AllMessageText).length;
       if (tokencount >= 8192) {
-        // If there's more than 4096 tokens here, complain.
+        // If there's more than a lot of tokens here, complain.
         // DiscordMessage.channel.send(`(Your conversation is getting too long! Please use \`clear all\` soon! Number of tokens: ${encode(AllMessageText).length})`);
     
         // If more than 10,000 tokens, crop down to like 8000. (Start from the end so that stuff at the start is lost first.)
@@ -419,11 +425,12 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
             }
           }
       
-          requestData.messages = CroppedMessages;
+          params.messages = CroppedMessages;
         }
 
+        // This approach no longer works as the latest GPT-4o model has 128k of context.
         // ! Just use a larger model.
-        requestData.model = "gpt-3.5-turbo-16k"
+        // AIParameters.model = "gpt-3.5-turbo-16k"
       }
     
       // Attach functions.
@@ -434,11 +441,11 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
         functions = []
       
       if (functions.length > 0) {
-        requestData.tool_choice = "auto";
-        requestData.tools = functions;
+        params.tool_choice = "auto";
+        params.tools = functions;
       }
     
-      const data = await openai.createChatCompletion(requestData)
+      const data = await openai.createChatCompletion(params)
       
       // For safety, prevent @everyone and @here.
       if (data.data.choices[0].message.content != undefined) {
@@ -448,12 +455,12 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
 
       // Add billing based on input.
       const TokenCount = encode(GetAllMessageText(messages)).length;
-      if (DiscordMessage != null)
+      if (DiscordMessage != null && (DiscordMessage.author ?? DiscordMessage.user) != null)
         AddCostOfGPTTokens((DiscordMessage.author ?? DiscordMessage.user).id, TokenCount)
 
       resolve(data);
     } catch (e) {
-      if (DiscordMessage != null && numReps == 0)
+      if (DiscordMessage != null && numReps == 0 && DiscordMessage.channel != null)
         DiscordMessage.channel.send("Request to AI failed, Retrying...") 
       
       console.log(e);
@@ -759,26 +766,13 @@ const rootBase = "You will not use functions unless they are specifically asked 
 async function fetchUserBase(id) {
   try {
     /** @type {string} */
-    const userbase = (await GetUserFile(id)).base + "\n";
+    const userbase = `${(await GetUserFile(id)).base}\nThe first user you are talking to is ${(await client.users.fetch(id)).displayName}. The user may change at any time, and you may speak to multiple users at the same time. Their name will be indicated in parenthesis at the start of their message.`;
     return rootBase + userbase.trim();
   } catch {
     // Getting here means that the user is new/doesn't have a base.
     return rootBase.trim() + "\n";
   }
 }
-
-async function fetchRootBase(id = null){
-  const now = new Date();
-  const minutes = now.getMinutes().toString();
-
-  let temp = rootBase;
-  temp += `The current time is ${GetCurrentDate()} at ${now.getHours() + 1}:${minutes.length == 1 ? "0" + minutes : minutes}.`
-
-  if (id != null) temp += `The current user is ${(await client.users.fetch(id)).username}!`
-
-  return temp;
-}
-
 
 /**
  * Looks for markdown tables in a string.
@@ -883,9 +877,10 @@ const DiscordMessageLengthLimit = 1900;
  * Splits up the response into 1900 character blocks and sends each of them.
  * @param {Discord.Message} Message The message to send in the channel of.
  * @param {String} Content The content to be sent.
+ * @param {boolean} [Reply=false] Whether to reply to the passed message.
  * @returns {Promise<Message>} A promise which resolves when the message is complete.
  */
-async function SendMessage(Message, StringContent) {
+async function SendMessage(Message, StringContent, Reply = false) {
   if (StringContent.trim() == "") {
     return Message.channel.send("[Empty Message]")
   }
@@ -895,15 +890,19 @@ async function SendMessage(Message, StringContent) {
       let lastMessage = null;
       if (DEBUG)
         console.log("Message content: " + part)
+
       if (part.length >= 20000) return Message.channel.send("More than 10 messages would be sent! Thus, I've decided to cut it short. Also, the AI is probably gonna crash immediately right now, LOL.")
-      if (part.length >= DiscordMessageLengthLimit) {
+        if (part.length >= DiscordMessageLengthLimit) {
         do {
           const SplitPoint = part.length > DiscordMessageLengthLimit ? DiscordMessageLengthLimit : part.length;
           const chunk = part.substring(0, SplitPoint);
           part = part.substring(SplitPoint);
-          lastMessage = await Message.channel.send(chunk)
+          if (lastMessage == null && Reply)
+            lastMessage = await Message.reply(chunk);
+          else 
+            lastMessage = await Message.channel.send(chunk)
         } while (part.length > 0)
-      } else lastMessage = Message.channel.send(part);
+      } else lastMessage = Reply ? Message.reply(part) : Message.channel.send(part);
 
       resolve(lastMessage);
     })
@@ -1033,7 +1032,6 @@ module.exports = {
   IsChannelMemory,
   ClearAll,
   UpdateUserBase,
-  fetchRootBase,
   Recover,
   FetchUserPersona,
   UpdateUserPersona,
@@ -1048,7 +1046,7 @@ function RefreshSlashCommands() {
   let commands = [];
 
   // Auto add all files in the various commands directories.
-  const CommandDirectories = ["./Commands/", "./Gradio/Gradio_Commands/", "./Security_Commands/"];
+  const CommandDirectories = ["./Commands/", "./Gradio/Gradio_Commands/", "./Config_Commands/"];
   CommandDirectories.forEach(dir => {
     fs.readdirSync(dir).forEach(file => {
       if (file.includes('.js'))
@@ -1069,7 +1067,6 @@ function RefreshSlashCommands() {
     const Module = require(command);
     if ('data' in Module && 'execute' in Module) {
       // Run OnConfigureSecurity before pushing anything.
-      if ('OnConfigureSecurity' in Module) 
       if ('OnConfigureSecurity' in Module) 
         Module.OnConfigureSecurity();
 
@@ -1104,7 +1101,7 @@ function RefreshSlashCommands() {
 
       // The put method is used to fully refresh all commands in the guild with the current set
       const data = await rest.put(
-        Discord.Routes.applicationCommands(DiscordClientId /*, guildId */), // use with ApplicationGuildCommands for testing.
+        Discord.Routes.applicationCommands(client.user.id /*, guildId */), // use with ApplicationGuildCommands for testing.
         { body: CommandJSON }
       );
       
@@ -1168,6 +1165,22 @@ async function CreateMemoryThread(message) {
 }
 //#endregion
 
+/**
+ * @param {Discord.Message} message 
+ * @returns {Promise<Discord.Message | undefined>}
+ */
+async function GetRepliedMessage(message) {
+  if (message.reference == undefined) return undefined;
+  else {
+    // Make this work across multiple channels by loading the channel seperately.
+    /**
+     * @type {Discord.Channel}
+     */
+    const channel = await client.channels.fetch(message.reference.channelId);
+    return await channel.messages.fetch(message.reference.messageId)
+  }
+}
+
 client.on('messageCreate',
   /**
    * @param {Discord.Message} message 
@@ -1182,19 +1195,102 @@ client.on('messageCreate',
         message.reply("Something went wrong! Please tell Micah to fix this error:\n```" + e + "```");
     }
 
-    if (message.content.startsWith("gpt3") && !message.author.bot) {
+    let RepliedMessageRepliesToBot = false;
+    if (message.reference) {
+      let repliedMessage = await GetRepliedMessage(message);
+      RepliedMessageRepliesToBot = repliedMessage != null && (repliedMessage.author ?? repliedMessage.user).id == client.user.id
+    }
+
+    if ((message.content.startsWith("gpt3") || message.content.startsWith(`<@${client.user.id}>`) || RepliedMessageRepliesToBot) && !message.author.bot) {
       if (message.content.length >= 1000) {
         message.channel.send("Your message is too long.");
       } else {
-        let Text = message.content.substring(5);
-        message.attachments.forEach(attachment => {
-          Text += ` ${attachment.url}`;
-        })
-        const Messages = NewMessage("system", (await GetUserFile(message.author.id)).base)
-          .concat(NewMessage("user", Text, authorname));
+        // Get starting phrase.
+        let startingPhrase = "";
+        if (message.content.startsWith("gpt3")) startingPhrase = "gpt3"
+        else if (message.content.startsWith(`<@${client.user.id}>`)) startingPhrase = `<@${client.user.id}>`;
 
+        let Text = message.content.substring(startingPhrase.length).trim();
+        message.attachments.forEach(attachment => {
+          if (!attachment.contentType.startsWith("image/"))
+            Text += ` ${attachment.url}`;
+        })
+        message.content = Text;
+
+        // Send a typing notification to make it clear we're thinking.
+        message.channel.sendTyping();
+
+        // Try to develop a list of messages by following replies.
+        let Messages; 
+        let arr = [];
+
+        /**
+         * @param {Discord.Message} m 
+         */
+        function ProcessMessage(m) {
+          const MessageIsFromAI = focusMessage.author.id == client.user.id;
+          const AuthorTag = MessageIsFromAI ? "Assistant" : "User";
+          let content = [];
+
+          const text = MessageIsFromAI ? focusMessage.content : `(${focusMessage.member.nickname ?? focusMessage.author.displayName}) ${focusMessage.content}`;
+          // Add text content. (Use an array type if there's attachments)
+          if (m.attachments.size != 0)
+            content.push({
+              type: "text",
+              text: text
+            })
+          else 
+            content = text;
+
+          // Add images if present.
+          m.attachments.forEach(attachment => {
+            if (attachment.contentType.startsWith("image/")) {
+              // Attach the image.
+              content.push({
+                "type": "image_url",
+                "image_url": {
+                  "url": attachment.url,
+                  "detail": "low" // Can be set to "high" or "auto" but "low" is cheapest so
+                },
+              });
+            }
+          })
+
+          arr = arr.concat(NewMessage(AuthorTag, content));
+        }
+
+        let focusMessage = message;
+        while (focusMessage != undefined) {
+          try {
+            ProcessMessage(focusMessage);
+
+            if (focusMessage.reference == null) {
+              // This is the last message in the chain. Use this author's base.
+              if (focusMessage.author.id != client.user.id)
+                arr = arr.concat(NewMessage("System", (await GetUserFile(focusMessage.author.id)).base));
+              // If this is from the bot, then find the user that called the message and then use their base.
+              else {
+                // Get user.
+                const user = focusMessage.content.substring(0, focusMessage.content.indexOf(":"));
+                await Promise.all((await focusMessage.guild.fetch()).members.cache.map(async v => {
+                  if (v.nickname == user || v.user.displayName == user) 
+                    arr = arr.concat(NewMessage("System", (await GetUserFile(v.id)).base));
+                }))
+              }
+            }
+            
+            focusMessage = await GetRepliedMessage(focusMessage);
+          } catch {
+            focusMessage = undefined;
+          }
+        }
+
+        // Messages array is backwards now, so flip it.
+        Messages = arr.reverse();
+        
         let result = await RequestChatGPT(Messages, message);
-        SendMessage(message, result[result.length - 1].content)
+        console.log(result);
+        SendMessage(message, result[result.length - 1].content, true)
       }
     }
 
@@ -1272,7 +1368,7 @@ client.on('messageCreate',
        * @type {[{content, role, name}]}
        */
       let messages = bases[GetBaseIdFromChannel(message.channel)];
-      if (messages == "" || messages == undefined) messages = NewMessage("system", fetchUserBase(message.author.id));
+      if (messages == "" || messages == undefined) messages = NewMessage("system", (await GetUserFile(message.author.id)).base);
 
       let Text = message.content;
       message.attachments.forEach(attachment => {
@@ -1488,7 +1584,8 @@ async function listener(req, res) {
 const fp = require('fs/promises');
 const token = require('./token');
 const { getVoiceConnection } = require('@discordjs/voice');
-const { GetUserFile, AddCostOfGPTTokens, GetCurrentDate } = require('./User');
+const { GetUserFile, GetCurrentDate } = require('./User');
+const { AddCostOfGPTTokens } = require('./Pricing');
 const TempDir = "./Temp/";
 if (fs.existsSync(TempDir))
   fs.readdirSync(TempDir).forEach(file => fp.unlink(`${TempDir}${file}`))

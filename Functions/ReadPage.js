@@ -33,7 +33,7 @@ module.exports = {
         if (parameters.url != undefined) {
           const path = `./temp/${Math.floor(Math.random() * 10000)}.html`;
 
-          if (DiscordMessage != null)
+          if (DiscordMessage != null && DiscordMessage.channel != null)
             DiscordMessage.channel.send(`Fetching <${parameters.url}>!`)
 
           // Download page.

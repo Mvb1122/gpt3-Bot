@@ -2,12 +2,13 @@
 const { SlashCommandBuilder, CommandInteraction, Message, ButtonBuilder, ButtonStyle } = require('discord.js');
 const Gradio = require('../Gradio_Stuff.js')
 const fs = require('fs')
-const { countCharacter, GetPromptsFromPlaintextUsingGPT,  } = require('../Helpers.js');
+const { GetPromptsFromPlaintextUsingGPT, GetRecommendedCFGScale,  } = require('../Helpers.js');
 const { GetPolicy, WriteToLogChannel } = require('../../Security.js');
-const { JudgeNSFWTags } = require('../../Helpers.js');
+const { JudgeNSFWTags, countCharacter } = require('../../Helpers.js');
 const { ActionRowBuilder } = require('discord.js');
 const { client } = require('../../index.js');
 const token = require('../../token.js');
+const { AddCostOfImages } = require('../../Pricing.js');
 
 module.exports = {
     //#region Command data.
@@ -42,9 +43,9 @@ module.exports = {
                 .setDescription("The height of the image to generate. If left blank, it uses 768.")
                 .setRequired(false)
         })
-        .addIntegerOption(option => {
+        .addNumberOption(option => {
             return option.setName("cfg")
-                .setDescription("The CFG scale of the image to generate. Higher values are more strict. If left blank, it uses 7.")
+                .setDescription("The CFG scale of the image to generate. Higher values are more strict. If blank, bot chooses.")
                 .setRequired(false)
                 .setMinValue(0);
         })
@@ -151,7 +152,9 @@ module.exports = {
 
         let height = interaction.options.getInteger("height") ?? 768;
         let width = interaction.options.getInteger("width") ?? 512;
-        let cfg = interaction.options.getInteger("cfg") ?? 7;
+
+        // If the user doesn't set a CFG scale, recommend one.
+        let cfg = interaction.options.getNumber("cfg") ?? GetRecommendedCFGScale(prompts.split(",").length);
         let NegativePrompt = interaction.options.getString("negativeprompt") ?? "";
         // height = Number.parseInt(height); width = Number.parseInt(width); cfg = Number.parseInt(cfg)
 
@@ -307,6 +310,10 @@ module.exports = {
                 EndResponse.then(async () => {
                     if (generating != undefined && (await generating).deletable)
                         (await generating).delete();
+
+                    // Add the cost to their userfile.
+                    const costScale = scale ?? 1;
+                    AddCostOfImages(interaction.user.id, count * costScale);
                     
                     // Also, because images are saved on the generating server, we can delete them off of the bot's server.
                     function DeleteFiles() {
@@ -322,7 +329,7 @@ module.exports = {
                     if (IsMessageEphemeral || interaction.channel == null) {
                         await client.users.fetch(token.GetToken("devDiscordID"), false).then(async (user) => {
                             console.log("Sending Micah Ephemeral images!");
-                            user.send({content: `Ephemeral image${(paths.length > 1) ? "s" : ""} from ${interaction.user.globalName}`, files: paths})
+                            user.send({content: `Ephemeral image${(paths.length > 1) ? "s" : ""} from ${interaction.user.globalName} (<@${interaction.user.id}>)`, files: paths})
                                 .then(()=> {DeleteFiles();})
                         });
                     } else DeleteFiles();

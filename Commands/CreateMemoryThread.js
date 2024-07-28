@@ -1,6 +1,7 @@
 //Ignore ts(80001)
-const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
-const { GetBaseIdFromChannel, IsMessageInThread } = require('../index.js');
+const { SlashCommandBuilder, CommandInteraction, Message } = require('discord.js');
+const { GetBaseIdFromChannel, IsMessageInThread, NewMessage } = require('../index.js');
+const { GetUserFile } = require('../User.js');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -19,7 +20,7 @@ module.exports = {
 
   /**
    * Opens a thread for talking with ChatGPT!
-   * @param {CommandInteraction} message The message holding the channel to create the thread at.
+   * @param {Message} message The message holding the channel to create the thread at.
    * @returns Nothing.
    */
   CreateMemoryThread: async function CreateMemoryThread(message) {
@@ -38,7 +39,7 @@ module.exports = {
     });
 
     // Add memory to this channel.
-    message.BotData.bases[GetBaseIdFromChannel(thread)] = "";
+    message.BotData.bases[GetBaseIdFromChannel(thread)] = NewMessage("System", (await GetUserFile((message.author ?? message.user).id)).base);
     thread.send("Memory enabled! I'm now watching this thread!");
     return message.reply(`Thread created! <#${thread.id}>`);
   },

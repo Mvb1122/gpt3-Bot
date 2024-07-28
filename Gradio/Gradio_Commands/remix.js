@@ -2,11 +2,12 @@
 const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
 const Gradio = require('../Gradio_Stuff.js')
 const fs = require('fs')
-const Index = require ('../../index.js');
 
-const { countCharacter, ImageIsValid, Download, GetPromptsFromPlaintextUsingGPT, NonSplitTypes } = require('../Helpers.js');
+const { ImageIsValid, Download, GetPromptsFromPlaintextUsingGPT, NonSplitTypes } = require('../Helpers.js');
 const sharp = require('sharp');
 const token = require('../../token.js');
+const { AddCostOfImages } = require('../../Pricing.js');
+const { countCharacter } = require('../../Helpers.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -48,10 +49,11 @@ module.exports = {
                 .setDescription("The height of the image to generate. If left blank, it uses 768.")
                 .setRequired(false)
         })
-        .addIntegerOption(option => {
+        .addNumberOption(option => {
             return option.setName("cfg")
-                .setDescription("The CFG scale of the image to generate. Higher values are more strict. If left blank, it uses 7.")
+                .setDescription("The CFG scale of the image to generate. Higher values are more strict. If blank, bot chooses.")
                 .setRequired(false)
+                .setMinValue(0);
         })
         .addBooleanOption(option => {
             return option.setName("autotag")
@@ -167,7 +169,7 @@ module.exports = {
                 // console.log(`AFTER Height: ${height} Width: ${width}, Count: ${height * width}`)
             }
 
-            let cfg = interaction.options.getInteger("cfg") ?? 7;
+            let cfg = interaction.options.getNumber("cfg") ?? 7;
             let NegativePrompt = interaction.options.getString("negativeprompt") ?? "";
             // height = Number.parseInt(height); width = Number.parseInt(width); cfg = Number.parseInt(cfg)
     
@@ -289,6 +291,9 @@ module.exports = {
 
                     interaction.editReply({"content": MessageContent, files: GeneratedImagesPaths})
                         .then(async () => {
+                            // Add the remix. (Remixes cost 1.3x as much.)
+                            AddCostOfImages(interaction.user.id, count * 1.3);
+
                             if (generating != undefined && (await generating).deletable)
                                 (await generating).delete();
                             

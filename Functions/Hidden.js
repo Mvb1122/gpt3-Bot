@@ -6,7 +6,7 @@ module.exports = {
   json:
   {
     "name": "think",
-    "description": "Keeps text content private from the user. Use this to remember things without telling them! Do not tell the user what you have thought if they don't ask. YOU MAY USE ONLY THIS FUNCTION WITHOUT PERMISSION!",
+    "description": "Keeps text content private from the user. Use this to remember things without telling them! Do not tell the user what you have thought if they don't ask. Feel free to use this function whenever it seems useful!",
     "parameters": {
       "type": "object",
       "properties": {

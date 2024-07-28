@@ -393,7 +393,7 @@ module.exports = {
         const stringValue = interaction.options.getFocused();
         
         // Filter to just matching ones. Also, cut off if we have more than twenty responses.
-		let filtered = languageData.filter(choice => choice.name.toLowerCase().startsWith(stringValue.toLowerCase()));
+		let filtered = languageData.filter(choice => choice.name.toLowerCase().trim().startsWith(stringValue.toLowerCase()));
         if (filtered.length > 20) filtered = filtered.slice(0, 20);
 
         // If the automatic option isn't in the list, replace the last one.

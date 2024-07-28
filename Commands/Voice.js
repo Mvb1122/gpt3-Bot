@@ -66,7 +66,7 @@ module.exports = {
         const stringValue = interaction.options.getFocused();
         
         // Filter to just matching ones. Also, cut off if we have more than twenty responses.
-		let filtered = choices.filter(choice => choice.name.toLowerCase().startsWith(stringValue.toLowerCase()));
+		let filtered = choices.filter(choice => choice.name.toLowerCase().trim().startsWith(stringValue.toLowerCase()));
         if (filtered.length > 20) filtered = filtered.slice(0, 20);
 		
         // Send back our response.
