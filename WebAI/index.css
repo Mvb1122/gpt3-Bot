@@ -1,0 +1,94 @@
+[hidden] {
+    display: none;
+}
+
+:root {
+    --NodeWidth: 32vw;
+    --NodeHeight: 32vh;
+    --TextInputBoxHeight: 2em;
+}
+
+body {
+    background: lightgrey;
+    /*
+    width:100vw;
+    height: 100vh;
+    */
+}
+
+.Node {
+    background: lightblue;
+    
+    border-radius: 15px;
+    padding: 7px;
+    scroll-behavior: auto;
+    font-family: system-ui;
+
+    /* This is absoltuely the wrong way to position this, but whatever.*/
+    position: absolute;
+    left: calc(50% - var(--NodeWidth) / 2);
+    width: var(--NodeWidth);
+    height: var(--NodeHeight);
+
+    scroll-behavior: smooth;
+}
+
+.Node::after {
+    /* Required fake content */
+    content: '';
+
+    border: black 3px solid;
+    width: calc(var(--NodeWidth) + 14px);
+    height: calc(var(--NodeHeight) + 14px);
+    display: block;
+    transform: translate(calc(-1% - 7px), calc(-96%));
+    border-radius: 15px;
+    pointer-events: none;
+}
+
+#chat {
+    /* Center chat in the middle of the screen. */
+    top: calc(50% - var(--NodeHeight) / 2)
+}
+
+#input {
+    width: 80%;
+    height: var(--TextInputBoxHeight);
+    align-self: flex-start;
+
+    border: none;
+    background: none;
+    color: white;
+}
+
+#messages {
+    height: calc(100% - var(--TextInputBoxHeight));
+    overflow: auto;
+}
+
+button {
+    display: inline;
+    /* height: var(--TextInputBoxHeight); */
+}
+
+.UI {
+    display: flex;
+    width: 107%;
+    height: var(--TextInputBoxHeight);
+    transform: translate(-3.5%, 2%);
+    /* padding-left: 5%; */
+    /* padding-bottom: 5%; */
+    background: black;
+    justify-content: center;
+}
+
+
+/* Node customizers */;
+.Node#TRNode { top: 0%; right: 0%; }
+.Node#TMNode { top: 0%; left: calc(50% - var(--NodeWidth) / 2); }
+.Node#TLNode { top: 0%; left: 0%; }
+.Node#MRNode { top: calc(50% - var(--NodeHeight) / 2); right: 0%; }
+.Node#MLNode { top: calc(50% - var(--NodeHeight) / 2); left: 0%; }
+.Node#BRNode { bottom: 0%; right: 0%; }
+.Node#BMNode { bottom: 0%; left: calc(50% - var(--NodeWidth) / 2); }
+.Node#BLNode { bottom: 0%; left: 0%; }

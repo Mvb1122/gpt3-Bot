@@ -14,7 +14,7 @@ module.exports = {
       "properties": {
         "text": {
           "type": "string",
-          "description": "The fact to remember. You MUST include the user's name for future reference."
+          "description": "The fact to remember. Refer to the user by their name, rather than by \"user\". Write something like \"Micah wears thigh high socks\" instead of \"User 'Micah' wears thigh high socks.\""
         },
       }
     },

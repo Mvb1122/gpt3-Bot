@@ -3,7 +3,7 @@ const tokens = JSON.parse(fs.readFileSync("./token.json"));
 
 module.exports = {
     /**
-     * discord | openai | openweathermap | serpapi
+     * Gets a token from the token.json file.
      * @param {String} service The service to look for.
      * @returns The respective token.
      */

@@ -11,7 +11,7 @@ const { PlayAudioToVC } = require('./TTSToVC');
 const { getVoiceConnection } = require('@discordjs/voice');
 const { GetUserFile } = require('../User');
 const { VoiceLong } = require('../VoiceLong');
-const AIWakePhrase = "computer"
+const AIWakePhrase = "computer,chat"
 
 /**
  * @type {[{Messages: [{role: "System" | "User" | "Function" | "Assistant"; content: string;}], LastMessageTime: number, ChannelId: string, GuildId: string, AlwaysListening: boolean, Bypass: boolean, CurrentlySpeaking: boolean}]}
@@ -30,6 +30,8 @@ new Promise(async ()=> {
                     // Only speak if we weren't the last one to speak, an amount of time has passed, and we aren't already currently speaking.
                     if (convo.Messages[convo.Messages.length - 1].role != "assistant" && performance.now() - convo.LastMessageTime > 1000 && !Conversations[convoKey].CurrentlySpeaking) { // Wait longer if there are more people. (await voiceChannel).memberCount * 
                         // Respond and then voice to call.
+                            // Stop listening for new words.
+                        Conversations[convoKey].Bypass = false;
                             // Play notification stop sound.
                         PlayAudioToVC(__dirname + "/Notification Sounds/notification stop.mp3", {
                             OutputID: Conversations[convoKey].ChannelId,
@@ -43,11 +45,6 @@ new Promise(async ()=> {
                             messageDetails.last.edit(`${messageDetails.last.content}\n${AIThinkingMessage}`);
                         }
 
-                            // Stop listening for new words until awoken again.
-                        Conversations[convoKey].Bypass = false;
-
-                        // I'm aware that this following section of code is vastly overcomplicated; I could generate in one go. 
-                        // However, this way feels smoother to the user and also avoids running out of length on the TTS component.
                         Conversations[convoKey].CurrentlySpeaking = true;
                         RequestChatGPT(convo.Messages, messageDetails.last).then(async v => {                            
                             // First, Generate all audio.
@@ -134,7 +131,11 @@ module.exports = {
             // Now, add a listener.
             AddOnLog(interaction.guildId, (type, name, content) => {
                 if (type == "STT" || type == "TTS") {
-                    if (content.toLowerCase().includes(AIWakePhrase)) {
+                    const includesPhrase = AIWakePhrase.split(",").some(v => {
+                        return content.toLowerCase().includes(v);
+                    })
+
+                    if (includesPhrase && !Conversations[inputId].CurrentlySpeaking) {
                         Conversations[inputId].Bypass = true;
 
                         // Play the notification sound.
@@ -144,7 +145,7 @@ module.exports = {
                         })
                     }
     
-                    if (AlwaysListening || Conversations[inputId].Bypass || content.toLowerCase().includes(AIWakePhrase)) {
+                    if (AlwaysListening || Conversations[inputId].Bypass || includesPhrase) {
                         if (Conversations[inputId].Messages[Conversations[inputId].Messages.length - 1].content.startsWith(`(${name})`))
                             Conversations[inputId].Messages[Conversations[inputId].Messages.length - 1].content += content
                         else

@@ -634,7 +634,7 @@ async function SummarizeConvo(messages, DiscordMessage) {
 /**
  * Gets the AI's next message.
  * @param {[{role: string;content: string;name: string;}]} InputMessages The messages in this conversation.
- * @param {Discord.Message} DiscordMessage The Discord Message calling this request.
+ * @param {Discord.Message | Web} DiscordMessage The Discord Message calling this request.
  * @returns {Promise<[{role: String, content: String, name: String}]>} The complete conversation, including a new response from the AI.
  */
 async function RequestChatGPT(InputMessages, DiscordMessage) {
@@ -687,14 +687,20 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
           let params = {}, returnedFromFunction;
           try {
             params = JSON.parse(call.arguments);
-            returnedFromFunction = await (func(params, DiscordMessage));
+
+            // If the DiscordMessage is actually a Web Handler, then make a fake message off of it.
+            const message = DiscordMessage.CreateMessage ? DiscordMessage.CreateMessage() : DiscordMessage;
+
+            returnedFromFunction = await (func(params, message));
     
             messages.push({
               role: "tool",
               tool_call_id: call.id,
-              content: returnedFromFunction
+              content: returnedFromFunction ?? "Nothing was returned."
             })
           } catch (error) {
+            console.log(error);
+
             returnedFromFunction = `{"successful": false, "reason": "Invalid JSON passed! Please retry.", "error": "${error}" }`;
             messages.push({
               role: "tool",
@@ -1198,7 +1204,7 @@ client.on('messageCreate',
     let RepliedMessageRepliesToBot = false;
     if (message.reference) {
       let repliedMessage = await GetRepliedMessage(message);
-      RepliedMessageRepliesToBot = repliedMessage != null && (repliedMessage.author ?? repliedMessage.user).id == client.user.id
+      RepliedMessageRepliesToBot = repliedMessage != null && (repliedMessage.author ?? repliedMessage.user ?? {id: -1}).id == client.user.id
     }
 
     if ((message.content.startsWith("gpt3") || message.content.startsWith(`<@${client.user.id}>`) || RepliedMessageRepliesToBot) && !message.author.bot) {
@@ -1547,6 +1553,7 @@ let val = Gradio.GetTagsFromImage(debugImagePath)
 //#region Chat AI Microservice for the web.
 const http = require('http');
 const MicroserviceHTML = fs.readFileSync("./Microservice.html");
+
 /**
  * Parses the request.
  * @param {http.IncomingMessage} req The request to the server.
@@ -1564,19 +1571,47 @@ async function listener(req, res) {
     // Once the request is done with, ask the AI the question.
     req.on('end', () => {
       const data = JSON.parse(Buffer.concat(binary_data));
-      console.log(`Web request message: ${data.role} says ${data.content}`);
+      if (DEBUG)
+        console.log(`Web request message: ${data.role} says ${data.content}`);
+      
       // Ask the AI.
       const messages = NewMessage(data.role, data.content, undefined);
       GetSafeChatGPTResponse(messages, null, 0, false)
         .then(response => {
-          console.log(`Response: ${response.data.choices[0].message.content}`)
+          if (DEBUG)
+            console.log(`Response: ${response.data.choices[0].message.content}`)
+
           res.end(JSON.stringify(response.data.choices[0].message));
         })
     })
   } else {
     // If this wasn't a post request, just send back the demo page.
-    res.setHeader("content-type", "text/html")
-    return res.end(MicroserviceHTML);
+    let localURL = "";
+    
+    if (req.url.startsWith('/'))
+      localURL += '.' + req.url;
+    else
+      localURL += "./" + req.url;
+  
+    localURL = unescape(localURL);
+
+    if (localURL.endsWith("/")) localURL += "index.html"
+
+    if (localURL.endsWith("css")) {
+      res.setHeader("content-type", "text/css")
+    } else if (localURL.endsWith(".js")) {
+      res.setHeader("content-type", "text/javascript")
+    } else {
+      res.setHeader("content-type", "text/html")
+    }
+
+    /* if (localURL == "./")
+      return res.end(MicroserviceHTML);
+    else */ {
+      if (fs.existsSync(localURL)) 
+        return res.end(fs.readFileSync(localURL));
+      else return res.end("That file doesn't exist!<br>" + localURL);
+    }
   }
 }
 
@@ -1596,6 +1631,44 @@ const server = http.createServer(listener);
 server.listen(port, host, () => {
   console.log(`Server is running on http://${host}:${port}`);
 });
+
+// Add Socket.io stuff.
+const { Server: SocketServer } = require("socket.io");
+const Web = require('./WebAI/Web');
+const { Message } = require('discord.js');
+const io = new SocketServer(server)
+
+io.on("connection", (socket) => {
+  if (DEBUG)
+    console.log(`connect ${socket.id}`);
+
+  socket.on("disconnect", (reason) => {
+    if (DEBUG)
+      console.log(`disconnect ${socket.id} due to ${reason}`);
+  });
+
+  /*
+  socket.on("chat message", (msg) => {
+    if (DEBUG)
+      console.log("chat message: " + msg);
+
+    // Send it to everyone else.
+    socket.broadcast.emit("chat message", msg);
+  });
+  */
+
+  socket.on("open", async (msg) => {
+    if (DEBUG)
+      console.log("open message: " + msg);
+
+    // Create the Web to handle it or update to have all sockets.
+    Web.GetInstance(socket);
+
+    // No response is necessary because the client should assume we're ready.
+    socket.broadcast.emit("open", "Ready!");
+  });
+});
+
 //#endregion
 
 // If we're not in debug mode, ignore all errors. 

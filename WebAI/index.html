@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>WebRTC test</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+        <!-- Include stuff necessary for making the socket. -->
+        <script src="/socket.io/socket.io.js"></script>
+
+        <script src="./index.js"></script>
+        <script>
+            const socket = io();
+            socket.on("connect", () => {
+                console.log("Connected to server");
+
+                // Ensure that the server is ready.
+                Send("open", "");
+            });
+
+            socket.on("chat message", (msg) => {
+                addMsg(msg);
+            });
+
+            socket.on("chat response", (msg) => {
+                addMsg("AI: " + msg)
+            })
+
+            socket.on("Function Message", /** @param {string} msg */ (msg) => {
+                const seed = msg.substring(0, msg.indexOf("-"));
+                const mode = msg.substring(seed.length, msg.indexOf(" "));
+
+                // Show it on screen.
+            })
+
+            function Send(event, data) {
+                if (event == "chat message") {
+                    addMsg(data);
+                    // Clear input.
+                    document.getElementById('input').value = ""
+                }
+
+                return socket.emit(event, data);
+            }
+
+            function addMsg(msg) {
+                const m = document.createElement("p");
+                document.getElementById("messages").appendChild(m);
+                m.scrollIntoView({
+                    behavior: "smooth",
+                    block: "end",
+                    inline: "nearest",
+                });
+
+                WriteOn(msg, m)
+            }
+        </script>
+        <link rel="stylesheet" href="index.css">
+    </head>
+    <body>
+        <div id="chat" class="Node">
+            <div id="messages"></div>
+
+            <div class="UI">
+                <input type="text" placeholder="message" id="input" />
+                <button onclick="Send('chat message', document.getElementById('input').value)">
+                    Send!
+                </button>
+            </div>
+        </div>
+
+        <!-- Node Tiles. -->
+        <div class="Node" id="TRNode" hidden></div>
+        <div class="Node" id="TMNode" hidden></div>
+        <div class="Node" id="TLNode" hidden></div>
+        <div class="Node" id="MRNode" hidden></div>
+        <div class="Node" id="MLNode" hidden></div>
+        <div class="Node" id="BRNode" hidden></div>
+        <div class="Node" id="BMNode" hidden></div>
+        <div class="Node" id="BLNode" hidden></div>
+    </body>
+    <script>
+        document
+            .getElementById("input")
+            .addEventListener("keydown", function (event) {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    Send("chat message", document.getElementById("input").value);
+                }
+            });
+    </script>
+</html>

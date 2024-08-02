@@ -43,9 +43,9 @@ module.exports = {
         const user = await GetUserFile(interaction.user.id);
 
         let messages = Index.NewMessage("system", user.base)
-            .concat(Index.NewMessage("user", UserQuestion))
+            .concat(Index.NewMessage("user", `(${username}) ` + UserQuestion))
         
-        await Index.RequestChatGPT(messages, interaction)
+        Index.RequestChatGPT(messages, interaction)
             .then(val => {
                 const Content = `${username}: ${UserQuestion}\nAI: ${val[val.length - 1].content}`;
                 if (Content.length <= 2000) {

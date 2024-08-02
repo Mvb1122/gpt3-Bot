@@ -1,5 +1,5 @@
 const { Message, Channel } = require("discord.js");
-const { client, SendMessage } = require(".");
+const { client, SendMessage, DEBUG } = require(".");
 
 const Logs = {"1234": {ChannelId: 1234, Listeners: [(t, n, c) => {}]}};
 delete Logs["1234"];
@@ -115,7 +115,8 @@ module.exports = {
                 return await output.send(TranscriptionMessageContent);
         } catch (e) {
             // If we error, send a new message.
-            console.log(e);
+            if (DEBUG)
+                console.log(e);
             return await output.send(TranscriptionMessageContent);
         }
     },

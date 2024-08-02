@@ -83,7 +83,7 @@ async function SubscribeTranscribe(user, set, bypassSubscribedMembers = false) {
         const TimeTaken = performance.now() - start;
         
         // Only transcribe if they were talking for more than 1/3 second.
-        if (TimeTaken >= 150)
+        if (TimeTaken >= 300)
             Transcribe(path).then(async val => {
                 val = val.trim();
                 const Name = user.nickname ?? user.displayName;
