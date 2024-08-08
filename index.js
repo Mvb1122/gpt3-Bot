@@ -1223,9 +1223,6 @@ client.on('messageCreate',
         })
         message.content = Text;
 
-        // Send a typing notification to make it clear we're thinking.
-        message.channel.sendTyping();
-
         // Try to develop a list of messages by following replies.
         let Messages; 
         let arr = [];
@@ -1268,6 +1265,9 @@ client.on('messageCreate',
         let focusMessage = message;
         while (focusMessage != undefined) {
           try {
+            // If this is a generate request message, just break and don't respond. 
+            if (focusMessage.content.startsWith("Generated! Tags:")) return;
+
             ProcessMessage(focusMessage);
 
             if (focusMessage.reference == null) {
@@ -1294,6 +1294,9 @@ client.on('messageCreate',
         // Messages array is backwards now, so flip it.
         Messages = arr.reverse();
         
+        // Send a typing notification to make it clear we're thinking.
+        message.channel.sendTyping();
+
         let result = await RequestChatGPT(Messages, message);
         console.log(result);
         SendMessage(message, result[result.length - 1].content, true)
@@ -1394,35 +1397,33 @@ client.on("interactionCreate",
   /**
    * @param {Discord.CommandInteraction} int 
    */
-  async (interaction) => {
-      // Find command by name.
-      const name = interaction.commandName;
-      for (let i = 0; i < SlashCommands.length; i++) {
-        const module = SlashCommands[i];
-        /** @type {Discord.SlashCommandBuilder} */
-        let data = module.data;
-        if (data.name == name) {
-          try {
+  async (interaction) => {    
+    // Find command by name.
+    const name = interaction.commandName;
+    for (let i = 0; i < SlashCommands.length; i++) {
+      const module = SlashCommands[i];
+      /** @type {Discord.SlashCommandBuilder} */
+      let data = module.data;
+      if (data.name == name) {
+        try {
+          // If it's a Chat Input (finished Slash Command)
+          if (interaction.isChatInputCommand() || interaction.isContextMenuCommand())
+            return module.execute(AttachDataToObject(interaction));
 
-            // If it's a Chat Input (finished Slash Command)
-            if (interaction.isChatInputCommand())
-              return module.execute(AttachDataToObject(interaction));
+          // If it's an autocomplete request:
+          else if (interaction.isAutocomplete() && 'OnAutocomplete' in module) 
+            return module.OnAutocomplete(AttachDataToObject(interaction));
 
-            // If it's an autocomplete request:
-            else if (interaction.isAutocomplete() && 'OnAutocomplete' in module) 
-              return module.OnAutocomplete(AttachDataToObject(interaction));
-
-          } catch (error) {
-            console.log(error);
-            if (interaction.isChatInputCommand()) {
-              if (interaction.replied) interaction.editReply("Something went wrong!")
-              else interaction.reply("Something went wrong!");
-            }
+        } catch (error) {
+          console.log(error);
+          if (interaction.isChatInputCommand()) {
+            if (interaction.replied) interaction.editReply("Something went wrong!")
+            else interaction.reply("Something went wrong!");
           }
         }
       }
     }
-  )
+})
 
 // Handle Voice state changes.
 client.on("voiceStateUpdate", (old, newState) => {

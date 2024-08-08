@@ -19,10 +19,10 @@ const token = require('../token');
 const { WriteToLogChannel } = require('../Security');
 
 // const JudgerModel = HFAIModelHandler.CreateModelHandler('MicahB/emotion_text_classifier', "text-classification")
-const JudgerModel = HFAIModelHandler.CreateModelHandler("MicahB/roberta-base-go_emotions", "text-classification", undefined, undefined, true);
+const EmotionalJudgerModel = HFAIModelHandler.CreateModelHandler("MicahB/roberta-base-go_emotions", "text-classification", undefined, undefined, true);
 
 if (DEBUG)
-    JudgerModel.Run('I love transformers!').then(v => {
+    EmotionalJudgerModel.Run('I love transformers!').then(v => {
         console.log(v);
     })
 
@@ -75,7 +75,7 @@ module.exports = {
                 /**
                  * @type {"Admiration"|"Amusement"|"Anger"|"Annoyance"|"Approval"|"Caring"|"Confusion"|"Curiosity"|"Desire"|"Disappointment"|"Disapproval"|"Disgust"|"Embarrassment"|"Excitement"|"Fear"|"Gratitude"|"Grief"|"Joy"|"Love"|"Nervousness"|"Optimism"|"Pride"|"Realization"|"Relief"|"Remorse"|"Sadness"|"Surprise"|"Neutral"}
                  */
-                const emotion = (await JudgerModel.Run(text))[0].label;
+                const emotion = (await EmotionalJudgerModel.Run(text))[0].label;
 
                 // Add a special thing to the prompt based on emotion. 
                 let SuggestedTags = "";
@@ -287,7 +287,20 @@ module.exports = {
                 notif.delete();
             }
         }
+
+        //#region Autistic emotion displayer.
+        /*
+        if (message.channelId == "776686811618476072" && message.author.id != "845159393494564904") {
+            // Respond with the top emotion.
+            const m = message.channel.send(`Your predicted emotion: \`${(await JudgerModel.Run(message.content))[0].label}\`!`);
+            await Wait(3000);
+            (await m).delete();
+        }
+        */
+        //#endregion
     },
+
+    EmotionalJudgerModel
 }
 
 /**

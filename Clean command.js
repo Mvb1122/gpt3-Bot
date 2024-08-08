@@ -9,6 +9,7 @@
 const { SlashCommandBuilder, CommandInteraction, VoiceState } = require('discord.js');
 
 module.exports = {
+    // Can be swapped for another CommandBuilder and the system will handle it.
     data: new SlashCommandBuilder()
         .setName('demo')
         .setDescription("demo")
