@@ -37,7 +37,7 @@ module.exports = {
   async execute(parameters, DiscordMessage) {
     if (!Gradio_Stuff.isConnected()) return JSON.stringify({ sucessful: false, reason: "Image generation is currently offline. Please tell the user to try again later." })
 
-    const channel = await client.channels.fetch(DiscordMessage.channelId);
+    const channel = DiscordMessage.channel ?? await client.channels.fetch(DiscordMessage.channelId);
     if (parameters.content == undefined) {
       channel.send("No content provided!");
       return JSON.stringify({ sucessful: false, reason: "No content provided." })

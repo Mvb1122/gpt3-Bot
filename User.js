@@ -3,15 +3,15 @@ const fs = require('fs')
 const path = require('path');
 
 const rootBase = "You will only call a function with a given value once. The user's name is given by the words in the parenthesis at the start of a message. DO NOT write names into your messages unless requested to do so by a user. You can use the `think` command to think things. Use it accordingly when you need to remember something before telling the user. When asked math questions with computable answers, you may use EVAL to run JavaScript code to get the answer."
-async function fetchRootBase(id = null){
+async function fetchRootBase(id = null) {
     const now = new Date();
     const minutes = now.getMinutes().toString();
-  
+
     let temp = rootBase;
     temp += `The current time is ${GetCurrentDate()} at ${now.getHours() + 1}:${minutes.length == 1 ? "0" + minutes : minutes}.`
-  
+
     // if (id != null) temp += `The current user is ${(await client.users.fetch(id)).username}!`
-  
+
     return temp;
 }
 
@@ -28,6 +28,9 @@ async function GetUserFile(userId, IncludeRootBase = true) {
         cost: {
             // "8/4/23": 0.03
         },
+
+        /** Just the user's face, in plain tags. */
+        persona_face: "",
 
         /**
          * Saves the file to disc.

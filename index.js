@@ -1619,8 +1619,8 @@ async function listener(req, res) {
 const fp = require('fs/promises');
 const token = require('./token');
 const { getVoiceConnection } = require('@discordjs/voice');
-const { GetUserFile, GetCurrentDate } = require('./User');
 const { AddCostOfGPTTokens } = require('./Pricing');
+const { GetUserFile } = require('./User');
 const TempDir = "./Temp/";
 if (fs.existsSync(TempDir))
   fs.readdirSync(TempDir).forEach(file => fp.unlink(`${TempDir}${file}`))
@@ -1667,6 +1667,12 @@ io.on("connection", (socket) => {
     // No response is necessary because the client should assume we're ready.
     socket.broadcast.emit("open", "Ready!");
   });
+
+  socket.on("ping", async (msg) => {
+    // Just respond immediately with a pong.
+    socket.broadcast.emit("ping", "pong")
+    socket.emit("ping recieved", "pong");
+  })
 });
 
 //#endregion

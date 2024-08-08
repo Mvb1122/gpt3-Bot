@@ -25,6 +25,7 @@ module.exports = {
         
         const x = await GetUserFile(id)
         x.persona = persona;
+        x.persona_face = ""; // Clear persona_face.
         x.sync();
 
         interaction.editReply({
