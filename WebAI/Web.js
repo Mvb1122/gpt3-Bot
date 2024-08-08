@@ -1,7 +1,11 @@
 const { Socket } = require("socket.io");
-const { RequestChatGPT, NewMessage } = require("..");
+const { RequestChatGPT, NewMessage, client } = require("..");
 const { GetUserFile } = require("../User");
 const token = require("../token");
+const { User } = require("discord.js");
+const fp = require('fs/promises');
+const path = require("path");
+const XMLHttpRequest = require('xhr2');
 
 /**
  * @type {Web}
@@ -19,6 +23,11 @@ class Web {
     }] */
     Messages = [];
 
+    Username = "";
+
+    /** @type {User} */
+    User = null;
+
     /**
      * Creates a new Web AI handler.
      * @param {Socket} socket Socket to listen on.
@@ -30,6 +39,13 @@ class Web {
         // Load the dev's base into the AI's memory.
         GetUserFile(token.GetToken("devDiscordID")).then(v => {
             this.Messages = NewMessage("System", v.base);
+        })
+
+        // Use the dev's name.
+        client.guilds.fetch(token.GetToken("devServerID")).then(async v => {
+            const member = await v.members.fetch(token.GetToken("devDiscordID"));
+            this.User = member;
+            this.Username = member.nickname ?? member.user.displayName;
         })
 
         this.UpdateSocket(socket)
@@ -49,7 +65,7 @@ class Web {
             socket.broadcast.emit("chat message", msg);
             
             // Request a completion and send it back.
-            this.Messages = this.Messages.concat(NewMessage("User", msg));
+            this.Messages = this.Messages.concat(NewMessage("User", `(${this.Username}) ` + msg));
             const response = await RequestChatGPT(this.Messages, this);
             
             // Only send back the AI's response, since functions should handle themselves.
@@ -80,6 +96,11 @@ class WebMessage {
 
     id = 0;
 
+    guildId = 0;
+
+    /** @type {User} */
+    user = null;
+
     /**
      * Creates a WebMessage.
      * @param {Web} Source
@@ -90,6 +111,9 @@ class WebMessage {
         // If this ever overlaps with itself, I will literally :3 in real life.
         this.id = Math.floor(Math.random() * 10000000);
 
+        // Use dev server for guild id.
+        this.guildId = token.GetToken("devServerID");
+
         // Bind the send method to ensure it has the correct context
         this.send = this.send.bind(this);
 
@@ -98,6 +122,8 @@ class WebMessage {
         }
         
         this.reply = this.send;
+
+        this.user = Source.User;
     };
 
     #sendInternal(type, content) {
@@ -106,10 +132,45 @@ class WebMessage {
 
     /**
      * Sends the message to all clients.
-     * @param {String | {*}} text 
+     * @param {{files: [string], content: string}} text string | 
      */
     send(text) {
-        return this.#sendInternal("Send", text);
+        return new Promise((resolve, reject) => {
+            const Promises = [];
+            if (typeof(text) != String) {
+                // This is a Discord Message object, meaning it probably has files or whatnot. So, let's push the files forward.
+                if (text.files) text.files.forEach(f => {
+                    Promises.push(new Promise(async res => {
+                        // Upload file to the server.
+                        const data = await fp.readFile(f);
+                        const actualData = data.buffer;
+                        const SplitPath = path.parse(f);
+                        let name = "../Canvas/@Res/" + SplitPath.name + SplitPath.ext;
+                        name = name.replaceAll(" ", "_")
+                        var url = "https://micahb.dev/FTP/Post_Modules/Upload.js&target=" + name;
+
+                        var xhr = new XMLHttpRequest();
+                        xhr.open("POST", url);
+                        xhr.setRequestHeader("Content-Type", data.type);
+
+                        xhr.onreadystatechange = () => {
+                            if (xhr.readyState === 4) {
+                                res();
+                            }
+                        };
+
+                        // Read and send the file.
+                        xhr.send(actualData);
+                    }))
+                })
+
+                text = JSON.stringify(text);
+            }
+            
+            Promises.push(this.#sendInternal("Send", text));   
+            
+            Promise.all(Promises).then(() => {resolve();})
+        })
     };
 
     editable() { return true; };
