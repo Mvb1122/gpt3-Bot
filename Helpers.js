@@ -52,4 +52,17 @@ async function JudgeNSFWImage(url) {
     return await ImageNSFWHandler.Run([url]);
 }
 
-module.exports = {countCharacter, CountCharactersInSections, JudgeNSFWTags, JudgeNSFWImage}
+/**
+ * Returns a promise which resolves after the time is up.
+ * @param {number} ms How long to wait in MS.
+ * @returns {Promise}
+ */
+function Wait(ms) {
+    return new Promise(res => {
+        setTimeout(() => {
+            res();
+        }, ms);
+    })
+}
+
+module.exports = {countCharacter, CountCharactersInSections, JudgeNSFWTags, JudgeNSFWImage, Wait}

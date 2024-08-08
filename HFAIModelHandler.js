@@ -11,7 +11,7 @@ module.exports = {
      * @param {number} [timeout=3000] How long to wait before cleaning up the model.
      * @returns {{Preload: () => Promise<void>;Run: (q: string) => Promise<any>;SetParams: (p: any) => void;}}
      */
-    CreateModelHandler(model, type, params = {}, timeout = 5000) {
+    CreateModelHandler(model, type, params = {}, timeout = 5000, quantized = false) {
         if (DEBUG) console.log(`Handler for ${model} created!`);
 
         let pipe = undefined;
@@ -22,7 +22,7 @@ module.exports = {
 
             // Allocate a pipeline for the task.
             const { pipeline } = await import("@xenova/transformers");
-            pipe = await pipeline(type, model, { quantized: false });
+            pipe = await pipeline(type, model, { quantized: quantized });
         }
 
         /**

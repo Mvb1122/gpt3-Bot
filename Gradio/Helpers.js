@@ -49,7 +49,7 @@ function GetMessageForGPTTalkingAboutTags(Plain, id = undefined) {
     let Messages = [
         {
             role: "system",
-            content: "Danbuuru tags are a descriptor for the content of an image. For example, some tags are: 1boy, 1girl, absurdres, red, black, and several others.\nUse thighhighs instead of thighhigh_socks\nYou can emphasize a tag by surrounding it in parenthesis, like (absurdres). Make sure to include (absurdres) in all lists of tags.\nFor example, an image of a woman with large breasts, long hair, wearing a white dress with earrings, on a simple background, would have the following tags: 1girl, absurdres, ((mature_female)), large_breasts, brown hair, long hair, white dress, earrings, simple background\nFor women, use 1girl, (mature_female) plus any other tags. For men, use 1boy, (mature_male) and any other tags.\nAny tag you can think of works as one, pretty much. If someone asks for a specific character, be sure to include the name and the franchise of the character. If the character has dark skin, use \`dark_skinned\` in your tags. If a name from a game, TV show, or other kind of visual non-OC media is passed, make sure it ends up in the final tag list in the format name_\(franchise\)\nBe creative when writing tag lists! Please write a set of tags which coorespond to the given text on one line, separated by commas, and with no other text. Given text: " + Plain + "\nRemember to be creative! "
+            content: "Danbuuru tags are a descriptor for the content of an image. For example, some tags are: 1boy, 1girl, absurdres, red, black, and several others.\nUse thighhighs instead of thighhigh_socks\nYou can emphasize a tag by surrounding it in parenthesis, like (absurdres). Make sure to include (absurdres) in all lists of tags.\nFor example, an image of a woman with large breasts, long hair, wearing a white dress with earrings, on a simple background, would have the following tags: 1girl, absurdres, ((mature_female)), large_breasts, brown hair, long hair, white dress, earrings, simple background\nFor women, use 1girl, (mature_female) plus any other tags. For men, use 1boy, (mature_male) and any other tags.\nAny tag you can think of works as one, pretty much. If someone asks for a specific character, be sure to include the name and the franchise of the character. If the character has dark skin, use \`dark_skinned\` in your tags. If a name from a game, TV show, or other kind of visual non-OC media is passed, make sure it ends up in the final tag list in the format name_\(franchise\)\nDo not write name_\(Original Character\) or anything with the same meaning.\nIf two characters are asked for, you can use any numerated count, eg; 2girls; 1boy, 1girl; or 2boys. Make sure to listen to what's said about each individual character. Always use 2 girls when showing 2 girls. Always use 2boys when showing 2 boys.\nBe creative when writing tag lists! Please write a set of tags which coorespond to the given text on one line, separated by commas, and with no other text. Given text: " + Plain + "\nRemember to be creative! "
         }
     ]
 
@@ -63,7 +63,7 @@ function GetMessageForGPTTalkingAboutTags(Plain, id = undefined) {
     })
 
     // If they say "me," add them in.
-    if (id != undefined && Index.PersonaArray[id] != undefined && !Messages[0].content.includes(Index.PersonaArray[id]) && LowerCasePlain.includes("me")) {
+    if (id != undefined && Index.PersonaArray[id] != undefined && !Messages[0].content.includes(Index.PersonaArray[id]) && (LowerCasePlain.includes("me") || LowerCasePlain.includes("my"))) {
         Messages[0].content += ` ${Index.PersonaArray[id]}`
         if (Index.DEBUG)
             console.log("Including user's own persona.")
@@ -82,7 +82,7 @@ function GetMessageForGPTTalkingAboutTags(Plain, id = undefined) {
 /**
  * Uses the Index's provided ChatGPT methods to summarize an image using a special prompt.
  * @param {String} Plain The plain text to tagify.
- * @returns {String} A peice of text saying what tags represent the passed string.
+ * @returns {Promise<String>} A peice of text saying what tags represent the passed string.
  * @see {Index.GetSafeChatGPTResponse}
  */
 async function GetPromptsFromPlaintextUsingGPT(Plain, id = undefined) {
@@ -118,5 +118,5 @@ const { AddCostOfGPTTokens } = require('../Pricing.js');
 
 module.exports = {
     ImageIsValid, Download, GetPromptsFromPlaintextUsingGPT,
-    NonSplitTypes, types, GetRecommendedCFGScale
+    NonSplitTypes, types, GetRecommendedCFGScale,
 }
