@@ -2,6 +2,7 @@ const AIThinkingMessage = ":robot: The AI is thinking of a response...";
 module.exports.AIThinkingMessage = AIThinkingMessage;
 const AIVoiceBin = "girl.bin";
 module.exports.AIVoiceBin = AIVoiceBin;
+const SpokenInteractionBase = " You will enter a spoken conversation with at least one user. That being said, if you encounter multiple users at once, please look at all messages provided in order to craft your response; don't just look at exactly the last message. Also, the user saying a particular thing will be listed in parenthesis at the start of that specific message."
 
 const { SlashCommandBuilder, CommandInteraction, ChannelType, Message } = require('discord.js');
 const { execute: TranscribeExecute } = require("./Transcribe");
@@ -122,7 +123,7 @@ module.exports = {
                 "ChannelId": OutputID,
                 "GuildId": interaction.guildId,
                 "LastMessageTime": undefined,
-                "Messages": NewMessage("System", (await GetUserFile(interaction.member.id)).base),
+                "Messages": NewMessage("System", (await GetUserFile(interaction.member.id)).base + SpokenInteractionBase),
                 "AlwaysListening": AlwaysListening,
                 "Bypass": false,
                 "CurrentlySpeaking": false
@@ -147,7 +148,7 @@ module.exports = {
     
                     if (AlwaysListening || Conversations[inputId].Bypass || includesPhrase) {
                         if (Conversations[inputId].Messages[Conversations[inputId].Messages.length - 1].content.startsWith(`(${name})`))
-                            Conversations[inputId].Messages[Conversations[inputId].Messages.length - 1].content += content
+                            Conversations[inputId].Messages[Conversations[inputId].Messages.length - 1].content += ' ' + content;
                         else
                             Conversations[inputId].Messages = Conversations[inputId].Messages.concat(NewMessage("User", `(${name}) ${content}`));
 
