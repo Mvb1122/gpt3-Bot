@@ -1,6 +1,7 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction } = require('discord.js');
 const { GetUserFile } = require('../User');
+const { GetSuggestedPersonaNames } = require('./SetPersona');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -15,6 +16,12 @@ module.exports = {
             return o.setName("user")
                 .setDescription("What user to read. Defaults to oneself.")
                 .setRequired(false)
+        })
+        .addStringOption(o => {
+            return o.setName("name")
+                .setDescription("Persona name. Setting this will force read your persona.")
+                .setRequired(false)
+                .setAutocomplete(true)
         }),
 
     /**
@@ -35,7 +42,21 @@ module.exports = {
         
         const id = (interaction.options.getUser("user") ?? {id: null}).id ?? interaction.user.id;
 
-        const base = (await GetUserFile(id, false)).persona;
-        interaction.editReply(`${pronoun} current persona:` + "```" + base + "```")
+        const name = interaction.options.getString("name");
+        if (!name) {
+            const base = (await GetUserFile(id, false)).persona;
+            return interaction.editReply(`${pronoun} current persona:` + "```" + base + "```");
+        } else {
+            const file = await GetUserFile(interaction.user.id);
+            const MatchedPersona = file.personas.find(v => v.name == name);
+            if (MatchedPersona) {
+                const FaceSuffix = MatchedPersona.face ? `Generated Face tags: \`\`\`${MatchedPersona.face}\`\`\`` : "";
+                interaction.editReply(`${name}'s persona:\`\`\`${MatchedPersona.content}\`\`\`` + FaceSuffix)
+            } else interaction.editReply("No matching persona found!");
+        }
     },
+
+    OnAutocomplete(interaction) {
+        return GetSuggestedPersonaNames(interaction, "No persona found!")
+    }
 };

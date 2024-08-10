@@ -31,7 +31,7 @@ const PhoneticAlphabet = [
     { letter: "I", phonetic: "Eye" },
     { letter: "J", phonetic: "Jay" },
     { letter: "K", phonetic: "Kay" },
-    { letter: "L", phonetic: "El" },
+    { letter: "L", phonetic: "Ell" },
     { letter: "M", phonetic: "Emm" },
     { letter: "N", phonetic: "Enn" },
     { letter: "O", phonetic: "Ohh" },
@@ -45,7 +45,7 @@ const PhoneticAlphabet = [
     { letter: "W", phonetic: "Double You" },
     { letter: "X", phonetic: "Ex" },
     { letter: "Y", phonetic: "Why" },
-    { letter: "Z", phonetic: "Zed" }
+    { letter: "Z", phonetic: "zee" }
     
 ];
 
@@ -190,7 +190,7 @@ async function Restart() {
 
 function ConvertFFMPEG(AudioFileName, AdditionalSettings = undefined) {
     return new Promise(res => {
-        const OutputName = `./${AudioFileName}.wav`;
+        const OutputName = `${AudioFileName}.wav`;
         // First convert auto to .wav with specifications required by the embedding AI.
         let options = [];
 
@@ -407,11 +407,13 @@ module.exports = {
                     res(e.message.text != null ? e.message.text : e.message);
                 }, (e) => {
                     // If we fail, still delete. Just reject the error I guess.
+                    /* Callers should clean up after themselves. Remember to delete files!
                     try {
                         fp.unlink(name);
                     } catch {
                         ; // Do nothing.
                     }
+                    */
                     rej(e);
                 })
                 .catch(e => {

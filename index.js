@@ -1042,7 +1042,8 @@ module.exports = {
   FetchUserPersona,
   UpdateUserPersona,
   PersonaArray,
-  RefreshSlashCommands
+  RefreshSlashCommands,
+  UpdatePersonaArray
 }
 
 const cmt = require('./Commands/CreateMemoryThread.js')
@@ -1192,15 +1193,6 @@ client.on('messageCreate',
    * @param {Discord.Message} message 
    */
   async message => {
-    const member = message.member;
-    let authorname = "";
-    try {
-      authorname = member.nickname ?? message.author.username;
-    } catch (e) {
-      if (DEBUG)
-        message.reply("Something went wrong! Please tell Micah to fix this error:\n```" + e + "```");
-    }
-
     let RepliedMessageRepliesToBot = false;
     if (message.reference) {
       let repliedMessage = await GetRepliedMessage(message);

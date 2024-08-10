@@ -40,7 +40,7 @@ module.exports = {
         if (Number.isNaN(parameters.time)) return "Invalid time passed! Please retry with a valid number."
         else {
             setTimeout(async () => {
-                const CommandContent = `You are responding to a reminder from ${parameters.time} minutes ago! ${parameters.operation}`;
+                const CommandContent = `You are NOW responding to a reminder from ${parameters.time} minutes ago! Please do not set another timer unless very very explicitly asked to do so. The original timer has already elapsed. That being said, here's what you're instructed to do: ${parameters.operation}\nPlease respond as if the timer is complete now.`;
                 const FirstMessageContent = DiscordMessage ? (await GetUserFile(DiscordMessage.user.id)).base : await fetchRootBase();
                 const messages = NewMessage("System", FirstMessageContent)
                     .concat(NewMessage("User", CommandContent));
@@ -49,7 +49,7 @@ module.exports = {
                 const response = await RequestChatGPT(messages, DiscordMessage);
                 if (DiscordMessage) {
                     const messageLink = `https://discord.com/channels/${DiscordMessage.guildId}/${DiscordMessage.channelId}/${DiscordMessage.id}`;
-                    const content = `[Source](${messageLink})\n${response[response.length - 1].content}`;
+                    const content = `[Source](<${messageLink}>)\n${response[response.length - 1].content}`;
                     // Send response.
                     if (!DoInDM) {
                         if (DiscordMessage.followUp)

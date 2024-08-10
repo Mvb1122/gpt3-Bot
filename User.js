@@ -24,13 +24,16 @@ async function GetUserFile(userId, IncludeRootBase = true) {
     let RootBaseAtStart = await fetchRootBase(userId);
     let file = {
         base: "",
-        persona: "",
         cost: {
             // "8/4/23": 0.03
         },
 
-        /** Just the user's face, in plain tags. */
+        /** The content of the currently active persona. */
+        persona: "",
         persona_face: "",
+        
+        /** @type {{name: string;content: string;face: string;}[]} */
+        personas: [],
 
         /**
          * Saves the file to disc.

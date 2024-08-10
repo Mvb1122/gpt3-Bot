@@ -43,9 +43,11 @@ function Download(url, outputPath) {
 
 /**
  * @param {String} Plain The plaintext input.
+ * @param {string} [id=undefined] UserID to include when first-person pronouns are used.
+ * @param {boolean} [AllowAddedPersonas=true] Whether or not to allow extra personas to be pulled in.
  * @returns {{role: string;content: string;}[]} The message for the AI. 
  */
-function GetMessageForGPTTalkingAboutTags(Plain, id = undefined) {
+function GetMessageForGPTTalkingAboutTags(Plain, id = undefined, AllowAddedPersonas = true) {
     let Messages = [
         {
             role: "system",
@@ -53,6 +55,10 @@ function GetMessageForGPTTalkingAboutTags(Plain, id = undefined) {
         }
     ]
 
+    // If we're not going to add in anything, just return what we've got so far.
+    if (!AllowAddedPersonas) return Messages;
+
+    // Otherwise, add ones which match.
     const LowerCasePlain = Plain.toLowerCase();
     Object.keys(Index.PersonaArray).forEach(key => {
         if (LowerCasePlain.includes(key.toLowerCase())) {
@@ -83,10 +89,12 @@ function GetMessageForGPTTalkingAboutTags(Plain, id = undefined) {
  * Uses the Index's provided ChatGPT methods to summarize an image using a special prompt.
  * @param {String} Plain The plain text to tagify.
  * @returns {Promise<String>} A peice of text saying what tags represent the passed string.
+ * @param {string} [id=undefined] The UserID to use when self-referencing.
+ * @param {boolean} [AllowAddedPersonas=false] Whether to allow other personas to be pulled in.
  * @see {Index.GetSafeChatGPTResponse}
  */
-async function GetPromptsFromPlaintextUsingGPT(Plain, id = undefined) {
-    let messages = GetMessageForGPTTalkingAboutTags(Plain, id)
+async function GetPromptsFromPlaintextUsingGPT(Plain, id = undefined, AllowAddedPersonas = true) {
+    let messages = GetMessageForGPTTalkingAboutTags(Plain, id, AllowAddedPersonas)
 
     const ResponseFromGPT = (await Index.GetSafeChatGPTResponse(messages, null, null, false)).data.choices[0];
     /**
