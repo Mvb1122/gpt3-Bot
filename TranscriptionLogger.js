@@ -1,5 +1,6 @@
-const { Message, Channel } = require("discord.js");
+const { Message, Channel, Guild, GuildMember, WebhookClient, Routes } = require("discord.js");
 const { client, SendMessage, DEBUG } = require(".");
+const { GetWebhook } = require("./Commands/Say");
 
 const Logs = {"1234": {ChannelId: 1234, Listeners: [(t, n, c) => {}]}};
 delete Logs["1234"];
@@ -49,14 +50,16 @@ module.exports = {
      * @param {string} Name Name of the user.
      * @param {string | undefined} NewLogContent Text content. (Not necessary for events other than TTS/STT.)
      */
-    async LogTo(GuildId, Type, Name = "A User", NewLogContent = undefined) {
+    async LogTo(GuildId, Type, Name = "A User", NewLogContent = undefined, UserID = null) {
         // Get log.
         if (Logs[GuildId] == undefined) return;
 
+        
         // Run OnLog things.
         for (let i = 0; i < Logs[GuildId].Listeners.length; i++) Logs[GuildId].Listeners[i](Type, Name, NewLogContent);
-
-        let TranscriptionMessageContent = `${Name}${UsernameSeperator}${NewLogContent}`;
+        
+        const UseWH = Logs[GuildId].UseWH;
+        let TranscriptionMessageContent = `${UseWH ? "" : Name + UsernameSeperator}${NewLogContent}`;
 
         switch (Type) {
             case "STT":
@@ -93,31 +96,60 @@ module.exports = {
 
         // Decide whether to send a message or to edit one.
         let { last, output } = await GetLastMessageAndOutputChannel(GuildId);
-        try {
-            if (output == undefined) output = last.channel;
-
-            // If the last message was written by us, and we can squeeze in our continued transcription, add onto it.
-            const MessageContent = last.content;
-            if (last.author.id == client.user.id && (NewLogContent + "\n " + TranscriptionMessageContent).length <= 2000) {
-                // If the last user was the person we just transcribed, then just append the transcription. Otherwise, add a newline and their name and stuff.
-                    // Get the last user.
-                const lines = MessageContent.split("\n");
-                const lastLine = lines[lines.length - 1];
-                if (lastLine.includes(UsernameSeperator) && lastLine.substring(lastLine.indexOf(" "), lastLine.indexOf(UsernameSeperator)).trim() == Name) {
-                    // Add punctuation if it's missing.
-                    // if (!(last.content.endsWith(".") || last.content.endsWith("?") || last.content.endsWith("!"))) last.content += ".";
-                    return await last.edit(MessageContent.trim() + " " + NewLogContent.trim());
+        if (UserID == undefined || !UseWH) {
+            try {
+                if (output == undefined) output = last.channel;
+    
+                // If the last message was written by us, and we can squeeze in our continued transcription, add onto it.
+                const MessageContent = last.content;
+                if (last.author.id == client.user.id && (NewLogContent + "\n " + TranscriptionMessageContent).length <= 2000) {
+                    // If the last user was the person we just transcribed, then just append the transcription. Otherwise, add a newline and their name and stuff.
+                        // Get the last user.
+                    const lines = MessageContent.split("\n");
+                    const lastLine = lines[lines.length - 1];
+                    if (lastLine.includes(UsernameSeperator) && lastLine.substring(lastLine.indexOf(" "), lastLine.indexOf(UsernameSeperator)).trim() == Name) {
+                        // Add punctuation if it's missing.
+                        // if (!(last.content.endsWith(".") || last.content.endsWith("?") || last.content.endsWith("!"))) last.content += ".";
+                        return await last.edit(MessageContent.trim() + " " + NewLogContent.trim());
+                    } else 
+                        return await last.edit(MessageContent + "\n" + TranscriptionMessageContent);
                 } else 
-                    return await last.edit(MessageContent + "\n" + TranscriptionMessageContent);
-            } else 
-                // If that didn't match up just send a new message.
-                // return await SendMessage({channel: output}, TranscriptionMessageContent)
+                    // If that didn't match up just send a new message.
+                    // return await SendMessage({channel: output}, TranscriptionMessageContent)
+                    return await output.send(TranscriptionMessageContent);
+            } catch (e) {
+                // If we error, send a new message.
+                if (DEBUG)
+                    console.log(e);
                 return await output.send(TranscriptionMessageContent);
-        } catch (e) {
-            // If we error, send a new message.
-            if (DEBUG)
-                console.log(e);
-            return await output.send(TranscriptionMessageContent);
+            }
+        } else {
+            // UserID exists, so let's find the member.
+            /**
+             * @type {GuildMember}
+             */
+            const member = await output.guild.members.fetch(UserID);
+            const name = member.nickname ?? member.displayName;
+            const ThreadID = output.isThread() ? output.id : undefined;
+
+            const wh = await GetWebhook(output, name, member.displayAvatarURL({size: 2048}))
+                // Send the thing.
+                console.log(TranscriptionMessageContent)
+            const m = wh.send({
+                content: TranscriptionMessageContent,
+                threadId: ThreadID
+            });
+
+            console.log("Sent!");
+
+            /*
+            const m = client.rest.post(Routes.webhookMessage(wh.id, wh.token) + `?thread_id=${ThreadID}`, { body: {
+                content: TranscriptionMessageContent
+            }})
+            */
+
+            // console.log(await m);
+            return m;
         }
     },
 
@@ -127,13 +159,15 @@ module.exports = {
      * Links the log up to a channel, updating it if needed.
      * @param {string} GuildId 
      * @param {string} ChannelId 
+     * @param {boolean} [UseWH=false] Whether to impersonate users.
      * @returns {boolean} Whether the server was logging before.
      */
-    StartLog(GuildId, ChannelId) {
+    StartLog(GuildId, ChannelId, UseWH = false) {
         const HadLogBefore = HasLog(GuildId);
         Logs[GuildId] = {
             ChannelId: ChannelId,
-            Listeners: []
+            Listeners: [],
+            UseWH: UseWH
         };
         return HadLogBefore;
     },

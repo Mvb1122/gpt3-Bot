@@ -37,7 +37,7 @@ const SubscribedMembers = [];
 /**
  * Subscribes transcription onto a user.
  * @param {GuildMember} user User to subscribe transcription onto.
- * @param {{ Output: number; Input: number }} set to transcribe to. 
+ * @param {{ Output: number; Input: number, UseWH: boolean }} set to transcribe to. 
  */
 async function SubscribeTranscribe(user, set, bypassSubscribedMembers = false) {
     // Prevent subscribing to a user twice.
@@ -83,7 +83,7 @@ async function SubscribeTranscribe(user, set, bypassSubscribedMembers = false) {
         const TimeTaken = performance.now() - start;
         
         // Only transcribe if they were talking for more than 1/3 second.
-        if (TimeTaken >= 300)
+        if (TimeTaken >= 500)
             Transcribe(path).then(async val => {
                 val = val.trim();
                 const Name = user.nickname ?? user.displayName;
@@ -93,7 +93,7 @@ async function SubscribeTranscribe(user, set, bypassSubscribedMembers = false) {
                 fp.unlink(path);
                 
                 // const channel = client.channels.fetch(set.Output);
-                await LogTo(user.guild.id, "STT", Name, val);
+                await LogTo(user.guild.id, "STT", Name, val, user.id);
             }, () => {
                 // If the transcription fails, just unlink the audio file, I guess.
                 try {
@@ -149,6 +149,11 @@ module.exports = {
                                 .setDescription("The text channel to transcribe into.")
                                 .addChannelTypes(ChannelType.GuildText, ChannelType.PublicThread, ChannelType.PrivateThread, ChannelType.AnnouncementThread)
                                 .setRequired(false);
+                        })
+                        .addBooleanOption(op => {
+                            return op.setName("usewh")
+                                .setDescription("Whether to impersonate the users.")
+                                .setRequired(false)
                         })
                 })
                 .addSubcommand(s => {
@@ -218,6 +223,9 @@ module.exports = {
             // Select the output text channel.
             const output = interaction.options.getChannel("output") ?? interaction.channel;
 
+            // Get UseWH.
+            const UseWH = interaction.options.getBoolean("usewh") ?? false;
+
             // Select the input voice channel.
             const ChannelInput = interaction.options.getChannel("input");
             const inputId = (ChannelInput != null ? ChannelInput.id : null) ?? interaction.member.voice.channelId ?? null;
@@ -227,7 +235,8 @@ module.exports = {
             // Make up a transcribing set.
             const set = {
                 Output: output.id,
-                Input: input.id
+                Input: input.id, 
+                UseWH: UseWH
             }
             TranscribingSets.push(set);
 
@@ -237,7 +246,7 @@ module.exports = {
             // Join voice call, subscribe to all people.
                 // EnsureHasConnectionTo(input);
             // Start the logger thing.
-            StartLog(interaction.guildId, set.Output);
+            StartLog(interaction.guildId, set.Output, set.UseWH);
 
             // If we're in DEBUG mode, log all transcriptions.
             if (DEBUG)

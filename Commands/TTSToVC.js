@@ -393,7 +393,7 @@ module.exports = {
                     if (HasLog(message.guildId)) {
                         const user = message.member;
                         const Name = user.nickname ?? user.displayName;
-                        LogTo(message.guildId, "TTS", Name, message.content.trim())
+                        LogTo(message.guildId, "TTS", Name, message.content.trim(), user.id)
                     }
     
                     WriteToLogChannel(message.guildId, `${message.author.displayName} in <#${set.OutputID}> voiced:\`\`\`` + message.content + "```")

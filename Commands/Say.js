@@ -9,7 +9,7 @@
 const { SlashCommandBuilder, CommandInteraction, Channel, Webhook, WebhookClient, Message, User, TextBasedChannel } = require('discord.js');
 const HFAIModelHandler = require('../HFAIModelHandler');
 const { DEBUG, client } = require('..');
-const { PredictContent } = require('../Gradio/Gradio_Stuff');
+const { PredictContent, ConnectToPreset } = require('../Gradio/Gradio_Stuff');
 const fp = require('fs/promises');
 const EditMessagePrefix = "e- ";
 const { Wait } = require('../Helpers');
@@ -416,7 +416,7 @@ function SendAsWebhookInChannel(text, user, channel, name, fileURLs = undefined)
                 prompt: prompt, // await prompt
                 width: 512,
                 height: 512
-            });
+            }, true);
 
             res(await imageMade);
         });
@@ -455,7 +455,7 @@ function SendAsWebhookInChannel(text, user, channel, name, fileURLs = undefined)
                 // Write to log channel.
                 await WriteToLogChannel(channel.guildId, {
                     content: `\`${user.globalName}\` as \`${name}\` wrote in <#${channel.id}>: ${text}${imageMade ? `\nEmotion: \`${emotion}\`\nNew PFP:` : ""}`, // Write also about the new PFP if one was made.
-                    files: imageMade ? [webhook.avatarURL()] : undefined // Send the pfp as a url so that way it doesn't have to be uploaded twice.
+                    files: imageMade ? [webhook.avatarURL({size: 2048})] : undefined // Send the pfp as a url so that way it doesn't have to be uploaded twice.
                 });
 
                 if (imageMade)
@@ -523,8 +523,8 @@ async function GetWebhook(channel, name, imagePath) {
     })
 
     async function GetImagePath() {
-        const IsImagePathFunction = typeof(imagePath) != String;
-        return IsImagePathFunction ? await imagePath() : imagePath 
+        const IsImagePathFunction = typeof(imagePath) == 'function';
+        return IsImagePathFunction ? await imagePath() : imagePath;
     }
 
     if (!hook) {

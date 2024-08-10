@@ -202,6 +202,9 @@ function GenerateSeed() {
  * @returns {Promise<String>} A promise which resolves to the path or error.
  */
 async function PredictContent(Input, MakeSeed = true) {
+    // Force images to ***always*** be saved. Sometimes this is weird.
+    Input.save_images = true;
+
     if (MakeSeed)
         Input.seed = GenerateSeed();
     
