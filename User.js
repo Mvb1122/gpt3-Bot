@@ -1,14 +1,27 @@
 const fp = require('fs/promises');
 const fs = require('fs')
 const path = require('path');
+const { LocalServerSettings } = require('.');
+const FunctionCallingBasesDir = path.resolve("./FunctionCallingBases/");
 
 const rootBase = "You will only call a function with a given value once. The user's name is given by the words in the parenthesis at the start of a message. DO NOT write names into your messages unless requested to do so by a user. You can use the `think` command to think things. Use it accordingly when you need to remember something before telling the user. When asked math questions with computable answers, you may use EVAL to run JavaScript code to get the answer."
+const FunctionEndMessage = "Your current available functions are:"
+let FunctionCallingRootBase = ""
+
+if (LocalServerSettings.Use)
+    LocalServerSettings.model.then(v => {
+        if (v.includes("70B"))
+            FunctionCallingRootBase = fs.readFileSync(`${FunctionCallingBasesDir}/Llama70BFunctionCallingRootBase.txt`) + FunctionEndMessage
+        else 
+            FunctionCallingRootBase = fs.readFileSync(`${FunctionCallingBasesDir}/FunctionCallingRootBase.txt`) + FunctionEndMessage
+    })
+
 async function fetchRootBase(id = null) {
     const now = new Date();
     const minutes = now.getMinutes().toString();
 
-    let temp = rootBase;
-    temp += `The current time is ${GetCurrentDate()} at ${now.getHours() + 1}:${minutes.length == 1 ? "0" + minutes : minutes}.`
+    let temp = LocalServerSettings.Use ? FunctionCallingRootBase : rootBase;
+    temp = `The current time is ${GetCurrentDate()} at ${now.getHours() + 1}:${minutes.length == 1 ? "0" + minutes : minutes}.` + temp;
 
     // if (id != null) temp += `The current user is ${(await client.users.fetch(id)).username}!`
 
@@ -21,7 +34,7 @@ async function fetchRootBase(id = null) {
 */
 async function GetUserFile(userId, IncludeRootBase = true) {
     const Path = path.resolve(`./users/${userId}_Base.json`);
-    let RootBaseAtStart = await fetchRootBase(userId);
+    let InitialRootBase = await fetchRootBase(userId);
     let file = {
         base: "",
         cost: {
@@ -39,7 +52,7 @@ async function GetUserFile(userId, IncludeRootBase = true) {
          * Saves the file to disc.
          */
         sync() {
-            this.base = this.base.replaceAll(RootBaseAtStart, "");
+            this.base = this.base.replaceAll(InitialRootBase, "");
             return fp.writeFile(Path, JSON.stringify(this));
         }
     };
@@ -52,7 +65,7 @@ async function GetUserFile(userId, IncludeRootBase = true) {
     }
 
     if (IncludeRootBase) {
-        file.base = RootBaseAtStart + file.base
+        file.base = file.base + InitialRootBase;
     }
 
     return file;
@@ -64,5 +77,5 @@ function GetCurrentDate() {
 }
 
 module.exports = {
-    GetUserFile, GetCurrentDate, fetchRootBase
+    GetUserFile, GetCurrentDate, fetchRootBase, FunctionEndMessage
 }

@@ -2,7 +2,6 @@ transcription_model_id = "openai/whisper-large-v3"
 musicgen_model_id = "facebook/musicgen-small"
 tts_model_id = "microsoft/speecht5_tts"
 language_classifier_model_id = "papluca/xlm-roberta-base-language-detection"
-whisper_model_id = "openai/whisper-large-v3"
 translation_model_id = "facebook/nllb-200-distilled-600M"
 
 from transformers import pipeline
@@ -13,7 +12,6 @@ import torch
 import time
 import torchaudio
 from audio_denoiser.AudioDenoiser import AudioDenoiser
-from threading import Timer
 
 used_time = time.time()
 embedding_file_name = "./Voice Embeddings/New_Embedding.bin"
@@ -40,7 +38,7 @@ def MakeTranscriber():
   global transcriber
   from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
   torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
-  model_id = whisper_model_id
+  model_id = transcription_model_id
   model = AutoModelForSpeechSeq2Seq.from_pretrained(
     model_id, torch_dtype=torch_dtype, 
     low_cpu_mem_usage=True, 

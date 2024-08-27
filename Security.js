@@ -201,16 +201,13 @@ if (Index.DEBUG)
     }, 10000);
 
 async function WriteToLogChannel(guildId, message) {
+    // Send text while preventing mentions from pinging.
+    message.allowedMentions = { parse: [] }
+
     const logChannel = await GetPolicy(guildId, "modchannel");
     if (logChannel != undefined) {
         const Log = await Index.client.channels.fetch(logChannel);
-        // Send text while preventing mentions from pinging.
-        return Log.send(message, {
-            "allowed_mentions": { 
-                users: ['0'], 
-                roles: ['0'] 
-            }
-        });
+        return Log.send(message);
     }
 }
 

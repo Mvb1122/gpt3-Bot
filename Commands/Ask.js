@@ -43,18 +43,29 @@ module.exports = {
         const user = await GetUserFile(interaction.user.id);
 
         let messages = Index.NewMessage("system", user.base)
-            .concat(Index.NewMessage("user", `(${username}) ` + UserQuestion))
+            .concat(Index.NewMessage("user", `(${username}) ` + UserQuestion));
+        let length = messages.length;
         
-        Index.RequestChatGPT(messages, interaction)
-            .then(val => {
-                const Content = `${username}: ${UserQuestion}\nAI: ${val[val.length - 1].content}`;
-                if (Content.length <= 2000) {
-                    interaction.editReply(Content)
-                } else {
-                    // If the message is too long, just say, look below for your answer and then SendMessage it.
-                    interaction.editReply("See message below.");
-                    Index.SendMessage(interaction, Content)
-                }
-            })
+        const val = await Index.RequestChatGPT(messages, interaction);
+        const NewMessages = val.slice(length);
+        
+        let firstIndex = NewMessages.findIndex(v => {return v.content != null && v.role == "assistant"});
+
+        const Content = `${username}: ${UserQuestion}\nAI: ${NewMessages[firstIndex].content}`;
+        if (Content.length <= 2000 && interaction.isRepliable()) {
+            await interaction.editReply(Content)
+        } else {
+            // If the message is too long, just say, look below for your answer and then SendMessage it.
+            if (interaction.isRepliable())
+                interaction.editReply("See message below.");
+            await Index.SendMessage(interaction, Content)
+        }
+
+        // Send any follow-up messages made by a local AI.
+        if (Index.LocalServerSettings.Use)
+            for (let i = firstIndex + 1; i < NewMessages.length; i++) {
+                if (NewMessages[i].content != "" && NewMessages[i].role == "assistant")
+                    await interaction.channel.send(NewMessages[i].content)
+            }
     },
 };

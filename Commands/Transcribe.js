@@ -47,8 +47,8 @@ async function SubscribeTranscribe(user, set, bypassSubscribedMembers = false) {
             // Add to the list, but also allow our recursions to bypass this if we're adding a new person.
             SubscribedMembers.push(UserGuildId); 
             bypassSubscribedMembers = true;
-        }
-    }
+        }; 
+    }; 
 
     // Subscribe to the user's audio.
     const connection = await EnsureHasConnectionTo(await client.channels.fetch(set.Input))
@@ -212,7 +212,6 @@ module.exports = {
             if (HasLog(interaction.guildId))
                 return interaction.editReply(`There's already a transcription ongoing in this server! Please stop the other before starting. Transcription channel: <#${GetLogId(interaction.guildId)}>`)
             
-
             interaction.editReply("I'll join in a second! Once I'm in, I'll be listening. You can run `/transcribe mode stopcall` to stop.");
 
             /**

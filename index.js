@@ -4,10 +4,18 @@ let AIParameters = {
   temperature: 0.8,
   max_tokens: 1000,
   // Keep n and stream set as they are.
-  n: 1, 
-  stream: false
+  n: 1,
+  stream: false,
 }
 const DEBUG = false;
+const LocalServerSettings = {
+  // Set Use: true to use local server.
+  Use: true,
+  basePath: "http://192.168.1.4:82/v1",
+  // Model will be set automatically from API request, but you can override here.
+  // model: "LM Studio Community/Meta-Llama-3-8B-Instruct-GGUF/Meta-Llama-3-8B-Instruct-Q4_K_M.gguf",
+  temperature: 0.8,
+}
 //#endregion
 
 //#region Imports and Constants
@@ -15,10 +23,31 @@ const Discord = require('discord.js');
 const fs = require('fs');
 const { Configuration, OpenAIApi } = require("openai");
 const tokens = require('./token');
+const red = '\x1b[31m';
+const green = '\x1b[32m';
+const reset = '\x1b[0m';
+module.exports.DEBUG = DEBUG;
+
+// Update LocalServerSettings model via API:
+if (LocalServerSettings.Use) {
+  // Override AIParameters with ones set in LocalServerSettings.
+  Object.keys(LocalServerSettings).forEach(key => { /* if (key in AIParameters) */ AIParameters[key] = LocalServerSettings[key] });
+  
+  if (!LocalServerSettings.model)
+    LocalServerSettings.model = new Promise(res => {
+      fetch(LocalServerSettings.basePath + "/models").then(async v => {
+        const json = await v.json();
+        AIParameters.model = LocalServerSettings.model = json.data[0].id
+        console.log(`Model automatically set to ${green}%s${reset}!`, LocalServerSettings.model)
+        res(LocalServerSettings.model)
+      });})
+}
 
 const configuration = new Configuration({
-  apiKey: tokens.GetToken("openai"),
+  apiKey: LocalServerSettings.Use ? LocalServerSettings.ApiKey : tokens.GetToken("openai"),
+  basePath: LocalServerSettings.Use ? LocalServerSettings.basePath : undefined
 });
+
 const openai = new OpenAIApi(configuration);
 const client = new Discord.Client({
   intents: [
@@ -220,8 +249,8 @@ const functionPath = "./Functions/";
 fs.readdir(functionPath, (err, paths) => {
   let commands = ""
   paths.forEach(file => {
-    if (file.includes("DISABLED")) return; // Don't include disabled functions.
-    
+    if (file.includes("DISABLED") || !file.includes(".js")) return; // Don't include disabled functions.
+
     /**
      * @type {{keywords: String, json: String, execute: Function}}
      */
@@ -240,7 +269,7 @@ fs.readdir(functionPath, (err, paths) => {
 /**
  * Searches through the provided messages for keywords and returns the relevant functions' JSON data.
  * @param {[{role: String, content: String}]} messages The inputted messages to be searched for function keywords.
- * @returns {[{name: String, description: String, parameters: {type: String, properties: {*}}}]}A list of functions which can be sent to OpenAI.
+ * @returns {[{function: {name: String, description: String, parameters: {type: String, properties: {*}}}, type: string}]} A list of functions which can be sent to OpenAI.
  */
 function GetFunctions(messages) {
   // Search only the user's messages.
@@ -309,14 +338,14 @@ function GetFunctionFromStart(message) {
 //#endregion
 
 //#region ChatGPT Methods
-  // Types: System, User Function
-  /**
-   * Creates a message object from the content.
-   * @param {"System" | "User" | "Function" | "Tool" | "Assistant"} Role System || User || Function || Assistant <- For AI only, will be appended automatically.
-   * @param {String} Content 
-   * @param {String | undefined} Username
-   * @returns {[{role: String, content: String}]}
-   */
+// Types: System, User Function
+/**
+ * Creates a message object from the content.
+ * @param {"System" | "User" | "Function" | "Tool" | "Assistant"} Role System || User || Function || Assistant <- For AI only, will be appended automatically.
+ * @param {String} Content 
+ * @param {String | undefined} Username
+ * @returns {[{role: String, content: String}]}
+ */
 function NewMessage(Role, Content, Username) {
   return [{
     role: Role.toLowerCase(),
@@ -326,6 +355,7 @@ function NewMessage(Role, Content, Username) {
 }
 
 const { encode } = require("gpt-3-encoder");
+const LlamaConverter = require('./LlamaSupport');
 
 /**
  * Converts message strings into json. 
@@ -391,13 +421,15 @@ function ConvertToMessageJSON(InputMessages) {
 //#region GetSafeChatGPTResponse
 /**
  * Gets the AI's response, without risk of crashing.
- * @param {[{role: String, content: String, name: String}]} messages The messages that are already in this conversation. 
+ * @param {[{role: String, content: String, name: String, tool_calls: { id: number; type: string ;function: { name: any; arguments: string; }}[]}]} messages The messages that are already in this conversation. 
  * @param {Discord.Message?} DiscordMessage The Discord message asking for this response.
  * @param {Number} numReps How many times this function has been called already.
- * @returns {Promise<openai.CreateChatCompletionResponse>} An object representing the AI's response, or the failure message.
+ * @returns {Promise<import('openai').CreateChatCompletionResponse>} An object representing the AI's response, or the failure message.
  */
 async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps = 0, allowFunctions = true) {
-  return new Promise(async (resolve, reject) => {
+  if (DEBUG)
+    console.log(messages);
+  return new Promise(async (resolve) => {
     try {
       // Clone parameters object.
       const params = JSON.parse(JSON.stringify(AIParameters));
@@ -409,7 +441,7 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
       if (tokencount >= 8192) {
         // If there's more than a lot of tokens here, complain.
         // DiscordMessage.channel.send(`(Your conversation is getting too long! Please use \`clear all\` soon! Number of tokens: ${encode(AllMessageText).length})`);
-    
+
         // If more than 10,000 tokens, crop down to like 8000. (Start from the end so that stuff at the start is lost first.)
         if (tokencount > 10000 && messages.length > 10) {
           let CroppedMessages = []; let NumTokens = 0;
@@ -418,13 +450,13 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
             try {
               if (encode(message.content).length + NumTokens <= 8000 || message.role == "user")
                 CroppedMessages.push(message);
-  
+
             } catch {
               // If something goes wrong, the message is probably important.
               CroppedMessages.push(message);
             }
           }
-      
+
           params.messages = CroppedMessages;
         }
 
@@ -432,26 +464,58 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
         // ! Just use a larger model.
         // AIParameters.model = "gpt-3.5-turbo-16k"
       }
-    
+
       // Attach functions.
       let functions;
-      if (allowFunctions)
+      if (allowFunctions) {
+        // If we're using an OpenAI remote model, then handle them normally.
         functions = GetFunctions(messages);
+
+        // If we're using a remote model, then handle them correctly for that.
+        // Get first system message.
+        if (LocalServerSettings.Use) {
+          const SystemMessage = messages[0];
+          if (SystemMessage.content && SystemMessage.content.indexOf(FunctionEndMessage) != -1) {
+            // Clip the content to the end.
+            SystemMessage.content = SystemMessage.content.substring(0, SystemMessage.content.indexOf(FunctionEndMessage) + FunctionEndMessage.length);
+
+            // Add the functions to the end.
+            SystemMessage.content += "\n" + functions.map(v => JSON.stringify(v.function)).join("\n");
+            messages[0] = SystemMessage;
+          }
+
+          // Do all necessary processing using the module.
+          messages = messages.map(m => {return LlamaConverter.MessageToLlama(m)});
+        }
+      }
       else
         functions = []
-      
-      if (functions.length > 0) {
+
+      if (functions.length > 0 && !LocalServerSettings.Use) {
         params.tool_choice = "auto";
         params.tools = functions;
       }
-    
-      const data = await openai.createChatCompletion(params)
-      
+
+      // Always log chat messages regardless of whether we're debug or not.
+      console.log(messages);
+
+      const data = await openai.createChatCompletion(params);
+
       // For safety, prevent @everyone and @here.
       if (data.data.choices[0].message.content != undefined) {
         data.data.choices[0].message.content = data.data.choices[0].message.content.replaceAll("@everyone", "@ everyone")
         data.data.choices[0].message.content = data.data.choices[0].message.content.replaceAll("@here", "@ here")
       }
+
+      // If we're using a local server, return the messages back to normal now.
+      if (LocalServerSettings.Use) {
+        messages = messages.map(m => LlamaConverter.MessageFromLlama(m));
+
+        // Fix AI's response.
+        data.data.choices[0].message = LlamaConverter.MessageFromLlama(data.data.choices[0].message);
+      }
+
+      console.log(messages);
 
       // Add billing based on input.
       const TokenCount = encode(GetAllMessageText(messages)).length;
@@ -461,11 +525,11 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
       resolve(data);
     } catch (e) {
       if (DiscordMessage != null && numReps == 0 && DiscordMessage.channel != null)
-        DiscordMessage.channel.send("Request to AI failed, Retrying...") 
-      
+        DiscordMessage.channel.send("Request to AI failed, Retrying...")
+
       console.log(e);
-  
-        // Wait for a bit before trying again.
+
+      // Wait for a bit before trying again.
       await new Promise(res => setTimeout(res, 500 * Math.pow(++numReps, 2)));
       resolve(await GetSafeChatGPTResponse(messages, DiscordMessage, numReps))
     }
@@ -597,7 +661,7 @@ GetSafeChatGPTResponse([{ role: "user", content: "Can you hear me?" }], null).th
 async function SummarizeConvo(messages, DiscordMessage) {
   return new Promise(async res => {
     // If this is the first time that the AI has responded, and the channel is a thread, write a summary of the convo up to this point.
-    if (await IsMessageInThread(DiscordMessage) && IsChannelMemory(DiscordMessage.channel) && DiscordMessage.channel.name.includes(cmt.MemoryChannelPrefix)) {
+    if (await IsMessageInThread(DiscordMessage) && DiscordMessage.channel.name.includes(cmt.MemoryChannelPrefix)) {
       // Count number of AI responses.
       let NumberOfAIResponses = 0;
       for (let i = 0; i < messages.length; i++) {
@@ -610,7 +674,7 @@ async function SummarizeConvo(messages, DiscordMessage) {
 
       // Getting to this point means that there's only one AI response, so we should summarize the convo.
       let MessagesPlusSummaryRequest = messages.concat({
-        role: "system",
+        role: LocalServerSettings.Use ? "user" : "system",
         content: "Please write a title for this conversation on its own line with no other text. It should be <= 100 characters in length."
       });
 
@@ -623,7 +687,7 @@ async function SummarizeConvo(messages, DiscordMessage) {
 
       try {
         DiscordMessage.channel.setName(Response.substring(0, 100));
-      } catch (e) {;} // Do nothing.
+      } catch (e) { ; } // Do nothing.
       return res();
     } else return res();
   })
@@ -649,11 +713,14 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
      */
     let newMessage = (await gptResponse).data.choices[0].message;
     let ReturnedMessages = InputMessages;
-    
+
     // If the message has a function call, run it.
     async function ProcessFunctionCall(newMessage) {
       console.log(newMessage)
       if (newMessage.tool_calls != null) {
+        if (newMessage.content && DiscordMessage.followUp == null) // followUp is only on slash commands; don't send extra content for slash commands.
+          DiscordMessage.channel.send(newMessage.content);
+
         messages.push(newMessage);
         /**
          * @type {[{name: string, arguments: string, id: string}]}
@@ -665,6 +732,7 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
         })
 
         // Process all function calls.
+        AllCallLoop:
         for (let i = 0; i < tool_calls.length; i++) {
           const call = tool_calls[i];
 
@@ -677,13 +745,23 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
               break;
             }
           }
-    
+
+          if (func == undefined) {
+            const returnedFromFunction = `{"successful": false, "reason": "Invalid JSON passed! Please retry immediately without asking for the User's permission. Make sure to correct your function name this time." }`;
+            messages.push({
+              role: "tool",
+              tool_call_id: call.id,
+              content: returnedFromFunction
+            })
+            continue AllCallLoop;
+          }
+
           if (DEBUG) {
             console.log(func);
             console.log(`Running ${func.name} with parameters:`)
             console.log(call.arguments);
           }
-    
+
           let params = {}, returnedFromFunction;
           try {
             params = JSON.parse(call.arguments);
@@ -691,8 +769,8 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
             // If the DiscordMessage is actually a Web Handler, then make a fake message off of it.
             const message = DiscordMessage.CreateMessage ? DiscordMessage.CreateMessage() : DiscordMessage;
 
-            returnedFromFunction = await (func(params, message));
-    
+            returnedFromFunction = await (func(params, message, messages));
+
             messages.push({
               role: "tool",
               tool_call_id: call.id,
@@ -700,7 +778,7 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
             })
           } catch (error) {
             console.log(error);
-
+            if (error.toString() == "func is not a function") error = "You put an invalid function."
             returnedFromFunction = `{"successful": false, "reason": "Invalid JSON passed! Please retry.", "error": "${error}" }`;
             messages.push({
               role: "tool",
@@ -714,32 +792,32 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
           */
           ReturnedMessages += `\n${call.name}: ${returnedFromFunction}`;
         }
-        
+
         // Push the data to the AI if it's not clearing the memory.
         const names = tool_calls.map(x => {
           return x.name;
         })
-        
+
         if (names.indexOf("ClearAll") == -1 && names.indexOf("Recover") == -1) {
           const functionCallResponse = await GetSafeChatGPTResponse(messages, DiscordMessage);
           const functionMessage = (await functionCallResponse).data.choices[0].message
           // ReturnedMessages += `\nAI: ${functionMessage.content}`;
-  
+
           // Just in case, check if this message is also a function call.
           return await ProcessFunctionCall(functionMessage);
         }
       } else {
         messages.push(newMessage)
         return;
-      } 
+      }
     }
     await ProcessFunctionCall(newMessage);
-  
+
     /*
     console.log("Returned message:");
     console.log(newMessage);
     */
-  
+
     // console.log("Returned Messages: ```" + ReturnedMessages + "```"
     let wasClearAllCalled = ReturnedMessages.includes("ClearAll: undefined") || ReturnedMessages.includes("Recover: { \"sucessful\": true }") /* false;
     for (let i = 0; i < messages.length; i++) {
@@ -749,15 +827,15 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
       }
     }
     */
-  
+
     // Summarize convo if needed (do async)
     try {
       SummarizeConvo(messages, DiscordMessage);
     } catch (e) {
       console.log(e);
     }
-      
-  
+
+
     if (!wasClearAllCalled)
       resolve(messages);
     else resolve([]);
@@ -807,7 +885,7 @@ function ParseMessage(string) {
 
   for (let i = 1; i < LineCounts.length; i++) {
     let ContentOnThisLine = Lines[i].split("|")
-    
+
     if (ContentOnThisLine.length > 0) {
       ContentOnThisLine = ContentOnThisLine.slice(1, ContentOnThisLine.length - 1)
       TableSets[tableIndex].push(ContentOnThisLine)
@@ -859,7 +937,7 @@ function ParseMessage(string) {
       TableSets[i] = ThisEmbed;
     }
   }
-  
+
   if (DEBUG)
     console.log(TableSets)
 
@@ -898,14 +976,14 @@ async function SendMessage(Message, StringContent, Reply = false) {
         console.log("Message content: " + part)
 
       if (part.length >= 20000) return Message.channel.send("More than 10 messages would be sent! Thus, I've decided to cut it short. Also, the AI is probably gonna crash immediately right now, LOL.")
-        if (part.length >= DiscordMessageLengthLimit) {
+      if (part.length >= DiscordMessageLengthLimit) {
         do {
           const SplitPoint = part.length > DiscordMessageLengthLimit ? DiscordMessageLengthLimit : part.length;
           const chunk = part.substring(0, SplitPoint);
           part = part.substring(SplitPoint);
           if (lastMessage == null && Reply)
             lastMessage = await Message.reply(chunk);
-          else 
+          else
             lastMessage = await Message.channel.send(chunk)
         } while (part.length > 0)
       } else lastMessage = Reply ? Message.reply(part) : Message.channel.send(part);
@@ -1011,7 +1089,7 @@ client.once('ready', () => {
       }
     }
   })
-  */ 
+  */
 })
 
 
@@ -1031,7 +1109,6 @@ module.exports = {
   RequestChatGPT,
   client,
   SendMessage,
-  DEBUG,
   NewMessage,
   fetchUserBase,
   bases,
@@ -1043,7 +1120,9 @@ module.exports = {
   UpdateUserPersona,
   PersonaArray,
   RefreshSlashCommands,
-  UpdatePersonaArray
+  UpdatePersonaArray,
+  LocalServerSettings,
+  AIParameters
 }
 
 const cmt = require('./Commands/CreateMemoryThread.js')
@@ -1074,15 +1153,15 @@ function RefreshSlashCommands() {
     const Module = require(command);
     if ('data' in Module && 'execute' in Module) {
       // Run OnConfigureSecurity before pushing anything.
-      if ('OnConfigureSecurity' in Module) 
+      if ('OnConfigureSecurity' in Module)
         Module.OnConfigureSecurity();
 
       SlashCommands.push(Module);
 
       // Add the required stuff for user commands.
-        // TODO: Update using proper APIs when DiscordJS allows it.
+      // TODO: Update using proper APIs when DiscordJS allows it.
       const JSON = Module.data.toJSON();
-      if (Module.CanExternal != false) { 
+      if (Module.CanExternal != false) {
         const extras = {
           "integration_types": [0, 1], //0 for guild, 1 for user
           "contexts": [0, 1, 2], //0 for guild, 1 for app DMs, 2 for GDMs and other DMs
@@ -1111,7 +1190,7 @@ function RefreshSlashCommands() {
         Discord.Routes.applicationCommands(client.user.id /*, guildId */), // use with ApplicationGuildCommands for testing.
         { body: CommandJSON }
       );
-      
+
       console.log(`Successfully reloaded ${data.length} application (/) commands.`);
     } catch (error) {
       // And of course, make sure you catch and log any errors!
@@ -1137,7 +1216,7 @@ async function UpdatePersonaArray() {
           const json = JSON.parse(data);
           const userID = file.substring(0, file.indexOf("_"));
           PersonaArray[userID] = json.persona;
-  
+
           // Get user's guilds
           const guilds = client.guilds.cache.forEach(async (guild) => {
             const isMember = await guild.members.fetch(userID).then(() => true).catch(() => false);
@@ -1147,8 +1226,7 @@ async function UpdatePersonaArray() {
               if (nick != undefined) {
                 PersonaArray[nick] = json.persona;
               }
-  
-  
+
               // Also do username.
               PersonaArray[userOnGuild.user.globalName] = json.persona;
             }
@@ -1156,7 +1234,7 @@ async function UpdatePersonaArray() {
         });
       }
     });
-  
+
     /*
     setTimeout(() => {
       console.log(PersonaArray);
@@ -1196,7 +1274,7 @@ client.on('messageCreate',
     let RepliedMessageRepliesToBot = false;
     if (message.reference) {
       let repliedMessage = await GetRepliedMessage(message);
-      RepliedMessageRepliesToBot = repliedMessage != null && (repliedMessage.author ?? repliedMessage.user ?? {id: -1}).id == client.user.id
+      RepliedMessageRepliesToBot = repliedMessage != null && (repliedMessage.author ?? repliedMessage.user ?? { id: -1 }).id == client.user.id
     }
 
     if ((message.content.startsWith("gpt3") || message.content.startsWith(`<@${client.user.id}>`) || RepliedMessageRepliesToBot) && !message.author.bot) {
@@ -1216,7 +1294,7 @@ client.on('messageCreate',
         message.content = Text;
 
         // Try to develop a list of messages by following replies.
-        let Messages; 
+        let Messages;
         let arr = [];
 
         /**
@@ -1234,7 +1312,7 @@ client.on('messageCreate',
               type: "text",
               text: text
             })
-          else 
+          else
             content = text;
 
           // Add images if present.
@@ -1271,12 +1349,12 @@ client.on('messageCreate',
                 // Get user.
                 const user = focusMessage.content.substring(0, focusMessage.content.indexOf(":"));
                 await Promise.all((await focusMessage.guild.fetch()).members.cache.map(async v => {
-                  if (v.nickname == user || v.user.displayName == user) 
+                  if (v.nickname == user || v.user.displayName == user)
                     arr = arr.concat(NewMessage("System", (await GetUserFile(v.id)).base));
                 }))
               }
             }
-            
+
             focusMessage = await GetRepliedMessage(focusMessage);
           } catch {
             focusMessage = undefined;
@@ -1285,7 +1363,7 @@ client.on('messageCreate',
 
         // Messages array is backwards now, so flip it.
         Messages = arr.reverse();
-        
+
         // Send a typing notification to make it clear we're thinking.
         message.channel.sendTyping();
 
@@ -1363,7 +1441,7 @@ client.on('messageCreate',
     }
     // }
 
-    if (/* message.channel.id === '1077725073378644008' && */ message.author.bot === false) {
+    if (/* message.channel.id === '1077725073378644008' && */ !message.author.bot) {
       // If the base is empty, use the first user's base.
       /**
        * @type {[{content, role, name}]}
@@ -1375,8 +1453,9 @@ client.on('messageCreate',
       message.attachments.forEach(attachment => {
         Text += ` ${attachment.url}`;
       })
-      
-      messages = messages.concat(NewMessage("user", /* `(${authorname}) ` + */ Text, /* authorname */ ));
+
+      message.channel.sendTyping();
+      messages = messages.concat(NewMessage("user", /* `(${authorname}) ` + */ Text, /* authorname */));
       // base = base.concat(NewMessage("user", message.content.trim())); // `\n${authorname}: ` + message.content.trim();
       await AskChatGPTAndSendResponse(messages, message);
     }
@@ -1389,7 +1468,7 @@ client.on("interactionCreate",
   /**
    * @param {Discord.CommandInteraction} int 
    */
-  async (interaction) => {    
+  async (interaction) => {
     // Find command by name.
     const name = interaction.commandName;
     for (let i = 0; i < SlashCommands.length; i++) {
@@ -1403,7 +1482,7 @@ client.on("interactionCreate",
             return module.execute(AttachDataToObject(interaction));
 
           // If it's an autocomplete request:
-          else if (interaction.isAutocomplete() && 'OnAutocomplete' in module) 
+          else if (interaction.isAutocomplete() && 'OnAutocomplete' in module)
             return module.OnAutocomplete(AttachDataToObject(interaction));
 
         } catch (error) {
@@ -1415,13 +1494,13 @@ client.on("interactionCreate",
         }
       }
     }
-})
+  })
 
 // Handle Voice state changes.
 client.on("voiceStateUpdate", (old, newState) => {
   for (let i = 0; i < SlashCommands.length; i++) {
     const module = SlashCommands[i];
-    if ('OnVoiceStateUpdate' in module) 
+    if ('OnVoiceStateUpdate' in module)
       module.OnVoiceStateUpdate(old, newState);
   }
 
@@ -1496,7 +1575,7 @@ async function AskChatGPTAndSendResponse(content, message) {
         SendMessage(message, actualResponse.trim());
       // fs.writeFile('./base.json', JSON.stringify({string: requestOut}), () => {console.log("File written.")});
       bases[GetBaseIdFromChannel(message.channel)] = Convo;
-    
+
       // Update bases.
       fs.writeFile("./ActiveBases.json", JSON.stringify(bases), () => {
         console.log("Active bases updated!");
@@ -1557,16 +1636,16 @@ async function listener(req, res) {
   if (req.method == "POST") {
     // Get the request's data.
     let binary_data = [];
-    req.on('data', function(chunk) {
+    req.on('data', function (chunk) {
       binary_data.push(chunk);
     });
-  
+
     // Once the request is done with, ask the AI the question.
     req.on('end', () => {
       const data = JSON.parse(Buffer.concat(binary_data));
       if (DEBUG)
         console.log(`Web request message: ${data.role} says ${data.content}`);
-      
+
       // Ask the AI.
       const messages = NewMessage(data.role, data.content, undefined);
       GetSafeChatGPTResponse(messages, null, 0, false)
@@ -1580,12 +1659,12 @@ async function listener(req, res) {
   } else {
     // If this wasn't a post request, just send back the demo page.
     let localURL = "";
-    
+
     if (req.url.startsWith('/'))
       localURL += '.' + req.url;
     else
       localURL += "./" + req.url;
-  
+
     localURL = unescape(localURL);
 
     if (localURL.endsWith("/")) localURL += "index.html"
@@ -1601,7 +1680,7 @@ async function listener(req, res) {
     /* if (localURL == "./")
       return res.end(MicroserviceHTML);
     else */ {
-      if (fs.existsSync(localURL)) 
+      if (fs.existsSync(localURL))
         return res.end(fs.readFileSync(localURL));
       else return res.end("That file doesn't exist!<br>" + localURL);
     }
@@ -1613,7 +1692,7 @@ const fp = require('fs/promises');
 const token = require('./token');
 const { getVoiceConnection } = require('@discordjs/voice');
 const { AddCostOfGPTTokens } = require('./Pricing');
-const { GetUserFile } = require('./User');
+const { GetUserFile, FunctionEndMessage } = require('./User');
 const TempDir = "./Temp/";
 if (fs.existsSync(TempDir))
   fs.readdirSync(TempDir).forEach(file => fp.unlink(`${TempDir}${file}`))
@@ -1672,7 +1751,7 @@ io.on("connection", (socket) => {
 
 // If we're not in debug mode, ignore all errors. 
 if (!DEBUG) {
-  process.on('uncaughtException', function(err) {
+  process.on('uncaughtException', function (err) {
     console.log('Caught exception: ');
     console.log(err);
   });
