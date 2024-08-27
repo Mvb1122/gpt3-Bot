@@ -1,0 +1,25 @@
+journey
+    title My working day
+    section Go to work
+      Make tea: 5: Me
+      Go upstairs: 3: Me
+      Do work: 1: Me, Cat
+    section Go home
+      Go downstairs: 5: Me
+      Sit down: 5: Me
+
+The names after the colon on each event represent the people who do that event. They must match previous events' users where applicable. Not every event has to have every person.
+The numbers after the first colon are the person's happiness from 1 to 5 at that point.
+
+Here's another example: 
+
+journey
+    title Daily Routine
+    section Go to School
+      Wake up: 5: Me, Cat
+      Eat Breakfast: 4: Me, Cat
+      Walk to class: 4: Me
+    section Class
+      Japanese: 5: Me
+      Calculus: 2: Me
+      Computer Science: 4: Me

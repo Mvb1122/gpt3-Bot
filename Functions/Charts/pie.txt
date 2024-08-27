@@ -1,0 +1,15 @@
+pie title Pets adopted by volunteers
+    "Cats" : 85
+    "Rats" : 15
+
+Here's a few more examples: 
+pie title NETFLIX
+    "Time spent looking for movie" : 90
+    "Time spent watching it" : 10
+
+pie title What Voldemort doesn't have?
+    "FRIENDS" : 2
+    "FAMILY" : 3
+    "NOSE" : 45
+
+Percentages will be calculated automatically.

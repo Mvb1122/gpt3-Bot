@@ -1,0 +1,49 @@
+sequenceDiagram
+    Alice->>John: Hello John, how are you?
+    John-->>Alice: Great!
+    Alice-)John: See you later!
+
+The arrows represent the flow of messages, and the names represent the names of users. You can add content to each message by putting a colon and following it with the content.
+
+Here's another example:
+sequenceDiagram
+    participant A as Alice
+    participant J as John
+    A->>J: Hello John, how are you?
+    J->>A: Great!
+
+In this example, the participants are created manually and assigned an alias. This means that the long name will appear on the diagram, but you only need to put the single letter.
+
+Here's one final example:
+sequenceDiagram
+    Alice->>Bob: Hello Bob, how are you ?
+    Bob->>Alice: Fine, thank you. And you?
+    create participant Carl
+    Alice->>Carl: Hi Carl!
+    create actor D as Donald
+    Carl->>D: Hi!
+    destroy Carl
+    Alice-xCarl: We are too many
+    destroy Bob
+    Bob->>Alice: I agree
+
+In this example, the user carl and Donald are created at an arbitary time and then removed at a later point using the `create` keyword.
+It is then removed at a later point using the `destroy` keyword.
+WHEN USING THE CREATE OR DESTROY KEYWORD, YOU MUST include a message immedately after which is to be shown at the point in when the creation or destruction is to happen.
+
+There are multiple different kinds of lines you can draw: 
+->	Solid line without arrow
+-->	Dotted line without arrow
+->>	Solid line with arrowhead
+-->>	Dotted line with arrowhead
+-x	Solid line with a cross at the end
+--x	Dotted line with a cross at the end.
+-)	Solid line with an open arrow at the end (async)
+--)	Dotted line with a open arrow at the end (async)
+
+You can add text notes:
+sequenceDiagram
+    participant John
+    Note right of John: Text in note
+
+The valid positions for notes are: "Right of" | "Left of" | "Over"

@@ -4,6 +4,15 @@ const { Voice, DefaultEmbedding } = require('../VoiceV2');
 const Path = require('path');
 const fp = require('fs/promises');
 
+/*
+const x = [{
+  "name": "Speak",
+  "parameters": {
+    "text": "Hello world!"
+  }
+}]
+*/
+
 module.exports = {
     keywords: "voice, speak, read aloud",
     json:

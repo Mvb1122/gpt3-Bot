@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 module.exports = {
-  keywords: "what functions, what tools, what can you do",
+  keywords: "what functions, what tools, what can you do, functions, tools",
   json:
   {
     "name": "ListFunctions",

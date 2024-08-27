@@ -1,0 +1,66 @@
+flowchart TD
+    Start --> Stop
+
+flowchart LR
+    Start --> Stop
+
+The first two letters after "flowchart" describe the direction that nodes are to flow. You can use any of:
+TB - Top to bottom
+TD - Top-down/ same as top to bottom
+BT - Bottom to top
+RL - Right to left
+LR - Left to right
+
+You can have nodes flow to eachother using IDs: 
+flowchart LR
+    id --> id2
+    id2 --> id3
+    id3 --> id
+
+Note that, initially, the ID will be what's displayed in the node but it CANNOT have spaces. 
+In order to have nodes with spaces in them, you must use text nodes:
+flowchart LR
+    id[This is the text in the box] --> id2
+    id2 --> id
+
+You must still use the ID to refer to the node when creating relationships between nodes.
+
+You can add subgraphs, as seen in this example:
+flowchart TB
+    c1-->a2
+    subgraph one
+    a1-->a2
+    end
+    subgraph two
+    b1-->b2
+    end
+    subgraph three
+    c1-->c2
+    end
+    one --> two
+    three --> two
+    two --> c2
+
+There are many different types of nodes you can use: 
+flowchart LR
+    id1[(This is a database!)]
+    id2[[This is the text in the box]]
+    id3([This is the text in a rounded square.])
+    id4{This is text in a rhombus. It's good for noting split paths.}
+
+If your text includes (parenthesis) in it, you MUST put quotes around it.
+
+Here's an example illustrating a decision:
+flowchart TD
+    C{"Choose Type"}
+    C --> D["Pie"] & E["flowchart"] & F["etc..."] 
+
+As seen above, you can map multiple node connections at once using the & character to note that it's happening to multiple targets. Additionally, note that it's best to use a Rhombus for decisions! 
+Remember that a Rhombus will have text in {curly brackets}
+
+There are several different ways of connecting nodes:
+flowchart LR
+    C -- This is the text! --- D
+    C --> D
+    C--- |This is the Text!|D
+    C-->|text|D

@@ -1,0 +1,48 @@
+mindmap
+  root((mindmap))
+    Origins
+      Long history
+      Popularisation
+        British popular psychology author Tony Buzan
+    Research
+      On effectiveness<br/>and features
+      On Automatic creation
+        Uses
+            Creative techniques
+            Strategic planning
+            Argument mapping
+    Tools
+      Pen and paper
+      Mermaid
+
+You should not match what's above exactly; it's just a guide. Do not include Tony Buzan in your mindmap.
+You can change the shape of certain nodes by doing as in this example:
+
+mindmap
+    id(I am a rounded square)
+
+You can use (parenthesis) for rounded squares, ((double parenthesis)) for circles.
+You can use {{double curly brackets}} for hexagons. DO NOT USE (((triple parenthesis)))! THEY BREAK STUFF.
+
+Here's a really simple example:
+mindmap
+  Root
+      A
+        B
+        C
+
+You may use icons:
+mindmap
+    Root
+        A
+        ::icon(fa fa-book)
+
+When using icons, you must put the icon line beneath the item to have the icon.  All in all, the line should look like:
+::icon(fa fa-DESCRIPTION)
+Where DESCRIPTION is what you want to be displayed, with dashes instead of spaces.
+
+Here are all of the DESCRIPTION you can use.
+"yin-yang","yen-sign","x-ray","wrench","won-sign","wine-glass-alt","wine-glass","wine-bottle","window-restore","window-minimize","window-maximize","window-close","wind","wifi","wheelchair","weight-hanging","weight","wave-square","water","warehouse","wallet","walking","vr-cardboard","vote-yea","volume-up","volume-off","volume-mute","volume-down","volleyball-ball","voicemail","viruses","virus-slash","virus","vihara","video-slash","video","vials","vial","vest-patches","vest","venus-mars","venus-double","venus","vector-square","utensils","utensil-spoon","users-slash","users-cog","users","user-times","user-tie","user-tag","user-slash","user-shield","user-secret","user-plus","user-nurse","user-ninja","user-minus","user-md","user-lock","user-injured","user-graduate","user-friends","user-edit","user-cog","user-clock","user-circle","user-check","user-astronaut","user-alt-slash","user-alt","user","upload","unlock-alt","unlock","unlink","university","universal-access","undo-alt","undo","underline","umbrella-beach","umbrella","tv","tty","tshirt","truck-pickup","truck-moving","truck-monster","truck-loading","truck","trophy","tree","trash-restore-alt","trash-restore","trash-alt","trash","transgender-alt","transgender","tram","train","trailer","traffic-light","trademark","tractor","torii-gate","torah","tooth","tools","toolbox","toilet-paper-slash","toilet-paper","toilet","toggle-on","toggle-off","tired","tint-slash","tint","times-circle","times","ticket-alt","thumbtack","thumbs-up","thumbs-down","thermometer-three-quarters","thermometer-quarter","thermometer-half","thermometer-full","thermometer-empty","thermometer","theater-masks","th-list","th-large","th","text-width","text-height","terminal","tenge","temperature-low","temperature-high","teeth-open","teeth","taxi","tasks","tape","tags","tag","tachometer-alt","tablets","tablet-alt","tablet","table-tennis","table","syringe","sync-alt","sync","synagogue","swimming-pool","swimmer","swatchbook","surprise","superscript","sun","suitcase-rolling","suitcase","subway","subscript","stroopwafel","strikethrough","street-view","stream","store-slash","store-alt-slash","store-alt","store","stopwatch-20","stopwatch","stop-circle","stop"
+
+
+Please only use circles for VERY major topics.

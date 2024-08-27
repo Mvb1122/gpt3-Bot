@@ -6,7 +6,7 @@
 
 
 //Ignore ts(80001)
-const { SlashCommandBuilder, CommandInteraction, Channel, Webhook, WebhookClient, Message, User, TextBasedChannel } = require('discord.js');
+const { SlashCommandBuilder, CommandInteraction, Channel, Webhook, WebhookClient, Message, User, TextBasedChannel, EmbedBuilder } = require('discord.js');
 const HFAIModelHandler = require('../HFAIModelHandler');
 const { DEBUG, client } = require('..');
 const { PredictContent, ConnectToPreset } = require('../Gradio/Gradio_Stuff');
@@ -14,11 +14,12 @@ const fp = require('fs/promises');
 const EditMessagePrefix = "e- ";
 const { Wait } = require('../Helpers');
 const { GetUserFile } = require('../User');
-const { GetPromptsFromPlaintextUsingGPT } = require('../Gradio/Helpers');
+const { GetPromptsFromPlaintextUsingGPT, Download } = require('../Gradio/Helpers');
 const token = require('../token');
 const { WriteToLogChannel } = require('../Security');
 const { MessagePayload } = require('discord.js');
 const { GetSuggestedPersonaNames } = require('./SetPersona');
+const Path = require('path');
 
 // const JudgerModel = HFAIModelHandler.CreateModelHandler('MicahB/emotion_text_classifier', "text-classification")
 const EmotionalJudgerModel = HFAIModelHandler.CreateModelHandler("MicahB/roberta-base-go_emotions", "text-classification", undefined, undefined, true);
@@ -38,7 +39,7 @@ let TrackingSets = [
 if (DEBUG) 
     TrackingSets.push({
         UserID: token.GetToken("devDiscordID"),
-        Name: "Micah"
+        Name: "Cat Micah"
     })
 
 module.exports = {
@@ -157,8 +158,28 @@ module.exports = {
      * @param {Message} message The inputted message. 
      */
     async OnMessageRecieved(message) {
+        // Ignore bots.
+        if (message.author.bot) return;
+
         // If we've got a message from a tracked user, then delete their message and send it.
-        const AlreadySetup = TrackingSets.find(v => { return v.UserID == message.author.id; });
+        let AlreadySetup = TrackingSets.find(v => { 
+            const ThisIsTracking = v.UserID == message.author.id;
+            return ThisIsTracking; 
+        });
+
+        // If we don't find something setup, then check their UserFile. 
+        if (AlreadySetup == undefined && message.content.indexOf("-") != -1) {
+            const User = await GetUserFile(message.author.id);
+            const MatchingPersona = User.personas.find(v => message.content.toLowerCase().startsWith(v.name.toLowerCase()));
+            if (MatchingPersona) {
+                AlreadySetup = {
+                    UserID: message.author.id,
+                    Name: MatchingPersona.name
+                }
+                message.content = message.content.substring(message.content.indexOf("-") + 1).trim();
+            }
+        }
+
         if (AlreadySetup) {
             // If we're editing a message, do the edit.
             if (message.content.startsWith(EditMessagePrefix)) {
@@ -181,11 +202,13 @@ module.exports = {
                 }
             }
 
-            // Scrape necessary data before they get removed alongside the message.
+            
             const content = message.content + "";
             const name = AlreadySetup.Name;
             SendMessageAsName(content, name);
         }
+
+        /*
         // If we get a message which starts with one of the user's persona's names, use that instead.
             // Only check messages with - in them.
         else if (message.content.indexOf('-') != -1) {
@@ -196,6 +219,7 @@ module.exports = {
                 SendMessageAsName(message.content.substring(PersonaAtStart.name.length + 1), PersonaAtStart.name);
             }
         }
+        */
 
         // If we get a message, and it's replying to a webhook's message, then forward the user who made that message.
         if (message.reference != null) {
@@ -215,9 +239,12 @@ module.exports = {
             if (hook) {
                 // If we're here, that means that the stuff matched up, and so we can try to ping the last user of this hook.
                 const userId = GetLastHookUserID(message.channel, hook.name)
-                const notif = await message.channel.send(`<@${userId}>`)
-                // await Wait(3000);
-                return notif.delete();
+                if (userId == -1) return;
+                else {
+                    const notif = await message.channel.send(`<@${userId}>`)
+                    // await Wait(3000);
+                    return notif.delete();
+                }
             }
         }
 
@@ -227,8 +254,22 @@ module.exports = {
             const user = message.author.fetch();
 
             // Get a list of URLs of attachments.
-            let fileURLs = message.attachments.map(v => { return v.proxyURL; });
+            let FilePaths = await Promise.all(message.attachments.map(v => { return new Promise(res => {
+                Download(v.url, Path.resolve(`./Temp/${v.name}`)).then(a => {
+                    res(a)
+                })
+            })}));
 
+            // Get reply info.
+            const reply = message.reference ? (await message.fetchReference()) : undefined;
+            let embed = undefined;
+            if (reply) {
+                embed = new EmbedBuilder()
+                    .setTitle("Reply to:")
+                    .setURL(`https://discord.com/channels/${message.guildId}/${message.channelId}/${reply.id}`)
+                    .setDescription(reply.content);
+            }
+            
             // Remove the message.
             if (message.deletable) await message.delete();
 
@@ -237,7 +278,8 @@ module.exports = {
             // if (client.channels.cache.has(channelId)) client.channels.cache.sweep(v => {return v.id == channelId});
             const channel = client.channels.fetch(channelId);
 
-            SendAsWebhookInChannel(content, await user, await channel, name, fileURLs);
+            await SendAsWebhookInChannel(content, await user, await channel, name, FilePaths, false, embed);
+            FilePaths.forEach(p => fp.unlink(p));
         }
         //#region Autistic emotion displayer.
         /*
@@ -274,195 +316,205 @@ let LastHookMessages = []
  * @param {TextBasedChannel} channel 
  * @param {string} name 
  * @param {string[] | undefined} [fileURLs=undefined] Files to attach.
+ * @param {boolean} [DoPing=true] Whether to do pings or not.
+ * @param {EmbedBuilder} Embed
+ * @returns {Promise} Resolves when complete.
  */
-function SendAsWebhookInChannel(text, user, channel, name, fileURLs = undefined) {
-    let imageMade = false, emotion = null;
-    const MakeImageFunction = () => {
-        return new Promise(async (res) => {
-            /**
-             * @type {"Admiration"|"Amusement"|"Anger"|"Annoyance"|"Approval"|"Caring"|"Confusion"|"Curiosity"|"Desire"|"Disappointment"|"Disapproval"|"Disgust"|"Embarrassment"|"Excitement"|"Fear"|"Gratitude"|"Grief"|"Joy"|"Love"|"Nervousness"|"Optimism"|"Pride"|"Realization"|"Relief"|"Remorse"|"Sadness"|"Surprise"|"Neutral"}
-             */
-            emotion = (await EmotionalJudgerModel.Run(text))[0].label;
+function SendAsWebhookInChannel(text, user, channel, name, fileURLs = undefined, DoPing = true, Embed) {
+    return new Promise(resolve => {
+        let imageMade = false, emotion = null;
+        const MakeImageFunction = () => {
+            return new Promise(async (res) => {
+                /**
+                 * @type {"Admiration"|"Amusement"|"Anger"|"Annoyance"|"Approval"|"Caring"|"Confusion"|"Curiosity"|"Desire"|"Disappointment"|"Disapproval"|"Disgust"|"Embarrassment"|"Excitement"|"Fear"|"Gratitude"|"Grief"|"Joy"|"Love"|"Nervousness"|"Optimism"|"Pride"|"Realization"|"Relief"|"Remorse"|"Sadness"|"Surprise"|"Neutral"}
+                 */
+                emotion = (await EmotionalJudgerModel.Run(text))[0].label;
 
-            // Add a special thing to the prompt based on emotion. 
-            let SuggestedTags = "";
-            switch (emotion) {
-                case "anger":
-                    SuggestedTags += "((angry))";
-                    break;
+                // Add a special thing to the prompt based on emotion. 
+                let SuggestedTags = "";
+                switch (emotion) {
+                    case "anger":
+                        SuggestedTags += "((angry))";
+                        break;
 
-                case "disgust":
-                    SuggestedTags += "((disgust))";
-                    break;
+                    case "disgust":
+                        SuggestedTags += "((disgust))";
+                        break;
 
-                case "fear":
-                    SuggestedTags += "((fear))";
-                    break;
+                    case "fear":
+                        SuggestedTags += "((fear))";
+                        break;
 
-                case 'joy':
-                    SuggestedTags += "smile, happy, (sparkles)";
-                    break;
+                    case 'joy':
+                        SuggestedTags += "smile, happy, (sparkles)";
+                        break;
 
-                case 'neutral':
-                    break;
+                    case 'neutral':
+                        break;
 
-                case 'sadness':
-                    SuggestedTags += "crying, sobbing";
-                    break;
+                    case 'sadness':
+                        SuggestedTags += "crying, sobbing";
+                        break;
 
-                case 'surprise':
-                    SuggestedTags += "((surprised)), dilated pupils, wide-eyed";
-                    break;
+                    case 'surprise':
+                        SuggestedTags += "((surprised)), dilated pupils, wide-eyed";
+                        break;
 
-                case 'admiration':
-                    SuggestedTags += "((star eyes)), dilated pupils";
-                    break;
+                    case 'admiration':
+                        SuggestedTags += "((star eyes)), dilated pupils";
+                        break;
 
-                case 'amusement':
-                    SuggestedTags += "smile";
-                    break;
+                    case 'amusement':
+                        SuggestedTags += "smile";
+                        break;
 
-                case 'annoyance':
-                    SuggestedTags += "((sigh))";
-                    break;
+                    case 'annoyance':
+                        SuggestedTags += "((sigh))";
+                        break;
 
-                case 'approval':
-                    SuggestedTags += "slight smile, eyes open, nod";
-                    break;
+                    case 'approval':
+                        SuggestedTags += "slight smile, eyes open, nod";
+                        break;
 
-                case 'caring':
-                    SuggestedTags += "slight smile, slightly tilted head";
-                    break;
+                    case 'caring':
+                        SuggestedTags += "slight smile, slightly tilted head";
+                        break;
 
-                case 'confusion':
-                    SuggestedTags += "((confusion)), slightly parted lips, tilted head, narrowed eyes";
-                    break;
+                    case 'confusion':
+                        SuggestedTags += "((confusion)), slightly parted lips, tilted head, narrowed eyes";
+                        break;
 
-                case 'curiosity':
-                    SuggestedTags += "raised eyebrows, slightly parted lips, slight smile";
-                    break;
+                    case 'curiosity':
+                        SuggestedTags += "raised eyebrows, slightly parted lips, slight smile";
+                        break;
 
-                case 'desire':
-                    SuggestedTags += "((heart-shaped_pupils)), blush";
-                    break;
+                    case 'desire':
+                        SuggestedTags += "((heart-shaped_pupils)), blush";
+                        break;
 
-                case 'disappointment':
-                    SuggestedTags += "looking away, slight frown, sigh";
-                    break;
+                    case 'disappointment':
+                        SuggestedTags += "looking away, slight frown, sigh";
+                        break;
 
-                case 'disapproval':
-                    SuggestedTags += "furrowed brow, tight lips, head shake";
-                    break;
+                    case 'disapproval':
+                        SuggestedTags += "furrowed brow, tight lips, head shake";
+                        break;
 
-                case 'embarrassment':
-                    SuggestedTags += "blushing, averted gaze, awkward smile";
-                    break;
+                    case 'embarrassment':
+                        SuggestedTags += "blushing, averted gaze, awkward smile";
+                        break;
 
-                case 'excitement':
-                    SuggestedTags += "((star eyes)), wide eyes, raised eyebrows, smile";
-                    break;
+                    case 'excitement':
+                        SuggestedTags += "((star eyes)), wide eyes, raised eyebrows, smile";
+                        break;
 
-                case 'gratitude':
-                    SuggestedTags += "smile, teary eyes, nodding";
-                    break;
+                    case 'gratitude':
+                        SuggestedTags += "smile, teary eyes, nodding";
+                        break;
 
-                case 'grief':
-                    SuggestedTags += "crying, sobbing, monochrome, looking away";
-                    break;
+                    case 'grief':
+                        SuggestedTags += "crying, sobbing, monochrome, looking away";
+                        break;
 
-                case 'love':
-                    SuggestedTags += "((heart eyes)), blush";
-                    break;
+                    case 'love':
+                        SuggestedTags += "((heart eyes)), blush";
+                        break;
 
-                case 'nervousness':
-                    SuggestedTags += "lip biting, slightly wide eyes, looking away";
-                    break;
+                    case 'nervousness':
+                        SuggestedTags += "lip biting, slightly wide eyes, looking away";
+                        break;
 
-                case 'optimism':
-                    SuggestedTags += "smile, eyes closed";
-                    break;
+                    case 'optimism':
+                        SuggestedTags += "smile, eyes closed";
+                        break;
 
-                case 'pride':
-                    SuggestedTags += "slight smile, staring";
-                    break;
+                    case 'pride':
+                        SuggestedTags += "slight smile, staring";
+                        break;
 
-                case 'realization':
-                    SuggestedTags += "eyes open, ((shock)), slightly parted lips";
-                    break;
+                    case 'realization':
+                        SuggestedTags += "eyes open, ((shock)), slightly parted lips";
+                        break;
 
-                case 'relief':
-                    SuggestedTags += "(sigh), slight smile, eyes closed";
-                    break;
+                    case 'relief':
+                        SuggestedTags += "(sigh), slight smile, eyes closed";
+                        break;
 
-                case 'remorse':
-                    SuggestedTags += "tense lips, sad";
-                    break;
+                    case 'remorse':
+                        SuggestedTags += "tense lips, sad";
+                        break;
 
-                default:
-                    break;
-            }
+                    default:
+                        break;
+                }
 
-            // Check if the user has a persona. 
-            let prompt = "";
-            if ((await GetUserFile(user.id)).persona != "") {
-                // If the user has a persona, use their persona to generate a face for them. Then, add the suggested tags.
-                prompt = await GetUserFacePlainTags(user.id, name);
-                prompt += `, ${SuggestedTags}`;
-            } else {
-                prompt = `1girl, absurdres, extreme_close_up, purple eyes, black hair, short hair, ${SuggestedTags}`;
-            }
+                // Check if the user has a persona. 
+                let prompt = "";
+                if ((await GetUserFile(user.id)).persona != "") {
+                    // If the user has a persona, use their persona to generate a face for them. Then, add the suggested tags.
+                    prompt = await GetUserFacePlainTags(user.id, name);
+                    prompt += `, ${SuggestedTags}`;
+                } else {
+                    prompt = `1girl, absurdres, extreme_close_up, purple eyes, black hair, short hair, ${SuggestedTags}`;
+                }
 
-            imageMade = PredictContent({
-                prompt: prompt, // await prompt
-                width: 512,
-                height: 512
-            }, true);
+                imageMade = PredictContent({
+                    prompt: prompt, // await prompt
+                    width: 512,
+                    height: 512
+                }, true);
 
-            res(await imageMade);
-        });
-    };
+                res(await imageMade);
+            });
+        };
 
-    // Create the webhook.   
-    const ThreadID = channel.isThread() ? channel.id : undefined;
-    GetWebhook(channel, name, MakeImageFunction)
-        .then(
-            /** @param {Webhook} webhook */
-            async (webhook) => {
-                if (DEBUG)
-                    console.log(`Got webhook ${webhook.name}`);
+        // Create the webhook.   
+        const ThreadID = channel.isThread() ? channel.id : undefined;
+        GetWebhook(channel, name, MakeImageFunction)
+            .then(
+                /** @param {Webhook} webhook */
+                async (webhook) => {
+                    if (DEBUG)
+                        console.log(`Got webhook ${webhook.name}`);
 
-                const whclient = new WebhookClient({ id: webhook.id, token: webhook.token });
-                const message = await whclient.send({
-                    content: text,
-                    threadId: ThreadID,
-                    files: fileURLs
-                });
+                    const HasEmbed = Embed != undefined;
+                    const whclient = new WebhookClient({ id: webhook.id, token: webhook.token });
+                    const message = await whclient.send({
+                        content: text,
+                        threadId: ThreadID,
+                        files: fileURLs,
+                        allowedMentions: DoPing ? undefined : { parse: [] },
+                        embeds: HasEmbed ? [Embed] : undefined
+                    });
 
-                // Add the message use.
-                const LastHookUse = LastHookMessages.find(v => v.ChannelId == channel.id);
-                if (LastHookUse)
-                    LastHookMessages.splice(LastHookMessages.indexOf(LastHookUse), 1);
-                LastHookMessages.push({
-                    ChannelId: channel.id,
-                    Name: name,
-                    MessageID: message.id
-                });
-    
-                // webhook.delete("Message sent complete.");
-                // Add the hook use.
-                AddLastHookUse(channel, user.id, name);
+                    // Add the message use.
+                    const LastHookUse = LastHookMessages.find(v => v.ChannelId == channel.id);
+                    if (LastHookUse)
+                        LastHookMessages.splice(LastHookMessages.indexOf(LastHookUse), 1);
+                    LastHookMessages.push({
+                        ChannelId: channel.id,
+                        Name: name,
+                        MessageID: message.id
+                    });
 
-                // Write to log channel.
-                await WriteToLogChannel(channel.guildId, {
-                    content: `\`${user.globalName}\` as \`${name}\` wrote in <#${channel.id}>: ${text}${imageMade ? `\nEmotion: \`${emotion}\`\nNew PFP:` : ""}`, // Write also about the new PFP if one was made.
-                    files: imageMade ? [webhook.avatarURL({size: 2048})] : undefined // Send the pfp as a url so that way it doesn't have to be uploaded twice.
-                });
+                    // webhook.delete("Message sent complete.");
+                    // Add the hook use.
+                    AddLastHookUse(channel, user.id, name);
 
-                if (imageMade)
-                    // Delete the pfp.
-                    fp.unlink(await imageMade);
-            })
-        .catch(console.error);
+                    // Write to log channel.
+                    await WriteToLogChannel(channel.guildId, {
+                        content: `\`${user.globalName}\` as \`${name}\` wrote in <#${channel.id}>: ${text}${imageMade ? `\nEmotion: \`${emotion}\`\nNew PFP:` : ""}`, // Write also about the new PFP if one was made.
+                        files: imageMade ? [webhook.avatarURL({ size: 2048 })] : undefined // Send the pfp as a url so that way it doesn't have to be uploaded twice.,
+                    });
+
+                    if (imageMade)
+                        // Delete the pfp.
+                        fp.unlink(await imageMade);
+
+                    resolve();
+                })
+            .catch(console.error);
+    })
 }
 
 /**
@@ -509,6 +561,7 @@ console.log(GetLastHookUserID("776686811618476072", "303011705598902273"))
  * @param {Channel} channel 
  * @param {string} name 
  * @param {() => string | string} [imagePath=undefined] Or a function that returns an image path to use.
+ * @param {boolean} [hasReply=false] Whether the request for a webhook has a reply on the message.
  * @returns {Promise<Webhook>}
  */
 async function GetWebhook(channel, name, imagePath) {    
@@ -542,7 +595,8 @@ async function GetWebhook(channel, name, imagePath) {
         }
 
         // Only make a new profile picture if the last message wasn't from this webhook or if it was from more than a minute ago.
-        const ShouldMakePFP = (lastMessage && (lastMessage.author.id != hook.id || Date.now() - lastMessage.createdTimestamp >= 60000)) || lastMessage == null;
+        const ShouldMakePFP = (lastMessage && (lastMessage.author.id != hook.id || Date.now() - lastMessage.createdTimestamp >= 60000)) 
+            || lastMessage == null
 
         if (ShouldMakePFP && imagePath) 
             await hook.edit({

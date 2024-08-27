@@ -97,6 +97,6 @@ module.exports = {
       })
     })
 
-    return JSON.stringify({ sucessful: true, reason: `Image queued! The user will be able to see it soon. Do not send the image yourself, it will be sent automatically. Do not send [Image: ${parameters.content.substring(0, parameters.content.indexOf(" "))}] or whatever. Also, make sure to be creative next time you use this function.\nPassed prompt: ${parameters.content}\nNumber of images: ${parameters.count}` });
+    return JSON.stringify({ sucessful: true, reason: `Image queued! The user will be able to see it soon. Do not send the image yourself, it will be sent automatically. DO NOT WRITE [Image: ${parameters.content.substring(0, parameters.content.indexOf(" "))}] or ANYTHING SIMILAR.\nPassed prompt: ${parameters.content}\nNumber of images: ${parameters.count}` });
   }
 }

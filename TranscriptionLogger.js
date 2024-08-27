@@ -53,7 +53,6 @@ module.exports = {
     async LogTo(GuildId, Type, Name = "A User", NewLogContent = undefined, UserID = null) {
         // Get log.
         if (Logs[GuildId] == undefined) return;
-
         
         // Run OnLog things.
         for (let i = 0; i < Logs[GuildId].Listeners.length; i++) Logs[GuildId].Listeners[i](Type, Name, NewLogContent);
@@ -95,6 +94,7 @@ module.exports = {
         }
 
         // Decide whether to send a message or to edit one.
+        if (Logs[GuildId] == undefined || (Logs[GuildId] && Logs[GuildId].ChannelId == undefined)) return;
         let { last, output } = await GetLastMessageAndOutputChannel(GuildId);
         if (UserID == undefined || !UseWH) {
             try {
