@@ -1,6 +1,6 @@
 //Ignore ts(80001)
 const { ContextMenuCommandBuilder, ApplicationCommandType, MessageContextMenuCommandInteraction, ButtonStyle } = require('discord.js');
-const { Transcribe } = require('../VoiceV2');
+const { Transcribe, Caption } = require('../VoiceV2');
 const { ButtonBuilder } = require('discord.js');
 const { ActionRowBuilder } = require('discord.js');
 const { Download } = require('../Gradio/Helpers');
@@ -9,7 +9,7 @@ const fp = require('fs/promises')
 
 module.exports = {
     data: new ContextMenuCommandBuilder()
-        .setName("Transcribe File")
+        .setName("Caption Images")
         .setType(ApplicationCommandType.Message),
 
     /**
@@ -24,7 +24,7 @@ module.exports = {
         const message = interaction.targetMessage;
         let attachments = message.attachments;
 
-        if (attachments.size == 0 || !attachments.some(v => v.contentType.includes("audio"))) interaction.editReply("This message has no audio attachments to transcribe!");
+        if (attachments.size == 0 || !attachments.some(v => v.contentType.includes("image"))) interaction.editReply("This message has no image attachments to transcribe!");
 
         if (attachments.size > 1) {
             /**
@@ -44,12 +44,12 @@ module.exports = {
 
             async function AwaitResponse() {
                 const click = await (await response).awaitMessageComponent();
-                click.deferReply({ ephemeral: true })
+                const reply = click.deferReply({ ephemeral: true })
 
                 // Find the file.
                 const file = attachments.find(v => {
                     return v.name == click.customId;
-                })            
+                });            
                 
                 // Remove the button.
                     // Remove the attachment.
@@ -73,25 +73,28 @@ module.exports = {
                     AwaitResponse();
                 
                 // Download and transcribe.
-                const p = await Download(file.url, Path.resolve(`./Temp/${file.name}`));
-                const transcription = await Transcribe(p);
-                fp.unlink(p);
-                click.editReply('Transcription: ```' + transcription + "```");
+                const caption = await Caption(file.url, "<MORE_DETAILED_CAPTION>");
+                await reply;
+                click.editReply({
+                    content: 'Caption: ```' + caption + "```",
+                    files: [file.url]
+                });
             }
             AwaitResponse();
         } else if (attachments.size == 1) {
             // Transcribe first file.
             const file = message.attachments.at(0);
-            const p = await Download(file.url, Path.resolve(`./Temp/${file.name}`));
-            const transcription = await Transcribe(p);
-            await interaction.editReply('Transcription: ```' + transcription + "```");
-            fp.unlink(p);
+            const caption = await Caption(file.url, "<MORE_DETAILED_CAPTION>");
+            await interaction.editReply({
+                content: 'Caption: ```' + caption + "```",
+                files: [file.url]
+            });
         }
 
         function RemakeButtons() {
             buttons = [];
             attachments.forEach((file, key) => {
-                if (file.contentType.includes("audio") || file.contentType.includes("video")) {
+                if (file.contentType.startsWith("image/")) {
                     // Add a button.
                     const b = new ButtonBuilder()
                         .setCustomId(file.name)

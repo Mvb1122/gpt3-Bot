@@ -35,6 +35,7 @@ const PolicyDefaults = {
 const fp = require('fs/promises');
 const fs = require('fs');
 const Index = require('./index');
+const { GuildMember } = require('discord.js');
 
 const FileNames = {
     Security: "./Security.json",
@@ -132,6 +133,19 @@ async function SetPolicy(gid, policy, value) {
 }
 
 /**
+ * Tells if a particular GUILD MEMBER has the guild's mod role.
+ * @param {GuildMember} user 
+ */
+async function HasModRole(user) {
+    if (!HasPolicy(user.guild.id, "modrole")) return false;
+    else {
+        // Look for the role.
+        const roleId = GetPolicy(user.guild.id, "modrole");
+        return user.roles.cache.some(v => v.id == roleId);
+    }
+}
+
+/**
  * Log for all servers.
  * @type {{GuildID: [string]}}
  */
@@ -212,5 +226,5 @@ async function WriteToLogChannel(guildId, message) {
 }
 
 module.exports = {
-    ReloadSecurity, SaveSecurity, GetPolicy, SetPolicy, policies, policyTypes, policyHelp, WriteToLogChannel, HasPolicy
+    ReloadSecurity, SaveSecurity, GetPolicy, SetPolicy, policies, policyTypes, policyHelp, WriteToLogChannel, HasPolicy, HasModRole
 }

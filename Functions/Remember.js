@@ -41,6 +41,9 @@ module.exports = {
   
       fp.writeFile(MemoriesFile, JSON.stringify(text));
   
+      // Tell the user that a memory was added.
+      if (DiscordMessage)
+        DiscordMessage.channel.send("```java\n// Memory added:\n" + parameters.text + "\n```")
       return `Memory saved! Content: ${parameters.text}`;
     } else return "You already know that!"
   }

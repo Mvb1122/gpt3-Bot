@@ -17,7 +17,9 @@ module.exports = {
    * @param {Discord.Message | Discord.CommandInteraction} DiscordMessage 
    */
   async execute(parameters, DiscordMessage = null) {
-    const files = fs.readdirSync(__dirname).map(v => {
+    const files = fs.readdirSync(__dirname)
+    .filter(v => v.includes("js"))
+    .map(v => {
         const f = require(path.resolve(__dirname + "/" + v));
         return {
             name: f.json.name,

@@ -65,6 +65,11 @@ module.exports = {
         
         
         if (DEBUG && DiscordMessage) SendMessage(DiscordMessage, `Recalling: ${parameters.text} ${JSON.stringify(data)}`);
+
+        // Tell the user that a memory was added.
+        else if (DiscordMessage)
+          DiscordMessage.channel.send("```java\n// Memory recalled:\n" + data.answer + "\n```");
+        
         return JSON.stringify(data);
     },
 

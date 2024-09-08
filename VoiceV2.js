@@ -70,6 +70,7 @@ let Started = false,
 /** A boolean which states if the transcription AI has been loaded or not. */
 transcribe_loaded = false;
 
+let LastRequest = null;
 /**
  * Posts the data to the given URL.
  * @param {String} URL The URL to post to.
@@ -77,7 +78,10 @@ transcribe_loaded = false;
  * @returns {Promise<Object>} The JSON back from the server.
  */
 function postJSON(URL, data) {
-    return new Promise(async (res, rej) => {
+    const thisRequest = new Promise(async (res, rej) => {
+        // Wait for the previous request to go through.
+        if (LastRequest != null) await LastRequest;
+
         let request = fetch(URL, {
             headers: {
                 'Accept': 'application/json',
@@ -95,11 +99,18 @@ function postJSON(URL, data) {
             } catch {
                 // If something goes wrong, let's restart the server before moving on.
                 await Restart();
-
                 rej(text);
             }
+        }, async (a) => {
+            // If something goes wrong, let's restart the server before moving on.
+            const text = await a.text();
+            rej(text);
+            await Restart();
+            console.log(text);
         });
-    })
+    });
+    LastRequest = thisRequest;
+    return thisRequest;
 }
 
 /**
@@ -181,6 +192,7 @@ async function Restart() {
     const transcribe_loaded_before = transcribe_loaded;
     await Stop();
     const start = Start();
+    LastRequest = null;
     if (transcribe_loaded_before) {
         await start;
         await PreloadTranscribe();
@@ -497,6 +509,29 @@ module.exports = {
         })
     }
     */
+
+    /**
+     * Captions an image loaded locally.
+     * @param {string} location Where to caption from.
+     * @param {'<CAPTION>' | '<DETAILED_CAPTION>' | '<MORE_DETAILED_CAPTION>' } mode what task to do.
+     * @returns {Promise<string>} Resulting value.
+     */
+    Caption(location, mode) {
+        return new Promise(async res => {
+            // Starts up the transcribe stuff.
+            if (!Started) await Start();
+
+            const data = {
+                location: location,
+                mode: mode,
+            };
+
+            postJSON("http://127.0.0.1:4963/caption", data)
+                .then((v) => {
+                    res(v);
+                });
+        })
+    },
 }
 // Debug.
 /*

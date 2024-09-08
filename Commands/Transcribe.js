@@ -193,7 +193,7 @@ module.exports = {
                         do {
                             let end = val.length >= 2000 ? 2000 : val.length
                             if (NumMessages == 1)
-                                await interaction.followUp(val.substring(0, end));
+                                await (await interaction.fetchReply()).reply(val.substring(0, end));
                             else await interaction.channel.send(val.substring(0, end));
                             val = val.substring(end);
                             NumMessages++;

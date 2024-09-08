@@ -9,7 +9,7 @@ module.exports = {
         .setDescription('Connects Gradio to the given API **preset**! (Dev only)')
         .addIntegerOption(option => {
             return option.setName("preset")
-                .setDescription("The preset number to connect to. 1: MPC both, 2: Server, 3: All, 4: MPC Main 4: MPC Secondary")
+                .setDescription("The preset number to connect to. 1: MPC both, 2: Server, 3: All, 4: MPC Main 5: MPC Secondary")
                 .setRequired(true)
                 .setMinValue(1)
                 .setMaxValue(5);

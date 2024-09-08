@@ -4,7 +4,7 @@ tts_model_id = "microsoft/speecht5_tts"
 language_classifier_model_id = "papluca/xlm-roberta-base-language-detection"
 translation_model_id = "facebook/nllb-200-distilled-600M"
 
-from transformers import pipeline
+from transformers import pipeline, AutoProcessor, AutoModelForCausalLM
 from transformers.utils import is_flash_attn_2_available
 from transformers.utils import is_torch_sdpa_available
 import soundfile as sf
@@ -174,6 +174,34 @@ def Make_Music(prompt, output, length = 5):
   sf.write(output, music["audio"][0].T, music["sampling_rate"])
   return True
 
+from PIL import Image
+import requests
+florenceProcessor = None
+florenceModel = None
+def Caption_Image(location, mode):
+  global florenceModel, florenceProcessor
+  if type(florenceModel) is type(None):
+    florenceModel = AutoModelForCausalLM.from_pretrained("multimodalart/Florence-2-large-no-flash-attn", torch_dtype=torch_dtype, trust_remote_code=True).to(device)
+    florenceProcessor = AutoProcessor.from_pretrained("multimodalart/Florence-2-large-no-flash-attn", trust_remote_code=True)
+  
+  # Read Web URLS properly.
+  if ("http" in location):
+    location = requests.get(location, stream=True).raw
+
+  image = Image.open(location).convert("RGB") # Must convert to RGB for safety!
+  inputs = florenceProcessor(text=mode, images=image, return_tensors="pt").to(device, torch_dtype)
+
+  generated_ids = florenceModel.generate(
+      input_ids=inputs["input_ids"],
+      pixel_values=inputs["pixel_values"],
+      max_new_tokens=1024,
+      num_beams=3
+    )
+  generated_text = florenceProcessor.batch_decode(generated_ids, skip_special_tokens=False)[0]
+
+  parsed_answer = florenceProcessor.post_process_generation(generated_text, task=mode, image_size=(image.width, image.height))
+  return parsed_answer[mode]
+
 # Server stuff.
 from flask import Flask, jsonify, request
 app = Flask(__name__)
@@ -257,6 +285,18 @@ def translate_function():
         
       if ('natural' in data) and ('to' in data) and ('from' in data):
           return jsonify(Translate(data['natural'], data['from'], data['to'])), 200
+      else:
+          return jsonify({'error': 'Invalid JSON structure', 'data': data}), 400
+  else:
+      return jsonify({'error': 'Request must be JSON', 'data': request.form }), 400
+  
+@app.route("/caption", methods=['POST'])
+def caption_function():
+  if request.is_json:
+      data = request.get_json()
+        
+      if ('location' in data) and ('mode' in data):
+          return jsonify(Caption_Image(data['location'], data['mode'])), 200
       else:
           return jsonify({'error': 'Invalid JSON structure', 'data': data}), 400
   else:
