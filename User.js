@@ -21,7 +21,7 @@ async function fetchRootBase(id = null) {
     const minutes = now.getMinutes().toString();
 
     let temp = LocalServerSettings.Use ? FunctionCallingRootBase : rootBase;
-    temp = `The current time is ${GetCurrentDate()} at ${now.getHours() + 1}:${minutes.length == 1 ? "0" + minutes : minutes}.` + temp;
+    temp = `\nThe current time is ${GetCurrentDate()} at ${now.getHours() + 1}:${minutes.length == 1 ? "0" + minutes : minutes}.` + temp;
 
     // if (id != null) temp += `The current user is ${(await client.users.fetch(id)).username}!`
 
@@ -37,6 +37,8 @@ async function GetUserFile(userId, IncludeRootBase = true) {
     let InitialRootBase = await fetchRootBase(userId);
     let file = {
         base: "",
+        base_face: "",
+        base_name: "",
         cost: {
             // "8/4/23": 0.03
         },

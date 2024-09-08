@@ -6,10 +6,10 @@
 
 
 //Ignore ts(80001)
-const { SlashCommandBuilder, CommandInteraction, Channel, Webhook, WebhookClient, Message, User, TextBasedChannel, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, CommandInteraction, Channel, Webhook, WebhookClient, Message, User, TextBasedChannel, EmbedBuilder, TextChannel } = require('discord.js');
 const HFAIModelHandler = require('../HFAIModelHandler');
 const { DEBUG, client } = require('..');
-const { PredictContent, ConnectToPreset } = require('../Gradio/Gradio_Stuff');
+const { PredictContent } = require('../Gradio/Gradio_Stuff');
 const fp = require('fs/promises');
 const EditMessagePrefix = "e- ";
 const { Wait } = require('../Helpers');
@@ -20,6 +20,7 @@ const { WriteToLogChannel } = require('../Security');
 const { MessagePayload } = require('discord.js');
 const { GetSuggestedPersonaNames } = require('./SetPersona');
 const Path = require('path');
+const CleanWH = require('./CleanWH');
 
 // const JudgerModel = HFAIModelHandler.CreateModelHandler('MicahB/emotion_text_classifier', "text-classification")
 const EmotionalJudgerModel = HFAIModelHandler.CreateModelHandler("MicahB/roberta-base-go_emotions", "text-classification", undefined, undefined, true);
@@ -41,6 +42,130 @@ if (DEBUG)
         UserID: token.GetToken("devDiscordID"),
         Name: "Cat Micah"
     })
+
+/**
+ * @param {@type {"Admiration"|"Amusement"|"Anger"|"Annoyance"|"Approval"|"Caring"|"Confusion"|"Curiosity"|"Desire"|"Disappointment"|"Disapproval"|"Disgust"|"Embarrassment"|"Excitement"|"Fear"|"Gratitude"|"Grief"|"Joy"|"Love"|"Nervousness"|"Optimism"|"Pride"|"Realization"|"Relief"|"Remorse"|"Sadness"|"Surprise"|"Neutral"}} emotion 
+ * @returns {string} Tags coorelating with the emotion.
+ */
+function GetSuggestedTagsFromEmotion(emotion) {
+    let SuggestedTags = "";
+    switch (emotion) {
+        case "anger":
+            SuggestedTags += "((angry))";
+            break;
+
+        case "disgust":
+            SuggestedTags += "((disgust))";
+            break;
+
+        case "fear":
+            SuggestedTags += "((fear))";
+            break;
+
+        case 'joy':
+            SuggestedTags += "smile, happy, (sparkles)";
+            break;
+
+        case 'neutral':
+            break;
+
+        case 'sadness':
+            SuggestedTags += "crying, sobbing";
+            break;
+
+        case 'surprise':
+            SuggestedTags += "((surprised)), dilated pupils, wide-eyed";
+            break;
+
+        case 'admiration':
+            SuggestedTags += "((star eyes)), dilated pupils";
+            break;
+
+        case 'amusement':
+            SuggestedTags += "smile";
+            break;
+
+        case 'annoyance':
+            SuggestedTags += "((sigh))";
+            break;
+
+        case 'approval':
+            SuggestedTags += "slight smile, eyes open, nod";
+            break;
+
+        case 'caring':
+            SuggestedTags += "slight smile, slightly tilted head";
+            break;
+
+        case 'confusion':
+            SuggestedTags += "((confusion)), slightly parted lips, tilted head, narrowed eyes";
+            break;
+
+        case 'curiosity':
+            SuggestedTags += "raised eyebrows, slightly parted lips, slight smile";
+            break;
+
+        case 'desire':
+            SuggestedTags += "((heart-shaped_pupils)), blush";
+            break;
+
+        case 'disappointment':
+            SuggestedTags += "looking away, slight frown, sigh";
+            break;
+
+        case 'disapproval':
+            SuggestedTags += "furrowed brow, tight lips, head shake";
+            break;
+
+        case 'embarrassment':
+            SuggestedTags += "blushing, averted gaze, awkward smile";
+            break;
+
+        case 'excitement':
+            SuggestedTags += "((star eyes)), wide eyes, raised eyebrows, smile";
+            break;
+
+        case 'gratitude':
+            SuggestedTags += "smile, teary eyes, nodding";
+            break;
+
+        case 'grief':
+            SuggestedTags += "crying, sobbing, monochrome, looking away";
+            break;
+
+        case 'love':
+            SuggestedTags += "((heart eyes)), blush";
+            break;
+
+        case 'nervousness':
+            SuggestedTags += "lip biting, slightly wide eyes, looking away";
+            break;
+
+        case 'optimism':
+            SuggestedTags += "smile, eyes closed";
+            break;
+
+        case 'pride':
+            SuggestedTags += "slight smile, staring";
+            break;
+
+        case 'realization':
+            SuggestedTags += "eyes open, ((shock)), slightly parted lips";
+            break;
+
+        case 'relief':
+            SuggestedTags += "(sigh), slight smile, eyes closed";
+            break;
+
+        case 'remorse':
+            SuggestedTags += "tense lips, sad";
+            break;
+
+        default:
+            break;
+    }
+    return SuggestedTags;
+}
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -151,7 +276,7 @@ module.exports = {
      */
     CanExternal: false,
 
-    GetWebhook, ClearUserFace, GetUserFacePlainTags,
+    GetWebhook, ClearUserFace, GetUserFacePlainTags, GetSuggestedTagsFromEmotion,
 
     /**
      * Executes code when message is recieved.
@@ -331,122 +456,7 @@ function SendAsWebhookInChannel(text, user, channel, name, fileURLs = undefined,
                 emotion = (await EmotionalJudgerModel.Run(text))[0].label;
 
                 // Add a special thing to the prompt based on emotion. 
-                let SuggestedTags = "";
-                switch (emotion) {
-                    case "anger":
-                        SuggestedTags += "((angry))";
-                        break;
-
-                    case "disgust":
-                        SuggestedTags += "((disgust))";
-                        break;
-
-                    case "fear":
-                        SuggestedTags += "((fear))";
-                        break;
-
-                    case 'joy':
-                        SuggestedTags += "smile, happy, (sparkles)";
-                        break;
-
-                    case 'neutral':
-                        break;
-
-                    case 'sadness':
-                        SuggestedTags += "crying, sobbing";
-                        break;
-
-                    case 'surprise':
-                        SuggestedTags += "((surprised)), dilated pupils, wide-eyed";
-                        break;
-
-                    case 'admiration':
-                        SuggestedTags += "((star eyes)), dilated pupils";
-                        break;
-
-                    case 'amusement':
-                        SuggestedTags += "smile";
-                        break;
-
-                    case 'annoyance':
-                        SuggestedTags += "((sigh))";
-                        break;
-
-                    case 'approval':
-                        SuggestedTags += "slight smile, eyes open, nod";
-                        break;
-
-                    case 'caring':
-                        SuggestedTags += "slight smile, slightly tilted head";
-                        break;
-
-                    case 'confusion':
-                        SuggestedTags += "((confusion)), slightly parted lips, tilted head, narrowed eyes";
-                        break;
-
-                    case 'curiosity':
-                        SuggestedTags += "raised eyebrows, slightly parted lips, slight smile";
-                        break;
-
-                    case 'desire':
-                        SuggestedTags += "((heart-shaped_pupils)), blush";
-                        break;
-
-                    case 'disappointment':
-                        SuggestedTags += "looking away, slight frown, sigh";
-                        break;
-
-                    case 'disapproval':
-                        SuggestedTags += "furrowed brow, tight lips, head shake";
-                        break;
-
-                    case 'embarrassment':
-                        SuggestedTags += "blushing, averted gaze, awkward smile";
-                        break;
-
-                    case 'excitement':
-                        SuggestedTags += "((star eyes)), wide eyes, raised eyebrows, smile";
-                        break;
-
-                    case 'gratitude':
-                        SuggestedTags += "smile, teary eyes, nodding";
-                        break;
-
-                    case 'grief':
-                        SuggestedTags += "crying, sobbing, monochrome, looking away";
-                        break;
-
-                    case 'love':
-                        SuggestedTags += "((heart eyes)), blush";
-                        break;
-
-                    case 'nervousness':
-                        SuggestedTags += "lip biting, slightly wide eyes, looking away";
-                        break;
-
-                    case 'optimism':
-                        SuggestedTags += "smile, eyes closed";
-                        break;
-
-                    case 'pride':
-                        SuggestedTags += "slight smile, staring";
-                        break;
-
-                    case 'realization':
-                        SuggestedTags += "eyes open, ((shock)), slightly parted lips";
-                        break;
-
-                    case 'relief':
-                        SuggestedTags += "(sigh), slight smile, eyes closed";
-                        break;
-
-                    case 'remorse':
-                        SuggestedTags += "tense lips, sad";
-                        break;
-
-                    default:
-                        break;
-                }
+                let SuggestedTags = GetSuggestedTagsFromEmotion(emotion);
 
                 // Check if the user has a persona. 
                 let prompt = "";
@@ -566,6 +576,9 @@ console.log(GetLastHookUserID("776686811618476072", "303011705598902273"))
  */
 async function GetWebhook(channel, name, imagePath) {    
     // Get the existing webhooks of the channel.
+    /**
+     * @type {TextChannel}
+     */
     const baseChannel = channel.isThread() ? channel.parent : channel;
     const webhooks = await baseChannel.fetchWebhooks();
     /**
@@ -581,6 +594,14 @@ async function GetWebhook(channel, name, imagePath) {
     }
 
     if (!hook) {
+        if ((await baseChannel.fetchWebhooks()).size == 15) // Clear WHs by spoofing.
+            await CleanWH.execute({
+                reply(x) {
+                    WriteToLogChannel(channel.guildId, "Webhooks in <#" + baseChannel.id + "> cleared!");
+                },
+                channel: channel
+            });
+
         return baseChannel.createWebhook({
             name: name,
             avatar: await GetImagePath(),

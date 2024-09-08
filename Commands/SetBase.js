@@ -24,10 +24,16 @@ module.exports = {
         
         const x = await GetUserFile(id)
         x.base = userBase;
+        // Clear base face.
+        x.base_face = "";
+        x.base_name = "";
         x.sync();
 
-        interaction.editReply({
-            content: "Base set! ```" + userBase + "```",
-        });
+        const text = "Base set! ```" + userBase + "```";
+        if (text.length <= 2000)
+            interaction.editReply({
+                content: text,
+            });
+        else interaction.editReply("Base set!");
     }
 };

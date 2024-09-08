@@ -8,6 +8,7 @@ const sharp = require('sharp');
 const token = require('../../token.js');
 const { AddCostOfImages } = require('../../Pricing.js');
 const { countCharacter } = require('../../Helpers.js');
+const { Caption } = require('../../VoiceV2.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -73,6 +74,13 @@ module.exports = {
                 .setMinValue(1)
                 .setMaxValue(2);
         })
+
+        // Option for caption remix instead of tagger remix.
+        .addBooleanOption(o => {
+            return o.setName("caption")
+                .setDescription("Whether to use caption to remix.")
+                .setRequired(false)
+        })
         ,
 
     /**
@@ -90,7 +98,8 @@ module.exports = {
         await interaction.deferReply({ephemeral: IsMessageEphemeral});
 
         /** @type {String} */
-        let prompts = interaction.options.getString("prompts") ?? undefined;
+        let prompts = interaction.options.getString("prompts") ?? "";
+        let captionPrompts = "";
 
         // After ten seconds, tell the user that we're still thinking if we are.
         /*
@@ -106,7 +115,9 @@ module.exports = {
         const attachment = interaction.options.getAttachment("image");
         // Name images randomly to keep from overwring same requests or whatever.
         const name = /* Math.floor(Math.random() * 10000) + */ attachment.name;
-        const url = attachment.url
+        const url = attachment.url;
+
+        let CaptionOption = interaction.options.getBoolean("caption") ?? false;
 
         try {
             /** @type {String} */ let UserImagePath, 
@@ -120,7 +131,7 @@ module.exports = {
                 sharpFile = await (new sharp(UserImagePath))
                 meta = await (sharpFile.metadata())
 
-                if (prompts == undefined)
+                if (prompts == "" && !CaptionOption)
                     prompts = await Gradio.GetTagsFromImage(UserImagePath);
             }
     
@@ -136,8 +147,12 @@ module.exports = {
     
             // If this prompt doens't contain any tags, use the AI to make some.
             let UsingGPTTags = false;
-            if (autotag) { 
-                prompts = (await GetPromptsFromPlaintextUsingGPT(prompts, interaction.user.id));
+            if (autotag || CaptionOption) { 
+                if (CaptionOption) 
+                    // Caption image and use that as information for the AI.
+                    captionPrompts = await Caption(url, "<MORE_DETAILED_CAPTION>");
+                
+                prompts = await GetPromptsFromPlaintextUsingGPT(captionPrompts, interaction.user.id);
                 UsingGPTTags = true;
                 UseMessage = true;
             }
@@ -221,7 +236,7 @@ module.exports = {
             */
     
             if (UsingGPTTags)
-                content += "Using ChatGPT tags: ```" + prompts + "```\nOriginal Prompt: ```" + interaction.options.getString("prompts") + "```";
+                content += "Using ChatGPT tags: ```" + prompts + "```\nOriginal Prompt: ```" + (interaction.options.getString("prompts") ?? captionPrompts) + "```";
 
             // If we're asked to make it secret, be secret.
             if (IsMessageEphemeral) UseMessage = false;

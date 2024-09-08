@@ -1,8 +1,8 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction, User } = require('discord.js');
 const { GetUserFile } = require('../User.js');
-
-
+const fp = require('fs/promises');
+const path = require('path');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -37,7 +37,19 @@ module.exports = {
         
         const id = (interaction.options.getUser("user") ?? {id: null}).id ?? interaction.user.id;
 
-        const base = (await GetUserFile(id, false)).base;
-        interaction.editReply(`${pronoun} current base:` + "```" + base + "```")
+        const User = await GetUserFile(id, false);
+        const FaceSuffix = User.base_face != "" ? "\nFace: `" + User.base_face + "`\n": "\n";
+        const NameSuffix = User.base_name != "" ? "Name: `" + User.base_name + "`" : "";
+        const suffix = `${FaceSuffix}${NameSuffix}`;
+
+        const text = `${pronoun} current base:\`\`\`${User.base}\`\`\`${suffix}`;
+        if (text.length <= 2000)
+            interaction.editReply(text)
+        else {
+            const p = path.resolve("./Temp/" + interaction.user.id + "_temp.txt");
+            await fp.writeFile(p, User.base + "\n\n\n ==METADATA== \n" + suffix);
+            await interaction.editReply({content: "Please see attached file!", files: [p]});
+            fp.unlink(p);
+        }
     }
 };

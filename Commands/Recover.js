@@ -25,7 +25,8 @@ module.exports = {
         await interaction.deferReply({ephemeral: true});
         const id = interaction.options.getNumber("recoveryid");
         const overwrite = interaction.options.getBoolean("overwrite") ?? true;
-        const result = await Index.Recover({RecoveryID: id, Overwrite: overwrite}, interaction)
+        const result = JSON.parse(await Index.Recover({RecoveryID: id, Overwrite: overwrite}, interaction));
+        console.log(result);
         if (result.sucessful)
             interaction.editReply("Recovered!");
         else

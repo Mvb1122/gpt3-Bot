@@ -27,6 +27,7 @@ const red = '\x1b[31m';
 const green = '\x1b[32m';
 const reset = '\x1b[0m';
 module.exports.DEBUG = DEBUG;
+module.exports.LocalServerSettings = LocalServerSettings;
 
 // Update LocalServerSettings model via API:
 if (LocalServerSettings.Use) {
@@ -53,9 +54,10 @@ const client = new Discord.Client({
   intents: [
     Discord.GatewayIntentBits.Guilds,
     Discord.GatewayIntentBits.GuildMessages,
+    Discord.GatewayIntentBits.GuildMessageTyping,
     Discord.GatewayIntentBits.MessageContent,
     Discord.GatewayIntentBits.GuildMembers,
-    Discord.GatewayIntentBits.GuildVoiceStates
+    Discord.GatewayIntentBits.GuildVoiceStates,
   ],
 });
 const BaseAddress = "./ActiveBases.json";
@@ -196,7 +198,7 @@ async function ClearAll(parameters = {}, DiscordMessage = null) {
  * Recovers the specified conversation.
  * @param {{RecoveryID: Number, Overwrite: Boolean}} parameters - { RecoveryID: 12345678, Overwrite: true = true }
  * @param {Discord.Message} DiscordMessage 
- * @returns {{sucessful: Boolean, reason: String}}
+ * @returns {Promise<String>} JSON in the format {sucessful: Boolean, reason: String}
  */
 async function Recover(parameters, DiscordMessage = null) {
   if (parameters.RecoveryID == undefined || RecoveryBases[parameters.RecoveryID] == undefined) {
@@ -343,10 +345,11 @@ function GetFunctionFromStart(message) {
  * Creates a message object from the content.
  * @param {"System" | "User" | "Function" | "Tool" | "Assistant"} Role System || User || Function || Assistant <- For AI only, will be appended automatically.
  * @param {String} Content 
- * @param {String | undefined} Username
+ * @param {String | undefined} Username NOTE: Do not pass content as an array AND the username as a string. Things won't work out very well.
  * @returns {[{role: String, content: String}]}
  */
 function NewMessage(Role, Content, Username) {
+  if (Username) Content = `(${Username}) ${Content}`;
   return [{
     role: Role.toLowerCase(),
     name: Username,
@@ -424,7 +427,7 @@ function ConvertToMessageJSON(InputMessages) {
  * @param {[{role: String, content: String, name: String, tool_calls: { id: number; type: string ;function: { name: any; arguments: string; }}[]}]} messages The messages that are already in this conversation. 
  * @param {Discord.Message?} DiscordMessage The Discord message asking for this response.
  * @param {Number} numReps How many times this function has been called already.
- * @returns {Promise<import('openai').CreateChatCompletionResponse>} An object representing the AI's response, or the failure message.
+ * @returns {Promise<{data: import('openai').CreateChatCompletionResponse}>} An object representing the AI's response, or the failure message.
  */
 async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps = 0, allowFunctions = true) {
   if (DEBUG)
@@ -472,8 +475,8 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
         functions = GetFunctions(messages);
 
         // If we're using a remote model, then handle them correctly for that.
-        // Get first system message.
         if (LocalServerSettings.Use) {
+          // Get first system message.
           const SystemMessage = messages[0];
           if (SystemMessage.content && SystemMessage.content.indexOf(FunctionEndMessage) != -1) {
             // Clip the content to the end.
@@ -483,9 +486,6 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
             SystemMessage.content += "\n" + functions.map(v => JSON.stringify(v.function)).join("\n");
             messages[0] = SystemMessage;
           }
-
-          // Do all necessary processing using the module.
-          messages = messages.map(m => {return LlamaConverter.MessageToLlama(m)});
         }
       }
       else
@@ -494,6 +494,11 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
       if (functions.length > 0 && !LocalServerSettings.Use) {
         params.tool_choice = "auto";
         params.tools = functions;
+      } 
+      
+      if (LocalServerSettings.Use) {
+        // Do all necessary processing using the module to make our messages compatible with Llama. 
+        messages = await Promise.all(messages.map(async m => {return await LlamaConverter.MessageToLlama(m)}));
       }
 
       // Always log chat messages regardless of whether we're debug or not.
@@ -631,6 +636,7 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
     }
   //#endregion
 }
+module.exports.GetSafeChatGPTResponse = GetSafeChatGPTResponse;
 
 /**
  * @param {[{content: string}]} messages 
@@ -699,10 +705,11 @@ async function SummarizeConvo(messages, DiscordMessage) {
  * Gets the AI's next message.
  * @param {[{role: string;content: string;name: string;}]} InputMessages The messages in this conversation.
  * @param {Discord.Message | Web} DiscordMessage The Discord Message calling this request.
+ * @param {boolean} [AutoRespond=true] Whether to automatically send messages with content when the AI makes a Function call.
  * @returns {Promise<[{role: String, content: String, name: String}]>} The complete conversation, including a new response from the AI.
  */
-async function RequestChatGPT(InputMessages, DiscordMessage) {
-  return new Promise(async (resolve, reject) => {
+async function RequestChatGPT(InputMessages, DiscordMessage, AutoRespond = true) {
+  return new Promise(async (resolve) => {
     let messages = ConvertToMessageJSON(InputMessages);
 
     // First things first, ask the AI for its thaughts.
@@ -718,7 +725,7 @@ async function RequestChatGPT(InputMessages, DiscordMessage) {
     async function ProcessFunctionCall(newMessage) {
       console.log(newMessage)
       if (newMessage.tool_calls != null) {
-        if (newMessage.content && DiscordMessage.followUp == null) // followUp is only on slash commands; don't send extra content for slash commands.
+        if (newMessage.content && DiscordMessage.followUp == null && AutoRespond) // followUp is only on slash commands; don't send extra content for slash commands.
           DiscordMessage.channel.send(newMessage.content);
 
         messages.push(newMessage);
@@ -1122,7 +1129,8 @@ module.exports = {
   RefreshSlashCommands,
   UpdatePersonaArray,
   LocalServerSettings,
-  AIParameters
+  AIParameters,
+  GetTypingInChannel
 }
 
 const cmt = require('./Commands/CreateMemoryThread.js')
@@ -1384,6 +1392,12 @@ client.on('messageCreate',
     */
     //#endregion
 
+    // Remove typing users when they send a message.
+    let UserTyping = typing.find(v => {
+      return v.channel == message.channel && v.user.id == message.author.id;
+    })
+    if (UserTyping) typing.splice(typing.indexOf(UserTyping), 1);
+
     // Run function command handlers if there are any.
     for (let i = 0; i < SlashCommands.length; i++) {
       if (SlashCommands[i].OnMessageRecieved != undefined) {
@@ -1452,10 +1466,13 @@ client.on('messageCreate',
       let Text = message.content;
       message.attachments.forEach(attachment => {
         Text += ` ${attachment.url}`;
-      })
+      });
+
+      let authorname = (message.member ?? {nickname: null}).nickname ?? message.author.displayName ?? message.author.username;
+      
 
       message.channel.sendTyping();
-      messages = messages.concat(NewMessage("user", /* `(${authorname}) ` + */ Text, /* authorname */));
+      messages = messages.concat(NewMessage("user", `(${authorname}) ` + Text, /* authorname */));
       // base = base.concat(NewMessage("user", message.content.trim())); // `\n${authorname}: ` + message.content.trim();
       await AskChatGPTAndSendResponse(messages, message);
     }
@@ -1622,6 +1639,30 @@ let val = Gradio.GetTagsFromImage(debugImagePath)
 // console.log(Gradio.PredictContent("1girl, absuredres, black thighhighs, school uniform, miniskirt, zettai ryouiki, black_hair, full_body, red necktie"));
 //#endregion
 
+//#region UserTyping stuff.
+/**
+ * @type {Discord.Typing[]}
+ */
+let typing = [];
+client.on(Discord.Events.TypingStart, (t) => {
+  typing.push(t);
+  setTimeout(() => {
+    // Remove the typing object after it expires.
+    if (typing.indexOf(t) != -1)
+      typing.splice(typing.indexOf(t), 1);
+  }, 10000);
+});
+
+/**
+ * @param {import('discord.js').Channel} channel 
+ * @returns {Discord.Typing[]}
+ */
+function GetTypingInChannel(channel) {
+  console.log(typing.map(v => v.member.nickname));
+  return typing.filter(t => t.channel == channel)
+}
+//#endregion
+
 //#region Chat AI Microservice for the web.
 const http = require('http');
 const MicroserviceHTML = fs.readFileSync("./Microservice.html");
@@ -1708,6 +1749,7 @@ server.listen(port, host, () => {
 const { Server: SocketServer } = require("socket.io");
 const Web = require('./WebAI/Web');
 const { Message } = require('discord.js');
+const LlamaSupport = require('./LlamaSupport');
 const io = new SocketServer(server)
 
 io.on("connection", (socket) => {
