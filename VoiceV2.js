@@ -501,44 +501,45 @@ module.exports = {
      */
     Translate(natural, to, from) {
         return new Promise(async res => {
-            // Starts up the transcribe stuff.
-            if (!LocalServerSettings.Use && !Started) await Start();
+            // If we're not using a local text server, use the discreet translation AI, split by sentence.
+            if (!LocalServerSettings.Use) {
+                // Starts up the transcribe stuff.
+                if (!Started) await Start();
 
-            let parts = natural.split(/(?<=[.!?…？。！])/);
+                let parts = natural.split(/(?<=[.!?…？。！])/);
 
-            // Translate each part and then reassemble.
-            /** @type {{translation_text: string, from_lang: string}[]} */
-            const outputs = await Promise.all(parts.map(async v => {
-                const data = {
-                    natural: v,
-                    to: to,
-                    from: from
-                };
-                if (!LocalServerSettings.Use)
-                // If we're connected to a local server for text generation, actually ues that AI instead of the connected one.
-                    return await postJSON("http://127.0.0.1:4963/translate", data);
-                else {
-                    // Make messages.
-                    if (to == "auto") to = "English";
-                    if (from == "auto") from = "whatever language text is written in";
-
-                    const messages = NewMessage("System", "You are an AI which is really good at translating text from " + from + " to " + to + ". When someone gives you text to translate, you will ONLY write your translation. YOU WILL NOT write anything EXCEPT for the translation. If auto is either language, you must translate it to English.")
-                        .concat(NewMessage("User", "Hi, please translate this text to " + to + " please!\nText:\n" + v + ""));
-                    
-                    const response = (await GetSafeChatGPTResponse(messages, null, 0, false)).data.choices[0].message;
-                    return { 
-                        translation_text: response.content,
-                        from_lang: from
+                // Translate each part and then reassemble.
+                /** @type {{translation_text: string, from_lang: string}[]} */
+                const outputs = await Promise.all(parts.map(async v => {
+                    const data = {
+                        natural: v,
+                        to: to,
+                        from: from
                     };
-                }
-            }));
 
-            const merged = {
-                translation_text: outputs.map(v => v.translation_text).join(" "),
-                from_lang: outputs[0].from_lang
-            };
+                    return await postJSON("http://127.0.0.1:4963/translate", data);
+                }));
 
-            res(merged);
+                const merged = {
+                    translation_text: outputs.map(v => v.translation_text).join(" "),
+                    from_lang: outputs[0].from_lang
+                };
+
+                return res(merged);
+            } else {
+                // If we're connected to a local server for text generation, actually use that AI instead of the connected one.
+                if (to == "auto") to = "English";
+                if (from == "auto") from = "whatever language text is written in";
+    
+                const messages = NewMessage("System", "You are an AI which is really good at translating text from " + from + " to " + to + ". When someone gives you text to translate, you will ONLY write your translation. YOU WILL NOT write anything EXCEPT for the translation. If auto is either language, you must translate it to English.")
+                    .concat(NewMessage("User", "Hi, please translate this text to " + to + " please!\nText:\n" + v + ""));
+                
+                const response = (await GetSafeChatGPTResponse(messages, null, 0, false)).data.choices[0].message;
+                return { 
+                    translation_text: response.content,
+                    from_lang: from
+                };
+            }
         })
     },
 

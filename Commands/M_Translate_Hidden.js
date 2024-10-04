@@ -1,15 +1,9 @@
 //Ignore ts(80001)
-const { ContextMenuCommandBuilder, ApplicationCommandType, MessageContextMenuCommandInteraction, ButtonStyle } = require('discord.js');
-const { Transcribe, Caption, Translate } = require('../VoiceV2');
-const { ButtonBuilder } = require('discord.js');
-const { ActionRowBuilder } = require('discord.js');
-const { Download } = require('../Gradio/Helpers');
-const Path = require('path');
-const fp = require('fs/promises')
+const { ContextMenuCommandBuilder, ApplicationCommandType, MessageContextMenuCommandInteraction } = require('discord.js');
 
 module.exports = {
     data: new ContextMenuCommandBuilder()
-        .setName("Translate to English")
+        .setName("🐱‍👤 Translate to English")
         .setType(ApplicationCommandType.Message),
 
     /**
