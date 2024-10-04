@@ -1,7 +1,8 @@
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction, AutocompleteInteraction, ChannelType, Message } = require('discord.js');
 const fs = require('fs');
-const { GetEmbeddingsToChoices, Voice, } = require('../VoiceV2');
+const fp = require('fs/promises');
+const { GetEmbeddingsToChoices, Voice, ListEmbeddings, } = require('../VoiceV2');
 const { WriteToLogChannel } = require('../Security');
 const Path = require('path');
 
@@ -23,6 +24,11 @@ module.exports = {
             return o.setName("fixtext")
                 .setDescription("Whether to turn everything into letters. eg; 1 -> \"one\"")
                 .setRequired(false)
+        })
+        .addBooleanOption(o => {
+            return o.setName("demo")
+                .setDescription("Whether to run on all voices!")
+                .setRequired(false)
         }),
 
     /**
@@ -34,23 +40,51 @@ module.exports = {
         const line = interaction.options.getString("line");
         const model = interaction.options.getString("model") ?? null;
         const fixtext = interaction.options.getBoolean("fixtext") ?? true;
+        const demo = interaction.options.getBoolean("demo") ?? false;
 
         const path = Path.normalize(__dirname + `\\..\\Temp\\${interaction.user.id}_tts.wav`);
         let time = performance.now();
         try {
-            Voice(line, path, model, fixtext).then((val) => {
-                // Save to temp folder and then send it off.
-                time = performance.now() - time;
-    
-                interaction.editReply({content: `Here's your audio! Voiced line: \`\`\`${val.text}\`\`\`\n Time Taken: ${(time/1000).toFixed(2)}s`, files: [path]}).then(() => {
-                    // Delete the image.
-                    fs.unlink(path, (err) => {if (err) console.log(err)});
+            if (!demo)
+                Voice(line, path, model, fixtext).then((val) => {
+                    // Save to temp folder and then send it off.
+                    time = performance.now() - time;
+        
+                    interaction.editReply({content: `Here's your audio! Voiced line: \`\`\`${val.text}\`\`\`\n Time Taken: ${(time/1000).toFixed(2)}s`, files: [path]}).then(() => {
+                        // Delete the image.
+                        fs.unlink(path, (err) => {if (err) console.log(err)});
 
-                    // Write to log about it.
-                    WriteToLogChannel(interaction.guildId, `${interaction.user.globalName} voiced the following: \`\`\`` + line + "\`\`\`");
+                        // Write to log about it.
+                        WriteToLogChannel(interaction.guildId, `${interaction.user.globalName} voiced the following: \`\`\`` + line + "\`\`\`");
+                    })
                 })
-            })
-        } catch {
+            else {
+                // Voice on all embeds.
+                let promises = ListEmbeddings().map(async (v, i) => {
+                    const thisPath = path.replace("tts", v + "_tts");
+                    await Voice(line, thisPath, v, fixtext);
+                    return thisPath;
+                });
+
+                await Promise.all(promises);
+
+                // Send all files, in groups of ten.
+                let reply = await interaction.editReply("See below!");
+                do {
+                    const snipLength = promises.length > 10 ? 10 : promises.length;
+                    let slice = promises.slice(0, snipLength);
+                    promises = promises.slice(snipLength);
+                    reply = await reply.reply({
+                        files: await Promise.all(slice)
+                    });
+                } while (promises.length != 0)
+
+                // After all parts are sent, delete all files.
+                await reply;
+                (await Promise.all(promises)).forEach(v => fp.unlink(v));
+            }
+        } catch (e) {
+            console.log(e);
             return await interaction.editReply("Your text was too long! Please cut it shorter.");
         }
     },

@@ -1,3 +1,5 @@
+const ResolutionMultiplier = 2;
+
 const { NewMessage, GetSafeChatGPTResponse, DEBUG, LocalServerSettings } = require('..');
 const Discord = require('discord.js');
 const path = require('path');
@@ -5,12 +7,19 @@ const { exec } = require('child_process');
 const fp = require('fs/promises');
 const { GetUserFile } = require('../User');
 const MMDCLocation = `"${path.resolve("./node_modules/.bin/mmdc")}"`;
-const ResolutionMultiplier = 2;
-const zlib = require('zlib');
+const { convert: GetHTMLText } = require('html-to-text');
 
-function GetChartHelpFilePromise(name) {
-    const p = path.resolve(`./Functions/Charts/${name}.txt`);
-    return fp.readFile(p);
+async function GetChartHelpFilePromise(name) {
+    // If we're not using a local AI model, then use the short help files.
+    if (!LocalServerSettings.Use) {
+        const p = path.resolve(`./Functions/Charts/${name}.txt`);
+        return await fp.readFile(p);
+    } else {
+        // Read the page and then convert it to text.
+        const pageURL = `https://mermaid.js.org/syntax/${name}.html`;
+        const data = await (await fetch(pageURL)).text();
+        return GetHTMLText(data)
+    }
 }
 
 // Create a list of supported 
@@ -27,9 +36,9 @@ let SupportedCharts = [
         }
     },
     {
-        name: "xychart",
+        name: "xyChart",
         alias: ["bar", "line"],
-        help: GetChartHelpFilePromise("xychart"),
+        help: GetChartHelpFilePromise("xyChart"),
         dimensions: {
             width: 1024,
             height: 768
@@ -63,24 +72,26 @@ let SupportedCharts = [
         }
     },
     {
-        name: "journey",
-        help: GetChartHelpFilePromise("journey"),
+        name: "userJourney",
+        help: GetChartHelpFilePromise("userJourney"),
+        alias: ["user jouney", "journey"],
         dimensions: {
             height: 768,
             width: 1024
         }
     },
     {
-        name: "quadrant",
-        help: GetChartHelpFilePromise("quadrantchart"),
+        name: "quadrantChart",
+        help: GetChartHelpFilePromise("quadrantChart"),
+        alias: ["quadrant chart", "quadrant"],
         dimensions: {
             height: 1024,
             width: 1024
         }
     },
     {
-        name: "sequence",
-        help: GetChartHelpFilePromise("sequencediagram"),
+        name: "sequenceDiagram",
+        help: GetChartHelpFilePromise("sequenceDiagram"),
         dimensions: {
             height: 1024,
             width: 768
@@ -112,6 +123,7 @@ function compressAndEncodeCode(code) {
         "updateDiagram": true,
         "editorMode": "code"
     })
+
     // Step 1: Compress the string using Pako
     const compressedData = pako.deflate(inputString, { to: 'string' });
 
@@ -180,7 +192,7 @@ module.exports = {
                     InternalMessaages = messages.concat(NewMessage("User", "Please create a concept for the chart Make sure to express numeric quantities if applicable. Please only write about the chart itself."));
                 else 
                     InternalMessaages = NewMessage("System", (await GetUserFile((DiscordMessage.author ?? DiscordMessage.user).id, false)).base).concat(
-                        NewMessage("User", `Please create a concept for how you'd make a chart with this prompt: ${parameters.concept}\nIn your concept, make sure to express numeric quantities if applicable.\nHere's everything I was given: ${JSON.stringify(parameters)}`));
+                        NewMessage("User", `Please create a concept for how you'd make a chart with this prompt: ${parameters.concept}\nIn your concept, make sure to express numeric quantities if applicable to the type of the chart!\nHere's everything I was given: ${JSON.stringify(parameters)}`));
 
                 const DetailMessage = (await GetSafeChatGPTResponse(InternalMessaages, DiscordMessage, undefined, false));
                 console.log(DetailMessage);
@@ -189,8 +201,9 @@ module.exports = {
                 // Now, make the actual code.
                     // Use a system prompt to help guide stuff better.
                 InternalMessaages = InternalMessaages.concat(
-                    NewMessage("User", "Your chart will be made by Mermaid, so if you know how to use that, then it's the same.\nPlease ONLY write the schema. Do not write anything EXCEPT for the schema! NO COMMENTS, just the schema.\nDo not include \"```mermaid\" in your response!\nWhen you write your schema, please remember that the first line must be the type of graph, in this case, please use: " + chart.name + "\n\nSchema/Example:\n" + chart.help),
-                    NewMessage("User", "Great! Now, please follow the example schema and write out the chart!\nRemember to write ONLY the schema."));
+                    NewMessage("User", "Your chart will be made by Mermaid, so if you know how to use that, then it's the same.\nPlease ONLY write the schema. Do not write anything EXCEPT for the schema! NO COMMENTS, just the schema.\nDo not include \"```mermaid\" in your response!\nWhen you write your schema, please remember that the first line must be the type of graph, in this case, please use: " + chart.name + "\n\nHere's the help file:\n" + chart.help
+                        + "Now, please follow the example schema and write out the chart!\nRemember to write ONLY your chart, following the schema!"
+                    ));
                 const LastMessage = GetSafeChatGPTResponse(InternalMessaages, DiscordMessage, undefined, false);
 
                 // Create the files to forward to mermaid for rendering.
@@ -245,7 +258,7 @@ module.exports = {
                         if (rep >= 3) res("Something went wrong making that chart! You can retry if you want.");
                         else {
                             console.log("Remaking.");
-                            Messages = Messages.concat((await LastMessage).data.choices[0].message, NewMessage("User", "Uh, oh. That doesn't look like it matches the schema! Please rewrite it, while EXACTLY matching the scheme given to you in your system prompt. DO NOT write an apology. JUST write the schema. Don't include ``` in your response AT ALL!\n\nHere's the schema information again:\n" + chart.help));
+                            Messages = Messages.concat((await LastMessage).data.choices[0].message, NewMessage("User", "Uh, oh. That doesn't look like it matches the schema! Please rewrite it, while EXACTLY matching the scheme given to you! DO NOT write an apology. JUST write the schema. Don't include ``` in your response AT ALL!"));
                             LastMessage = await GetSafeChatGPTResponse(Messages, DiscordMessage, undefined, false);
                             if (!DEBUG)
                                 fp.unlink(inFile);

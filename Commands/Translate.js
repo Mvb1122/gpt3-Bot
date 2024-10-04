@@ -216,23 +216,22 @@ Chinese (Simplified)	zho_Hans
 Chinese (Traditional)	zho_Hant
 Standard Malay	zsm_Latn
 Zulu	zul_Latn
-`.trim().split('\n');
-
-for (let i = 0; i < languageData.length; i++) {
-    const line = languageData[i];
-    languageData[i] = {
+`.trim().split('\n').map(line => {
+    return {
         name: line.substring(0, line.lastIndexOf("	")).trim(),
         value: line.substring(line.lastIndexOf("	")).trim()
-    }
-}
+    };
+});
 
 
 //Ignore ts(80001)
 const { SlashCommandBuilder, CommandInteraction, Message, ChannelType } = require('discord.js');
 const { Translate } = require('../VoiceV2');
 const { client } = require('..');
+const fs = require('fs'); const fp = require('fs/promises'); const path = require('path');
+const { GetWebhook } = require('./Say');
 
-const TranslatingLists = [
+let TranslatingLists = [
     {
         inputId: 1234,
         outputId: 1234,
@@ -240,6 +239,18 @@ const TranslatingLists = [
         from: "lang_code"
     }
 ];
+
+// On start, read the lists in.
+const ListsFile = path.resolve("./TranslatingSets.json");
+if (fs.existsSync(ListsFile)) {
+    fs.readFile(ListsFile, (e, d) => {
+        TranslatingLists = JSON.parse(d);
+    })
+}
+
+function WriteLists() {
+    return fp.writeFile(ListsFile, JSON.stringify(TranslatingLists));
+}
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -346,15 +357,19 @@ module.exports = {
             }
 
             TranslatingLists.push(data);
+            WriteLists();
             
             interaction.editReply("Started translating!");
         } else if (subcommand == "stopconvo") {
             const output = interaction.options.getChannel("output") ?? interaction.channel;
+            let found = false;
             for (let i = 0; i < TranslatingLists.length; i++) if (TranslatingLists[i].outputId == output.id) {
                 TranslatingLists.splice(i, 1);
+                found = true;
             }
 
-            interaction.editReply("Stopped translating!");
+            WriteLists();
+            interaction.editReply(found ? "Stopped translating!" : "No set to remove found! Please try specifying the output channel.");
         }
     },
 
@@ -372,7 +387,13 @@ module.exports = {
             if (message.channelId == CurrentList.inputId) {
                 // Translate it to the list's langauge and send it.
                 Translate(message.content, CurrentList.to, CurrentList.from).then(async v => {
-                    (await client.channels.fetch(CurrentList.outputId)).send(`${message.author.displayName} | ${v.translation_text}`);
+                    // Get a WH to send their stuff in.
+                    const channel = await client.channels.fetch(CurrentList.outputId);
+                    const wh = await GetWebhook(channel, message.member.nickname ?? message.member.displayName, () => message.member.displayAvatarURL({size: 4096}))
+                    wh.send({
+                        content: v.translation_text,
+                        threadId: channel.isThread() ? channel.id : undefined
+                    })
                 })
             }
         }

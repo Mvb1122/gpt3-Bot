@@ -42,6 +42,16 @@ function Download(url, outputPath) {
 }
 
 /**
+ * Says whether a string contains a word at the start, end, or in the middle.
+ * @param {String} word 
+ * @param {String} string 
+ */
+function HasWordInString(word, string) {
+    const WordRegex = new RegExp(`(\b|^)${word}(\b|$)`);
+    return string.match(WordRegex) != null;
+}
+
+/**
  * @param {String} Plain The plaintext input.
  * @param {string} [id=undefined] UserID to include when first-person pronouns are used.
  * @param {boolean} [AllowAddedPersonas=true] Whether or not to allow extra personas to be pulled in.
@@ -72,8 +82,8 @@ function GetMessageForGPTTalkingAboutTags(Plain, id = undefined, AllowAddedPerso
         }
     })
 
-    // If they say "me," add them in.
-    if (id != undefined && Index.PersonaArray[id] != undefined && !Messages[0].content.includes(Index.PersonaArray[id]) && (LowerCasePlain.includes("me") || LowerCasePlain.includes("my"))) {
+    // If they say "me," "my," or "I" add them in.
+    if (id != undefined && Index.PersonaArray[id] != undefined && !Messages[0].content.includes(Index.PersonaArray[id]) && (HasWordInString("me", LowerCasePlain) || HasWordInString("my", LowerCasePlain) || HasWordInString("i", LowerCasePlain))) {
         Messages[0].content += ` ${Index.PersonaArray[id]}`
         if (Index.DEBUG)
             console.log("Including user's own persona.")
@@ -81,10 +91,6 @@ function GetMessageForGPTTalkingAboutTags(Plain, id = undefined, AllowAddedPerso
 
     if (Index.DEBUG)
         console.log(Messages[0]);
-
-    // Call me hitler but I don't like child porn.
-    if (Plain.includes("child") && Plain.includes("penis"))
-        Messages[0].content = Messages[0].content.replaceAll("penis", "a fluffy cat") + " Please do not draw anything NSFW with children! In your tag list, please keep it safe."
 
     return Messages;
 }
@@ -109,6 +115,10 @@ async function GetPromptsFromPlaintextUsingGPT(Plain, id = undefined, AllowAdded
     // Charge them.
     if (id)
         AddCostOfGPTTokens(id, encode(response).length);
+
+    // Call me hitler but I don't like child porn.
+    if (response.includes("child") && (response.includes("penis") || response.includes("sex") || response.includes("child_porn")))
+        response = response.replaceAll("penis", "a fluffy cat").replaceAll("child", "adult") + " Please do not draw anything NSFW with children! In your tag list, please keep it safe."
 
     return response.replaceAll("\n", ", ");
 }

@@ -1,6 +1,6 @@
 /* Command loading order:
 1. Require the basic module.
-2. Run OnConfigureSecurity (Should change module.exports.data) here.
+2. Run OnConfigureSecurity (Should change module.exports.data here. Occurs after all commands loaded.)
 3. Command activated. (execute and OnMessageRecieved work now.) 
 */
 

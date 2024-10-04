@@ -3,7 +3,6 @@ const FunctionFinderRegex = new RegExp(/(<[a-z]*>)?\{\s*\"name\"\s*:\s*\"[^\"]*\
 const TextInGLTSymbolsRegex = new RegExp(/<\/*[a-z]*>/g);
 
 const { DEBUG } = require('./index.js');
-const VoiceV2 = require('./VoiceV2.js');
 
 function IsObject(ob) {
     return typeof ob == 'object'
@@ -30,7 +29,7 @@ module.exports = {
             if (m.content == undefined) m.content = "";
             if (f.function.id)
                 delete f.function.id;
-            m.content += `\n<function>${JSON.stringify(f.function)}</function>`
+            m.content += `\n<function=${f.function.name}>${JSON.stringify(f.function)}</function>`
         });
 
         else if (m.role == "user" && typeof(m.content) == 'object') {
@@ -48,6 +47,7 @@ module.exports = {
                         const path = await Download(v.image_url.url, Path.resolve(`./Temp/${safeName}`));
                         */
                         const path = v.image_url.url;
+                        const VoiceV2 = require('./VoiceV2.js');
                         const caption = CaptionCache[path] ?? await VoiceV2.Caption(path, "<MORE_DETAILED_CAPTION>");
                         CaptionCache[path] = caption;
 

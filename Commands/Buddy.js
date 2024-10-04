@@ -133,7 +133,7 @@ module.exports = {
             AddOnLog(interaction.guildId, (type, name, content) => {
                 if (type == "STT" || type == "TTS") {
                     const includesPhrase = AIWakePhrase.split(",").some(v => {
-                        return content.toLowerCase().includes(v);
+                        return content.toLowerCase().includes(v.trim());
                     })
 
                     if (includesPhrase && !Conversations[inputId].CurrentlySpeaking) {

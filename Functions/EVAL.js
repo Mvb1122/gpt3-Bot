@@ -11,7 +11,7 @@ module.exports = {
             "properties": {
                 "CODE": {
                     "type": "string",
-                    "description": "Javascript code to be evaluated.",
+                    "description": "Javascript code to be evaluated. Your code must be the body of an async function.",
                 }
             },
             "required": ["CODE"],
@@ -39,8 +39,10 @@ module.exports = {
                 ResponseMessage = SendMessage(message, "Evaluating: ```js\n" + parameters.CODE + "```")
 
             try {
-                response.response = await eval(parameters.CODE);
+                response.response = await eval('(function() {' + parameters.CODE + '}())');
+                console.log(response.response);
             } catch (e) {
+                console.log(e);
                 response.response = JSON.stringify({
                     sucessful: false,
                     resason: e.cause
@@ -54,6 +56,7 @@ module.exports = {
             
             response.sucessful = true;
         } catch (e) {
+            console.log(e);
             response.response = e.toString();
             response.sucessful = false;
         }

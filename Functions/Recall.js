@@ -1,5 +1,5 @@
 const Discord = require('discord.js')
-const { DEBUG, SendMessage } = require('../index');
+const { DEBUG, SendMessage, GetSafeChatGPTResponse, NewMessage } = require('../index');
 const { CreateModelHandler } = require('../HFAIModelHandler');
 const MemoriesFile = "./Memories.json";
 const fs = require('fs');
@@ -48,12 +48,22 @@ module.exports = {
          */
         const MemoryData = JSON.parse(fs.readFileSync(MemoriesFile))[GuildID];
         classifier.SetParams(JSON.stringify(MemoryData));
-        
+
         /**
          * Use the assistant classifier if requested.
          * @type {{answer: string, score: number}}
          */
-        let data = parameters.assist ? await classifier.Run(parameters.text) : { answer: parameters.text, score: 100 };
+        let data = parameters.assist ? await classifier.Run(parameters.text) : { answer: parameters.text, score: 1 };
+
+        // If the score was low, then just make a general response.
+        if (data.score <= 0.01) {
+            // Generate a response using the AI.
+            const messages = NewMessage("System", "You are an AI that is good at describing things. When asked to describe something, you will give a general overview of the concept, plus a deeper dive.")
+                .concat(NewMessage("User", "What is " + parameters.text));
+
+            const response = await GetSafeChatGPTResponse(messages, DiscordMessage, 0, false);
+            return response.data.choices[0].message.content;
+        }
 
         // Find the full line. Using find with assist means that it can find the specific memory, but using filter without assist means it can search properly.
         let OldAnswer = data.answer;
@@ -62,14 +72,14 @@ module.exports = {
             return v.includes(data.answer);
         });
         if (data.answer == []) data.answer == OldAnswer;
-        
-        
+
+
         if (DEBUG && DiscordMessage) SendMessage(DiscordMessage, `Recalling: ${parameters.text} ${JSON.stringify(data)}`);
 
-        // Tell the user that a memory was added.
+        // Tell the user that a memory was recalled.
         else if (DiscordMessage)
-          DiscordMessage.channel.send("```java\n// Memory recalled:\n" + data.answer + "\n```");
-        
+            DiscordMessage.channel.send("```java\n// Memory recalled:\n" + data.answer + "\n```");
+
         return JSON.stringify(data);
     },
 

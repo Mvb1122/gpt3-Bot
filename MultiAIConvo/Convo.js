@@ -42,7 +42,7 @@ const RealPerson = new Agent(
     "Evil Bodhi.bin"
 );
 
-const DefaultAgents = [Biden, Scholar, Kitty];
+const DefaultAgents = [Biden, Trump];
 
 exports.Conversation = class Conversation {
     /** @type {[Agent]} */

@@ -349,7 +349,7 @@ module.exports = {
         // If we get a message, and it's replying to a webhook's message, then forward the user who made that message.
         if (message.reference != null) {
             const ref = message.reference;
-            const webhookMessage = await message.channel.messages.fetch(ref.messageId)
+            const webhookMessage = await message.fetchReference();
     
             // Get the existing webhooks of the channel.
             const baseChannel = message.channel.isThread() ? message.channel.parent : message.channel;
@@ -572,9 +572,10 @@ console.log(GetLastHookUserID("776686811618476072", "303011705598902273"))
  * @param {string} name 
  * @param {() => string | string} [imagePath=undefined] Or a function that returns an image path to use.
  * @param {boolean} [hasReply=false] Whether the request for a webhook has a reply on the message.
+ * @param {boolean} [singleton=true] Whether to just use the first webhook we can get our hands on. Only use if you're going to change the visuals **COMPLETELY**.
  * @returns {Promise<Webhook>}
  */
-async function GetWebhook(channel, name, imagePath) {    
+async function GetWebhook(channel, name, imagePath, singleton = true) {    
     // Get the existing webhooks of the channel.
     /**
      * @type {TextChannel}
@@ -585,7 +586,7 @@ async function GetWebhook(channel, name, imagePath) {
      * @type {Webhook | undefined}
      */
     const hook = webhooks.find(wh => {
-        return wh.name == name;
+        return wh.name == name || singleton;
     })
 
     async function GetImagePath() {
@@ -594,17 +595,21 @@ async function GetWebhook(channel, name, imagePath) {
     }
 
     if (!hook) {
-        if ((await baseChannel.fetchWebhooks()).size == 15) // Clear WHs by spoofing.
-            await CleanWH.execute({
-                reply(x) {
-                    WriteToLogChannel(channel.guildId, "Webhooks in <#" + baseChannel.id + "> cleared!");
-                },
-                channel: channel
+        if ((await baseChannel.fetchWebhooks()).size == 15) // Clear WHs.
+        {
+            const hooks = await baseChannel.fetchWebhooks();
+            hooks.forEach(v => {
+                // Protect user-created WHs.
+                if (!v.isUserCreated())
+                    v.delete();
             });
+        }
+
+        console.log(`Making new webhook for ${name} in ${channel.name}`);
 
         return baseChannel.createWebhook({
             name: name,
-            avatar: await GetImagePath(),
+            avatar: await GetImagePath()
         });        
     } else {
         // Check if the last message was also from this webhook.
@@ -616,8 +621,9 @@ async function GetWebhook(channel, name, imagePath) {
         }
 
         // Only make a new profile picture if the last message wasn't from this webhook or if it was from more than a minute ago.
-        const ShouldMakePFP = (lastMessage && (lastMessage.author.id != hook.id || Date.now() - lastMessage.createdTimestamp >= 60000)) 
-            || lastMessage == null
+            // If it's the hook but the name is different, also make PFP. 
+        const ShouldMakePFP = (lastMessage && (lastMessage.author.id != hook.id || Date.now() - lastMessage.createdTimestamp >= 60000 || (lastMessage.author.id == hook.id && lastMessage.author.displayName != name))) 
+            || lastMessage == null;
 
         if (ShouldMakePFP && imagePath) 
             await hook.edit({

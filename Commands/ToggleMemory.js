@@ -19,8 +19,7 @@ module.exports = {
             bases[GetBaseIdFromChannel(interaction.channel)] = [];
             interaction.editReply("Memory enabled! I'm now watching this channel!");
         } else {
-            await ClearAll({}, interaction);
-            delete bases[GetBaseIdFromChannel(interaction.channel)];
+            await ClearAll({}, interaction, false);
             interaction.editReply("No longer watching this channel! Feel free to speak without my gaze upon your writings.")
         }
     }
