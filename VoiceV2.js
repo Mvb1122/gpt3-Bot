@@ -8,12 +8,13 @@ const DefaultEmbedding = `luminary.bin`;
 //#endregion
 
 const { spawn, ChildProcess } = require('child_process');
-const { DEBUG } = require('.');
+const { DEBUG, LocalServerSettings, NewMessage, GetSafeChatGPTResponse } = require('.');
 const fp = require('fs/promises');
 const fs = require('fs');
 
 // Text formatting reqs.
 const converter = require('number-to-words');
+const path = require('path');
 const NumberMatchingRegex = new RegExp(/(\d+,?\.?\d?)+/g);
 const AcronymRegex = new RegExp(/([A-Z]\.?(?![a-z' ]))+/g);
 const SpaceRegex = new RegExp(/ (?=[ ])/g);
@@ -103,10 +104,9 @@ function postJSON(URL, data) {
             }
         }, async (a) => {
             // If something goes wrong, let's restart the server before moving on.
-            const text = await a.text();
-            rej(text);
+            rej();
             await Restart();
-            console.log(text);
+            console.log();
         });
     });
     LastRequest = thisRequest;
@@ -157,6 +157,9 @@ function Start() {
     } else return startPromise;
 }
 
+// If we're doing console log in DEBUG, might as well start up.
+if (DoConsoleLog && DEBUG) Start();
+
 function Stop() {
     transcribe_loaded = false;
     LastTranscribe = null;
@@ -200,9 +203,23 @@ async function Restart() {
     return start;
 }
 
+let UsingFiles = [];
 function ConvertFFMPEG(AudioFileName, AdditionalSettings = undefined) {
     return new Promise(res => {
-        const OutputName = `${AudioFileName}.wav`;
+        let num = 0;
+        do {
+            ++num // = Math.floor(Math.random() * 1000000);
+        } while (UsingFiles[num] != undefined);
+        
+        UsingFiles[num] = true;
+        const OutputName = path.resolve(`./Temp/${num}.wav`);
+
+        /*
+        // Create a file instantly to hold the name.
+            // This prevents multiple sections from being written if, somehow, the file already exists.
+        fs.writeFileSync(OutputName, "");
+        */
+
         // First convert auto to .wav with specifications required by the embedding AI.
         let options = [];
 
@@ -402,20 +419,35 @@ module.exports = {
     /**
      * Transcribes audio from a path.
      * @param {String} location Path to transcribe from.
+     * @param {null} [start=null] Timestamp in seconds to start from
+     * @param {null} [stop=null] Timestamp in seconds to stop at.
      * @returns {Promise<string>} A promise which resolves the audio's text.
      */
-    Transcribe(location) {
+    Transcribe(location, start = null, stop = null) {
         const thisTranscribe = new Promise(async (res, rej) => {
-            if (LastTranscribe != null) await LastTranscribe;
-            // Wait for last transcription request to finish before starting this one.
-            if (!Started) await Start();
+            // Copy last transcribe internally.
+            const _LastTranscribe = LastTranscribe;
 
-            ConvertFFMPEG(location).then(name => {
+            if (!Started) await Start();
+            
+            let AdditionalSettings = [];
+            if (start != null)
+                AdditionalSettings = ['-ss', start];
+            if (stop != null) 
+                AdditionalSettings = AdditionalSettings.concat(['-to', stop])
+            
+            if (start || stop) AdditionalSettings.concat(["-map", 0, "-copyts"])
+                
+            ConvertFFMPEG(location, AdditionalSettings).then(async convertedFileLocation => {
+                // Wait for last transcription request to finish before starting this one.
+                if (_LastTranscribe != null) await _LastTranscribe;
+                if (!fs.existsSync(convertedFileLocation)) res("");
+
                 postJSON("http://127.0.0.1:4963/transcribe", {
-                    source: name
+                    source: convertedFileLocation
                 }).then((e) => {
                     // Delete the converted file.
-                    fp.unlink(name);
+                    fp.unlink(convertedFileLocation);
                     res(e.message.text != null ? e.message.text : e.message);
                 }, (e) => {
                     // If we fail, still delete. Just reject the error I guess.
@@ -470,18 +502,43 @@ module.exports = {
     Translate(natural, to, from) {
         return new Promise(async res => {
             // Starts up the transcribe stuff.
-            if (!Started) await Start();
+            if (!LocalServerSettings.Use && !Started) await Start();
 
-            const data = {
-                natural: natural,
-                to: to,
-                from: from
+            let parts = natural.split(/(?<=[.!?…？。！])/);
+
+            // Translate each part and then reassemble.
+            /** @type {{translation_text: string, from_lang: string}[]} */
+            const outputs = await Promise.all(parts.map(async v => {
+                const data = {
+                    natural: v,
+                    to: to,
+                    from: from
+                };
+                if (!LocalServerSettings.Use)
+                // If we're connected to a local server for text generation, actually ues that AI instead of the connected one.
+                    return await postJSON("http://127.0.0.1:4963/translate", data);
+                else {
+                    // Make messages.
+                    if (to == "auto") to = "English";
+                    if (from == "auto") from = "whatever language text is written in";
+
+                    const messages = NewMessage("System", "You are an AI which is really good at translating text from " + from + " to " + to + ". When someone gives you text to translate, you will ONLY write your translation. YOU WILL NOT write anything EXCEPT for the translation. If auto is either language, you must translate it to English.")
+                        .concat(NewMessage("User", "Hi, please translate this text to " + to + " please!\nText:\n" + v + ""));
+                    
+                    const response = (await GetSafeChatGPTResponse(messages, null, 0, false)).data.choices[0].message;
+                    return { 
+                        translation_text: response.content,
+                        from_lang: from
+                    };
+                }
+            }));
+
+            const merged = {
+                translation_text: outputs.map(v => v.translation_text).join(" "),
+                from_lang: outputs[0].from_lang
             };
 
-            postJSON("http://127.0.0.1:4963/translate", data)
-                .then((v) => {
-                    res(v);
-                });
+            res(merged);
         })
     },
 
@@ -532,7 +589,48 @@ module.exports = {
                 });
         })
     },
+
+    /**
+     * Captions an image loaded locally.
+     * @param {string} location Where to caption from.
+     * @param {number} [maxSpeakers=undefined] Number of speakers. Set to -1 to have automatic.
+     * @returns {Promise<[{start: number, stop: number, speaker: string}]>} Resulting value.
+     */
+    Diarize(location, maxSpeakers = undefined) {
+        return new Promise(async (res, rej) => {
+            // Starts up the transcribe stuff.
+            if (!Started) await Start();
+
+            const data = {
+                location: "",
+                maxSpeakers: Math.abs(maxSpeakers)
+            };
+
+            ConvertFFMPEG(location).then(name => {
+                data.location = name
+                postJSON("http://127.0.0.1:4963/diarize", data).then((e) => {
+                    // Delete the converted file.
+                    fp.unlink(name);
+                    res(e);
+                }, (e) => {
+                    // If we fail, still delete. Just reject the error I guess.
+                    /* Callers should clean up after themselves. Remember to delete files!
+                    try {
+                        fp.unlink(name);
+                    } catch {
+                        ; // Do nothing.
+                    }
+                    */
+                    rej(e);
+                })
+                .catch(e => {
+                    rej(e);
+                });
+            });
+        })
+    },
 }
+
 // Debug.
 /*
 module.exports.Transcribe("./audio.mp3");

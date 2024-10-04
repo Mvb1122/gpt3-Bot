@@ -58,6 +58,8 @@ const client = new Discord.Client({
     Discord.GatewayIntentBits.MessageContent,
     Discord.GatewayIntentBits.GuildMembers,
     Discord.GatewayIntentBits.GuildVoiceStates,
+
+    Discord.GatewayIntentBits.GuildPresences
   ],
 });
 const BaseAddress = "./ActiveBases.json";
@@ -161,14 +163,15 @@ function IsChannelMemory(channel) {
 /**
  * Clears the AI's memory for a specified channel. Does not stop it from listening.
  * @param {*} parameters 
+ * @param {boolean} [KeepListening=true] Whether to keep listening in this channel.
  * @param {Discord.Message} DiscordMessage 
  */
-async function ClearAll(parameters = {}, DiscordMessage = null) {
+async function ClearAll(parameters = {}, DiscordMessage = null, KeepListening = true) {
   // Clear the AI's memory for the specified channel. 
   let Base = bases[GetBaseIdFromChannel(DiscordMessage.channel)];
-  bases[GetBaseIdFromChannel(DiscordMessage.channel)] = [];
+  bases[GetBaseIdFromChannel(DiscordMessage.channel)] = KeepListening ? [] : undefined;
   // Write file to recovery file.
-  // Come up with a RecoveryID.
+    // Come up with a RecoveryID.
   let RecoveryId = -1;
   do {
     RecoveryId = Math.floor(Math.random() * 100000);
@@ -356,9 +359,7 @@ function NewMessage(Role, Content, Username) {
     content: Content
   }]
 }
-
-const { encode } = require("gpt-3-encoder");
-const LlamaConverter = require('./LlamaSupport');
+module.exports.NewMessage = NewMessage;
 
 /**
  * Converts message strings into json. 
@@ -420,6 +421,9 @@ function ConvertToMessageJSON(InputMessages) {
 
   return messages;
 }
+
+const { encode } = require("gpt-3-encoder");
+const LlamaConverter = require('./LlamaSupport');
 
 //#region GetSafeChatGPTResponse
 /**
@@ -686,7 +690,7 @@ async function SummarizeConvo(messages, DiscordMessage) {
 
 
       /** @type {string} */
-      const Response = (await GetSafeChatGPTResponse(MessagesPlusSummaryRequest, DiscordMessage)).data.choices[0].message.content;
+      const Response = (await GetSafeChatGPTResponse(MessagesPlusSummaryRequest, DiscordMessage, 0, false)).data.choices[0].message.content;
       // Set thread title.
       // console.log("Summary: " + Response.content);
       if (Response.length > 100) DiscordMessage.channel.send("Full title: \n# " + Response)
@@ -1313,15 +1317,35 @@ client.on('messageCreate',
           const AuthorTag = MessageIsFromAI ? "Assistant" : "User";
           let content = [];
 
-          const text = MessageIsFromAI ? focusMessage.content : `(${focusMessage.member.nickname ?? focusMessage.author.displayName}) ${focusMessage.content}`;
+          let text = MessageIsFromAI ? focusMessage.content : `(${focusMessage.member.nickname ?? focusMessage.author.displayName}) ${focusMessage.content}`;
+
+          // If the message is special, put in a special reply.
+          switch (focusMessage.type) {
+            case Discord.MessageType.UserJoin:
+              text = "I joined the conversation!"
+              break;
+
+            case Discord.MessageType.ChannelNameChange:
+              text = `Channel name changed to: ${focusMessage.channel.name}`
+              break;
+          
+            default:
+              break;
+          }
+
           // Add text content. (Use an array type if there's attachments)
           if (m.attachments.size != 0)
             content.push({
               type: "text",
               text: text
             })
-          else
+          else {
             content = text;
+            /*
+            if (content != "") content = text;
+            else content = "Empty Message! Please ignore this."
+            */
+          }
 
           // Add images if present.
           m.attachments.forEach(attachment => {
@@ -1749,7 +1773,6 @@ server.listen(port, host, () => {
 const { Server: SocketServer } = require("socket.io");
 const Web = require('./WebAI/Web');
 const { Message } = require('discord.js');
-const LlamaSupport = require('./LlamaSupport');
 const io = new SocketServer(server)
 
 io.on("connection", (socket) => {
@@ -1798,3 +1821,25 @@ if (!DEBUG) {
     console.log(err);
   });
 }
+
+//#region Watch for Micah's status updating and save it automatically.
+let lastStatus = "";
+const StatusLoggingChannelID = "1120516346736807968"
+client.on('presenceUpdate', async (o, n) => {
+  if (n.activities.length > 0 && (n.status != 'invisible' || n.status != 'offline') && n.userId == token.GetToken("devDiscordID")) {
+    let thisStatus = ((n.activities[0].emoji.toString() ?? "") + " " + n.activities[0].state).trim();
+    if (thisStatus != lastStatus) {
+      lastStatus = thisStatus;
+
+      const channel = await client.channels.fetch(StatusLoggingChannelID);
+      
+      // Check that it wasn't one that I or the bot already posted.
+      /** @type {Discord.GuildMessageManager} */
+      const messages = channel.messages;
+      const alreadyPosted = (await messages.fetch({limit: 100})).some((v) => v.content == thisStatus)
+
+      if (!alreadyPosted)
+        channel.send(thisStatus);
+    }
+  }
+})

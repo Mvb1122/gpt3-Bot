@@ -1,8 +1,9 @@
-transcription_model_id = "openai/whisper-large-v3"
+transcription_model_id = "openai/whisper-large-v3-turbo"
 musicgen_model_id = "facebook/musicgen-small"
 tts_model_id = "microsoft/speecht5_tts"
 language_classifier_model_id = "papluca/xlm-roberta-base-language-detection"
 translation_model_id = "facebook/nllb-200-distilled-600M"
+HF_Token = "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"
 
 from transformers import pipeline, AutoProcessor, AutoModelForCausalLM
 from transformers.utils import is_flash_attn_2_available
@@ -202,6 +203,29 @@ def Caption_Image(location, mode):
   parsed_answer = florenceProcessor.post_process_generation(generated_text, task=mode, image_size=(image.width, image.height))
   return parsed_answer[mode]
 
+# Diarization stuff.
+from pyannote.audio import Pipeline as PyanPipeline
+Diarizer = None
+def Diarize(path, maxSpeakers):
+  global Diarizer
+  if type(Diarizer) is type(None): 
+    Diarizer = PyanPipeline.from_pretrained("pyannote/speaker-diarization-3.1", use_auth_token=HF_Token)
+    Diarizer.to(torch.device(device))
+
+  diarization = Diarizer(path, max_speakers=maxSpeakers)
+
+  # Put the output to a string.
+  out = []
+  for turn, _, speaker in diarization.itertracks(yield_label=True):
+    t = {
+       "start": f"{turn.start:.1f}",
+       "stop": f"{turn.end:.1f}",
+       "speaker": f"{speaker}"
+    }
+    out.append(t)
+
+  return out
+
 # Server stuff.
 from flask import Flask, jsonify, request
 app = Flask(__name__)
@@ -297,6 +321,18 @@ def caption_function():
         
       if ('location' in data) and ('mode' in data):
           return jsonify(Caption_Image(data['location'], data['mode'])), 200
+      else:
+          return jsonify({'error': 'Invalid JSON structure', 'data': data}), 400
+  else:
+      return jsonify({'error': 'Request must be JSON', 'data': request.form }), 400
+  
+@app.route("/diarize", methods=['POST'])
+def diarize_function():
+  if request.is_json:
+      data = request.get_json()
+        
+      if 'location' in data:
+          return jsonify(Diarize(data['location'], data['maxSpeakers'] or None)), 200
       else:
           return jsonify({'error': 'Invalid JSON structure', 'data': data}), 400
   else:
