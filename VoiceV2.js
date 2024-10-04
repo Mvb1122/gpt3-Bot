@@ -532,13 +532,13 @@ module.exports = {
                 if (from == "auto") from = "whatever language text is written in";
     
                 const messages = NewMessage("System", "You are an AI which is really good at translating text from " + from + " to " + to + ". When someone gives you text to translate, you will ONLY write your translation. YOU WILL NOT write anything EXCEPT for the translation. If auto is either language, you must translate it to English.")
-                    .concat(NewMessage("User", "Hi, please translate this text to " + to + " please!\nText:\n" + v + ""));
+                    .concat(NewMessage("User", "Hi, please translate this text to " + to + " please!\nText:\n" + natural + ""));
                 
                 const response = (await GetSafeChatGPTResponse(messages, null, 0, false)).data.choices[0].message;
-                return { 
+                return res({ 
                     translation_text: response.content,
                     from_lang: from
-                };
+                });
             }
         })
     },
