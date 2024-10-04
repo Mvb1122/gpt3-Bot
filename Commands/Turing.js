@@ -46,7 +46,7 @@ async function GetBaseName(UserID) {
 
         const response = (await GetSafeChatGPTResponse(Messages)).data.choices[0].message.content;
 
-        User.base_name = response;
+        User.base_name = response ?? "Nameless AI";
         User.sync();
         return response;
     } else {
@@ -204,7 +204,26 @@ async function ResponseCheckLoop() {
 }
 ResponseCheckLoop();
 
+function RemoveTuringAgentByLastChannelID(lastChannelId) {
+    let index = -1;
+    let set = TrackingSets.find((v, i) => {
+        const matches = v.LastMessageChannelId == lastChannelId;
+        if (matches) index = i;
+        return matches 
+    });
 
+    if (!set) {
+        return false
+    } else {
+        // Remove from the list. 
+        TrackingSets.splice(TrackingSets.indexOf(set), 1);
+        return; 
+    }
+}
+
+
+const ChatStartMessage = "You've just joined chat! Please briefly tell everyone that you've just joined.";
+const ChatEndMessage = "Now you're leaving! Please briefly announce your departure to everyone here.";
 module.exports = {
     // Can be swapped for another CommandBuilder and the system will handle it.
     data: new SlashCommandBuilder()
@@ -285,14 +304,15 @@ module.exports = {
             TrackingSets.push(set);
 
             // Get the AI to send their first message.
-            set.AddMessages(NewMessage("User", "You've just joined chat! Please briefly tell everyone that you've just joined."));
+            set.AddMessages(NewMessage("User", ChatStartMessage));
             set.Respond(interaction);
 
         } else if (subcommand == "stop") {
+            const UserID = interaction.user.id;
             // Remove the set, also have them announce that they're leaving.
             let index = -1;
             let set = TrackingSets.find((v, i) => {
-                const ownedByUser = v.RootUserid == interaction.user.id;
+                const ownedByUser = v.RootUserid == UserID;
                 if (ownedByUser) index = i;
                 return ownedByUser 
             });
@@ -301,7 +321,7 @@ module.exports = {
                 return interaction.editReply("You are not the owner of any of the AI's talking on this server!");
             }
 
-            set.AddMessages(NewMessage("User", "Now you're leaving! Please briefly announce your departure to everyone here."));
+            set.AddMessages(NewMessage("User", ChatEndMessage));
             set.Respond(interaction);
 
             // Remove from the list. 
@@ -333,11 +353,19 @@ module.exports = {
      */
     async OnMessageRecieved(message) {
         TrackingSets.forEach(async set => {
-            if (set.Channels.indexOf(message.channelId) != -1 && set.WebHookIDs[message.channelId] != message.author.id && message.author.id != client.user.id) {
+            if (set.Channels.indexOf(message.channelId) != -1 && set.WebHookIDs[message.channelId] != message.author.id /* && message.author.id != client.user.id */ ) {
                 // Create content objects.
                 const name = (message.member ?? {nickname: null}).nickname ?? message.author.displayName;
                 let content = [];
-                const TextContent = `(${name}) ${message.content}`;
+                let ReplyPrefix = "";
+
+                if (message.reference) {
+                    const ref = await message.fetchReference();
+                    const n = (ref.member ?? {nickname: null}).nickname ?? ref.author.displayName;
+                    ReplyPrefix = `Replying to: (${n}) ${ref.content}\n`;
+                }
+
+                const TextContent = `(${name}) ${ReplyPrefix}${message.content}`;
                 if (message.attachments.size != 0)
                     content.push({
                         type: "text",
@@ -356,6 +384,12 @@ module.exports = {
                                 "url": attachment.url,
                                 "detail": "low" // Can be set to "high" or "auto" but "low" is cheapest so
                             },
+                        });
+                    } else {
+                        // Put the link.
+                        content.push({
+                            "type": "text",
+                            text: attachment.url
                         });
                     }
                 })
@@ -389,7 +423,9 @@ module.exports = {
                 return typers.length > 0;
             }
         });
-    }
+    },
+
+    ChatStartMessage, ChatEndMessage, RemoveSetByLastMessageContent: RemoveTuringAgentByLastChannelID
 }
 
 function WaitForMS(time = 1000) {
