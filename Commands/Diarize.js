@@ -124,10 +124,7 @@ module.exports = {
 
             // If we're making notes, make them and follow up.
             if (interaction.options.getBoolean("notetake") ?? false) {
-                const messages = NewMessage("System", SummarizeBase)
-                    .concat(NewMessage("User", /* "That being said, please summarize this conversation:\n" + */ output + "\n\nPlease summarize the above conversation using Markdown syntax!"))
-                
-                const response = (await GetSafeChatGPTResponse(messages, interaction, 0, false)).data.choices[0].message.content;
+                const response = await SummarizeText(output, interaction);
                 interaction.followUp({
                     content: response.length > 2000 ? "Notes were too long!" : response
                 });
@@ -153,4 +150,14 @@ module.exports = {
             else return Output;
         }
     },
+
+    SummarizeText
+}
+
+async function SummarizeText(output, interaction) {
+    const messages = NewMessage("System", SummarizeBase)
+        .concat(NewMessage("User", /* "That being said, please summarize this conversation:\n" + */ output + "\n\nPlease summarize the above conversation using Markdown syntax!"));
+
+    const response = (await GetSafeChatGPTResponse(messages, interaction, 0, false)).data.choices[0].message.content;
+    return response;
 }

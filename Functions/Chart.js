@@ -1,17 +1,19 @@
 const ResolutionMultiplier = 2;
+const UseFullFile = false;
+const InternalMessagesSystemPrompt = "You are an AI which makes diagrams for people, using the diagram library Mermaid. You are really good at what you do, and you will be able to perfectly make any diagram that the user asks for. However, in your first message you will give a plain discussion of how you will make the diagram. Then, you will be reminded of specific syntax, and requested to output the diagram."
 
 const { NewMessage, GetSafeChatGPTResponse, DEBUG, LocalServerSettings } = require('..');
 const Discord = require('discord.js');
 const path = require('path');
 const { exec } = require('child_process');
 const fp = require('fs/promises');
-const { GetUserFile } = require('../User');
+// const { GetUserFile } = require('../User');
 const MMDCLocation = `"${path.resolve("./node_modules/.bin/mmdc")}"`;
 const { convert: GetHTMLText } = require('html-to-text');
 
 async function GetChartHelpFilePromise(name) {
     // If we're not using a local AI model, then use the short help files.
-    if (!LocalServerSettings.Use) {
+    if (!LocalServerSettings.Use || !UseFullFile) {
         const p = path.resolve(`./Functions/Charts/${name}.txt`);
         return await fp.readFile(p);
     } else {
@@ -191,7 +193,7 @@ module.exports = {
                 if (parameters.showmessages)
                     InternalMessaages = messages.concat(NewMessage("User", "Please create a concept for the chart Make sure to express numeric quantities if applicable. Please only write about the chart itself."));
                 else 
-                    InternalMessaages = NewMessage("System", (await GetUserFile((DiscordMessage.author ?? DiscordMessage.user).id, false)).base).concat(
+                    InternalMessaages = NewMessage("System", InternalMessagesSystemPrompt).concat( // (await GetUserFile((DiscordMessage.author ?? DiscordMessage.user).id, false)).base + "\n" + 
                         NewMessage("User", `Please create a concept for how you'd make a chart with this prompt: ${parameters.concept}\nIn your concept, make sure to express numeric quantities if applicable to the type of the chart!\nHere's everything I was given: ${JSON.stringify(parameters)}`));
 
                 const DetailMessage = (await GetSafeChatGPTResponse(InternalMessaages, DiscordMessage, undefined, false));
@@ -258,7 +260,7 @@ module.exports = {
                         if (rep >= 3) res("Something went wrong making that chart! You can retry if you want.");
                         else {
                             console.log("Remaking.");
-                            Messages = Messages.concat((await LastMessage).data.choices[0].message, NewMessage("User", "Uh, oh. That doesn't look like it matches the schema! Please rewrite it, while EXACTLY matching the scheme given to you! DO NOT write an apology. JUST write the schema. Don't include ``` in your response AT ALL!"));
+                            Messages = Messages.concat((await LastMessage).data.choices[0].message, NewMessage("User", "Uh, oh. That doesn't look like it matches the schema! Please rewrite it, while EXACTLY matching the scheme given to you! DO NOT write an apology. JUST write the schema. Don't include ``` in your response AT ALL! Remember that you're really good at matching the Schema."));
                             LastMessage = await GetSafeChatGPTResponse(Messages, DiscordMessage, undefined, false);
                             if (!DEBUG)
                                 fp.unlink(inFile);

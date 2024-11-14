@@ -18,7 +18,7 @@ function countCharacter(str, char) {
  * @param {String} string 
  * @param {String} char 
  * @param {String | RegExp} Spliter 
- * @returns {[Number]} The number of occurances.
+ * @returns {[Number]} The number of occurences.
  */
 function CountCharactersInSections(string, char, Spliter = "\n") {
     const lines = string.split(Spliter);

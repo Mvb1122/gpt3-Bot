@@ -129,7 +129,7 @@ module.exports = {
     }
 }
 
-if (DEBUG) {
+if (false) {
     const TestCommand = {"name": "recall", "parameters": {"text": "what I like to wear", "assist": true}};
     const TestCall = {
         id: 1,

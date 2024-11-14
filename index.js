@@ -11,7 +11,7 @@ const DEBUG = false;
 const LocalServerSettings = {
   // Set Use: true to use local server.
   Use: true,
-  basePath: "http://192.168.1.4:82/v1",
+  basePath: "http://192.168.68.57:82/v1",
   // Model will be set automatically from API request, but you can override here.
   // model: "LM Studio Community/Meta-Llama-3-8B-Instruct-GGUF/Meta-Llama-3-8B-Instruct-Q4_K_M.gguf",
   temperature: 0.8,
@@ -343,6 +343,21 @@ function GetFunctionFromStart(message) {
 //#endregion
 
 //#region ChatGPT Methods
+class GPTMessage {
+  /** @type {"System" | "User" | "Function" | "Tool" | "Assistant"} */
+  role;
+
+  /**@type {String} */
+  name;
+
+  /** @type {content: String | {type: string, image_url: {url: string, detail: "low" | "high"} | undefined, text: string | undefined}[]} */
+  content;
+
+  /** @type { id: number; type: string ;function: { name: any; arguments: string; }[]} */
+  tool_calls;
+}
+module.exports.GPTMessage = GPTMessage;
+
 // Types: System, User Function
 /**
  * Creates a message object from the content.
@@ -869,6 +884,7 @@ async function fetchUserBase(id) {
   }
 }
 
+const tableRegex = new RegExp(/((\|[^|\r\n]*)+\|(\r?\n|\r)?)+/g);
 /**
  * Looks for markdown tables in a string.
  * @param {String} string Content of message.
@@ -876,83 +892,52 @@ async function fetchUserBase(id) {
  */
 function ParseMessage(string) {
   // Before we do anything, to save flops, if we don't have any "|" in the message, just return it like that.
-  if (string.indexOf("|") == -1) return [string];
+  if (string.indexOf("|") == -1) return string;
 
+  // Use a regex to detect tables.
+  const output = [];
+  try {
+    const matches = string.match(tableRegex);
+    matches.map((v, i) => {
+  
+      // Parse to a 2D string array.
+      /**
+       * @type {String[][]}
+       */ 
+      let cells = [];
+      const lines = v.split("\n");
+      lines.forEach((v, i) => {
+        cells[i] = v.split("|").filter(v => v.trim() != "");
+      });
 
-  const LineCounts = Helpers.CountCharactersInSections(string, "|", "\n");
-  /**
-   * @type {[[[String]]]}
-   */
-  let TableSets = [[]];
-  const Lines = string.split("\n")
-  let tableIndex = 0;
+      // Filter to only valid cells.
+      cells = cells.filter(v => v[0] != "" && v.length >= 2);
 
-  // If multiple lines contain the same number of "|" characters, cut those lines out and convert them to a table embed.
-  if (LineCounts[0] >= 2) TableSets[0] = LineCounts[0];
-  else {
-    TableSets[0] = Lines[0];
-    tableIndex = 1; TableSets[1] = [];
-  }
-
-  for (let i = 1; i < LineCounts.length; i++) {
-    let ContentOnThisLine = Lines[i].split("|")
-
-    if (ContentOnThisLine.length > 0) {
-      ContentOnThisLine = ContentOnThisLine.slice(1, ContentOnThisLine.length - 1)
-      TableSets[tableIndex].push(ContentOnThisLine)
-    } else {
-      TableSets.push(Lines[i]);
-      tableIndex += 2;
-      TableSets[tableIndex] = [];
-    }
-    /*Old Code
-    (LineCounts[i] == LineCounts[i - 1] && LineCounts[i] >= 2)
-    {
-      TableSets[tableIndex].push(ContentOnThisLine); 
-    } else if (LineCounts[i] == LineCounts[i + 1]){
-      TableSets[tableIndex] = [ContentOnThisLine]
-    } else if (LineCounts[i] == 0 && TableSets[tableIndex] != []) {
-      // Remove the table from the currentText.
-      let TableText = "";
-      TableSets[tableIndex]
-
-      currentText = currentText.replace(TableText, "[Table Embed]");
-
-      // Move on.
-      tableIndex++;
-      tableStartIndex = i + 1;
-    }*/
-  }
-
-  console.log(TableSets)
-
-  // Construct an embed for each embed as needed, if needed.
-  for (let i = 0; i < TableSets.length; i++) {
-    if ((typeof TableSets[i]).toString() != "string" && TableSets[i].length > 1) {
-      const table = TableSets[i];
-      let ThisEmbed = new Discord.EmbedBuilder();
-      // console.log(`${i}: ${typeof TableSets[i]}`)
-      for (let j = 0; j < table[0].length; j++) {
-        let column = [];
-        for (let k = 0; k < table.length; k++)
-          column.push(table[k][j])
-
-        // Now that we have the column, we can add a field for it.
-        ThisEmbed.addFields({
-          name: column[0],
-          value: column.slice(1).toString().replaceAll(",", "\n"),
+      const title = `Table #${i + 1}`;
+      const fields = cells.map((v, i) => {
+        // Each row should have its own inline field.
+        return {
+          name: cells[0][i] ?? "",
+          // Rotate the cells array 90° so that Discord's weird formatting works out correctly.
+          value: cells.slice(1).map(v => v[i] ?? "").join("\n"),
           inline: true
-        })
-      }
+        };
+      }).filter(v => v.name != "" && v.value != "");
 
-      TableSets[i] = ThisEmbed;
-    }
+      const embed = new EmbedBuilder()
+        .setTitle(title)
+        .addFields(fields);
+  
+      // Replace it in the text. 
+      string = string.replace(v, title);
+      output.push(embed)
+    });
+  } catch (e) {
+    console.log(e);
   }
 
-  if (DEBUG)
-    console.log(TableSets)
-
-  return TableSets;
+  // Return the replaced content followed by all the tables. 
+  return [string].concat(output);
 }
 
 /* !DEBUG: g!test function.
@@ -1004,20 +989,21 @@ async function SendMessage(Message, StringContent, Reply = false) {
   }
 
   // For the moment, just send the message as a string because I need to find time to patch the ParseMessage thing.
-  return SendString(StringContent);
+  // return SendString(StringContent);
 
   // TODO: Fix the below functionality.
-  /*
   return new Promise(async res => {
     // If the input message contains a markdown table, send it as an embed.
-    // [Content, Embed] = ParseTables(Content)
+    /**
+     * @type {[string | Discord.EmbedBuilder]}
+     */
     let Content = ParseMessage(StringContent);
 
     // First, merge all string lines into the one previous to it.
     for (let i = 1; i < Content.length; i++)
       if ((typeof Content[i]).toString() == "string")
       {
-        // Retain the text if the previous chunk was also a string.
+        // Merge the text if the previous chunk was also a string.
         if ((typeof Content[i - 1]).toString() == "string") {
           Content[i - 1] += "\n" + Content[i];
           Content.splice(i, 1);
@@ -1025,11 +1011,8 @@ async function SendMessage(Message, StringContent, Reply = false) {
         }
       }
 
-    console.log("=====================")
-    console.log(Content)
+    // Finally, send.
     for (let i = 0; i < Content.length; i++) {
-      console.log(`Type: ${typeof Content[i]}`);
-      console.log(Content[i])
       if ((typeof Content[i]).toString() == "string")
       {
         if (Content[i].trim() == "") continue;
@@ -1044,7 +1027,6 @@ async function SendMessage(Message, StringContent, Reply = false) {
 
     res()
   })
-  */
 }
 
 /**
@@ -1140,7 +1122,7 @@ module.exports = {
 const cmt = require('./Commands/CreateMemoryThread.js')
 
 //#region Command handler stuff.
-function RefreshSlashCommands() {
+function RefreshSlashCommands(onlyDisallowed = false) {
   let commands = [];
 
   // Auto add all files in the various commands directories.
@@ -1197,13 +1179,72 @@ function RefreshSlashCommands() {
     try {
       console.log(`Started refreshing application commands.`);
 
-      // The put method is used to fully refresh all commands in the guild with the current set
+      // Fetch the already loaded ones and only update new ones.
+      /**
+       * @type {import('discord.js').RESTPutAPIApplicationGuildCommandsJSONBody}
+       */
+      const alreadyLoaded = await client.application.commands.fetch()
+
+      // Filter commands to only up-to-date ones.
+      CommandJSON = CommandJSON.filter(v => {
+        // Return true if this command matches one of the already loaded JSON.
+        for (let i = 0; i < alreadyLoaded.length; i++) {
+          if (JSON.stringify(alreadyLoaded[i]) === JSON.stringify(v)) 
+            return false; // Remove loaded ones.
+        }
+        
+        return true;
+      });
+
+      // Apply limits.
+      const sums = {
+        pad: 0, // Something I added so the enum matches the index.
+        CHAT_INPUT: 0, // 1
+        USER: 0, // 2
+        MESSAGE: 0 // 3
+      };
+      const limits = {
+        pad: 0,
+        CHAT_INPUT: 100,
+        USER: 5,
+        MESSAGE: 5
+      };
+      const names = Object.keys(sums);
+      let disallowed = [];
+
+      CommandJSON = CommandJSON.filter(v => {
+        const type = names[v.type ? v.type : 1];
+
+        let allowed = sums[type] < limits[type];
+
+        // Add sum by type.
+        if (allowed) {
+          // Allowed.
+          sums[type]++;
+          return !onlyDisallowed;
+        } else {
+          disallowed.push(v);
+          return onlyDisallowed;
+        }
+      })
+
       const data = await rest.put(
-        Discord.Routes.applicationCommands(client.user.id /*, guildId */), // use with ApplicationGuildCommands for testing.
+        Discord.Routes.applicationCommands(client.user.id /*, token.GetToken("devServerID") */), // use with ApplicationGuildCommands for testing.
         { body: CommandJSON }
       );
 
-      console.log(`Successfully reloaded ${data.length} application (/) commands.`);
+      if (data.length != 0)
+        console.log(`${green}Successfully reloaded ${data.length} application (/) commands.${reset}`);
+      else console.log("It was not necessary to update any commands!");
+
+      if (disallowed.length != 0 && !onlyDisallowed) {
+        console.log(`${red}${disallowed.length} commands were prevented from reloading!${reset}`);
+        setTimeout(() => {
+          // After 12 hours, upload the rest.
+          for (let v in disallowed)
+            rest.put(Discord.Routes.applicationCommand(client.user.id), { body: v });
+        }, 12 * 60 * 1000);
+      }
     } catch (error) {
       // And of course, make sure you catch and log any errors!
       console.error(error);
@@ -1223,7 +1264,7 @@ async function UpdatePersonaArray() {
     }
 
     fs.readdirSync(UsersFolder).forEach(file => {
-      if (file.includes("_Base.json")) {
+      if (file.includes("_Base.json")){
         fs.readFile(`./users/${file}`, (err, data) => {
           const json = JSON.parse(data);
           const userID = file.substring(0, file.indexOf("_"));
@@ -1504,6 +1545,15 @@ client.on('messageCreate',
 
 client.login(DiscordToken);
 
+//#region Ratelimit.
+client.on('rateLimit', v => {
+  /** @type {Discord.RateLimitData} */
+  v = v;
+
+  console.log(v);
+})
+//#endregion
+
 //#region Interaction handling
 client.on("interactionCreate",
   /**
@@ -1773,6 +1823,8 @@ server.listen(port, host, () => {
 const { Server: SocketServer } = require("socket.io");
 const Web = require('./WebAI/Web');
 const { Message } = require('discord.js');
+const internal = require('stream');
+const { EmbedBuilder } = require('discord.js');
 const io = new SocketServer(server)
 
 io.on("connection", (socket) => {
@@ -1827,7 +1879,7 @@ let lastStatus = "";
 const StatusLoggingChannelID = "1120516346736807968"
 client.on('presenceUpdate', async (o, n) => {
   if (n.activities.length > 0 && (n.status != 'invisible' || n.status != 'offline') && n.userId == token.GetToken("devDiscordID")) {
-    let thisStatus = ((n.activities[0].emoji.toString() ?? "") + " " + n.activities[0].state).trim();
+    let thisStatus = ((((n.activities[0] ?? {emoji: ""}).emoji).toString()) + " " + n.activities[0].state).trim();
     if (thisStatus != lastStatus) {
       lastStatus = thisStatus;
 

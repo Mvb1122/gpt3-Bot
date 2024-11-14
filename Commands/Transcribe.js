@@ -9,6 +9,7 @@ const { getVoiceConnection, VoiceConnection, EndBehaviorType } = require('@disco
 const { client, DEBUG } = require('..');
 const prism = require('prism-media');
 const { LogTo, StartLog, StopLog, HasLog, GetLogId, AddOnLog } = require('../TranscriptionLogger');
+const { SummarizeText } = require('./Diarize');
 
 /**
  * Ensures that a voice connection to a channel exists.
@@ -134,6 +135,11 @@ module.exports = {
                                 .setDescription("The voice you want to transcribe.")
                                 .setRequired(true)
                         })
+                        .addBooleanOption(o => {
+                            return o.setName("notetake")
+                                .setDescription("Whether to have the AI take notes for you!")
+                                .setRequired(false);
+                        })
                 })
                 .addSubcommand(s => {
                     return s.setName("call")
@@ -181,6 +187,7 @@ module.exports = {
             try {
                 let TimeTaken = performance.now();
                 TranscribeURL(url, name).then(async val => {
+                    const pureText = val + "";
                     TimeTaken = ((performance.now() - TimeTaken) / 1000).toFixed(2);
                     const NormalContent = "```" + val + "```\nTime Taken: " + TimeTaken + " seconds";
                     if (NormalContent.length >= 2000) {
@@ -203,6 +210,14 @@ module.exports = {
                             content: NormalContent,
                             files: [url]
                         });
+
+                    // If we're making notes, make them and follow up.
+                    if (interaction.options.getBoolean("notetake") ?? false) {
+                        const response = await SummarizeText(pureText, interaction);
+                        interaction.followUp({
+                            content: response.length > 2000 ? "Notes were too long!" : response
+                        });
+                    }
                 })
             } catch (e) {
                 interaction.editReply("Something went wrong! ```" + e + "```");
