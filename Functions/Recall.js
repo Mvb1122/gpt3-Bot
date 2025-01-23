@@ -3,11 +3,17 @@ const { DEBUG, SendMessage, GetSafeChatGPTResponse, NewMessage } = require('../i
 const { CreateModelHandler } = require('../HFAIModelHandler');
 const MemoriesFile = "./Memories.json";
 const fs = require('fs');
+const User = require('../User');
 
 const classifier = CreateModelHandler("Xenova/distilbert-base-cased-distilled-squad", "question-answering", "Micah is a cute girl.");
 
 if (DEBUG)
     classifier.Run("Who is Micah?").then(v => console.log(v));
+
+function SendAnswer(message, answer) {
+    if (message)
+        message.channel.send("Memory recalled:\n```java\n" + answer + "\n```");
+}
 
 module.exports = {
     keywords: "",
@@ -55,14 +61,16 @@ module.exports = {
          */
         let data = parameters.assist ? await classifier.Run(parameters.text) : { answer: parameters.text, score: 1 };
 
-        // If the score was low, then just make a general response.
+        // If the score was low, then just make a general response using the AI.
         if (data.score <= 0.01) {
             // Generate a response using the AI.
-            const messages = NewMessage("System", "You are an AI that is good at describing things. When asked to describe something, you will give a general overview of the concept, plus a deeper dive.")
+            const messages = NewMessage("System", (await User.fetchRootBase()) + "\nYou are an AI that is good at describing things. When asked to describe something, you will give a general overview of the concept, plus a deeper dive.")
                 .concat(NewMessage("User", "What is " + parameters.text));
 
             const response = await GetSafeChatGPTResponse(messages, DiscordMessage, 0, false);
-            return response.data.choices[0].message.content;
+            const answer = response.data.choices[0].message.content;
+            SendAnswer(DiscordMessage, answer);
+            return answer;
         }
 
         // Find the full line. Using find with assist means that it can find the specific memory, but using filter without assist means it can search properly.
@@ -77,8 +85,7 @@ module.exports = {
         if (DEBUG && DiscordMessage) SendMessage(DiscordMessage, `Recalling: ${parameters.text} ${JSON.stringify(data)}`);
 
         // Tell the user that a memory was recalled.
-        else if (DiscordMessage)
-            DiscordMessage.channel.send("```java\n// Memory recalled:\n" + data.answer + "\n```");
+        else SendAnswer(DiscordMessage, data.answer)
 
         return JSON.stringify(data);
     },
