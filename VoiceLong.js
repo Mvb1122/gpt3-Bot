@@ -28,7 +28,7 @@ const NormalVolumeHashTags = 4;
  */
 function SplitToSections(text) {
     const lines = text.split("\n");
-    const parts = lines.map(v => {
+    let parts = lines.map(v => {
         return v.split(/(?<=[.!?])/);
     });
 
@@ -191,3 +191,4 @@ async function VoiceLong(GuildId, content, ChannelId, Voice = AIVoiceBin, log = 
     return;
 }
 exports.VoiceLong = VoiceLong;
+const { AIVoiceBin, AIThinkingMessage } = require("./Commands/Buddy");

@@ -52,7 +52,7 @@ module.exports = {
         else 
             try {
                 AudioPath = await Download(url, `./Temp/${fileName}`);
-                Embed(AudioPath, `./Voice Embeddings/${name}.bin`, SilenceRemove).then(() => {
+                Embed(AudioPath, `./Speaker Wavs/${name}.wav`, SilenceRemove).then(() => {
                     interaction.editReply("Embed processed! It should be available on the `/ttstovc` and `/voice` commands immediately!");
 
                     // Delete the original audio.

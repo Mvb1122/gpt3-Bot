@@ -1,6 +1,6 @@
 const AIThinkingMessage = ":robot: The AI is thinking of a response...";
 module.exports.AIThinkingMessage = AIThinkingMessage;
-const AIVoiceBin = "girl.bin";
+const AIVoiceBin = "Girl 1.wav";
 module.exports.AIVoiceBin = AIVoiceBin;
 const SpokenInteractionBase = " You will enter a spoken conversation with at least one user. That being said, if you encounter multiple users at once, please look at all messages provided in order to craft your response; don't just look at exactly the last message. Also, the user saying a particular thing will be listed in parenthesis at the start of that specific message."
 
@@ -12,7 +12,7 @@ const { PlayAudioToVC } = require('./TTSToVC');
 const { getVoiceConnection } = require('@discordjs/voice');
 const { GetUserFile } = require('../User');
 const { VoiceLong } = require('../VoiceLong');
-const AIWakePhrase = "computer,chat"
+const AIWakePhrase = "computer,chat,fairy"
 
 /**
  * @type {[{Messages: [{role: "System" | "User" | "Function" | "Assistant"; content: string;}], LastMessageTime: number, ChannelId: string, GuildId: string, AlwaysListening: boolean, Bypass: boolean, CurrentlySpeaking: boolean}]}
@@ -89,7 +89,7 @@ module.exports = {
                         })
                         .addBooleanOption(op => {
                             return op.setName("alwayslistening")
-                                .setDescription(`Whether to always listen. Defaults to false, wakes on "${AIWakePhrase}"`)
+                                .setDescription(`Whether to always listen. Defaults to false, wakes on ${AIWakePhrase}`)
                                 .setRequired(false)
                         })
                 })

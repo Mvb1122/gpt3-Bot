@@ -139,6 +139,10 @@ if (fs.existsSync(ReadingListsFile)) {
     ReadingList = JSON.parse(fs.readFileSync(ReadingListsFile));
 }
 
+/**
+ * Selects a random voice from existing VoiceV2 embeddings.
+ * @returns {String}
+ */
 function GetRandomVoice() {
     const embeddings = VoiceV2.ListEmbeddings();
     let index = Math.floor(Math.random() * embeddings.length);
