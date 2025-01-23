@@ -6,5 +6,8 @@
     "clicksendauthorization": "Basic YOURCODEHERE",
     "x-rapidapi-key": "",
     "devDiscordID": "",
-    "devServerID": ""
+    "devServerID": "",
+    "gImagesSearchApi": "",
+    "gImagesSearchEngineId": "",
+    "Polygon_IO_API_Key": ""
 }

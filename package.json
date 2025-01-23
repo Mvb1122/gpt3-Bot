@@ -14,12 +14,15 @@
   "dependencies": {
     "@discordjs/opus": "^0.9.0",
     "@discordjs/voice": "^0.17.0",
+    "@googleapis/customsearch": "^3.2.0",
     "@gradio/client": "^0.3.1",
     "@mermaid-js/mermaid-cli": "^10.9.1",
+    "@polygon.io/client-js": "^7.3.2",
     "@xenova/transformers": "^2.17.1",
     "a1111-webui-api": "^1.0.0",
     "canvas": "^2.11.2",
     "color": "^4.2.3",
+    "cutlet": "^0.0.0",
     "dictionary-en-us": "^3.0.0",
     "discord.js": "^14.15.3",
     "ffmpeg-static": "^5.2.0",
@@ -37,6 +40,7 @@
     "sharp": "^0.32.6",
     "socket.io": "^4.8.0",
     "tweetnacl": "^1.0.3",
+    "unfluff": "^3.2.0",
     "update": "^0.7.4",
     "wavefile": "^11.0.0",
     "xhr2": "^0.2.1"
