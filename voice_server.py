@@ -226,6 +226,26 @@ def Diarize(path, maxSpeakers):
 
   return out
 
+# Time Series Prediction stuff
+from autogluon.timeseries import TimeSeriesPredictor, TimeSeriesDataFrame
+
+def Predict(location, out, reps = 20):
+  # Load data.
+  df = TimeSeriesDataFrame(location)
+
+  # Build Prediction model and predict out.
+  predictor = TimeSeriesPredictor(prediction_length=reps, freq='D').fit(
+    df,
+    hyperparameters={
+        "Chronos": {"model_path": "amazon/chronos-bolt-small"},
+    },
+  )
+
+  predictions = predictor.predict(df)
+
+  # Save out
+  predictions.to_csv(out)
+
 # Server stuff.
 from flask import Flask, jsonify, request
 app = Flask(__name__)
@@ -333,6 +353,18 @@ def diarize_function():
         
       if 'location' in data:
           return jsonify(Diarize(data['location'], data['maxSpeakers'] or None)), 200
+      else:
+          return jsonify({'error': 'Invalid JSON structure', 'data': data}), 400
+  else:
+      return jsonify({'error': 'Request must be JSON', 'data': request.form }), 400
+  
+@app.route("/predict", methods=['POST'])
+def predict_function():
+  if request.is_json:
+      data = request.get_json()
+        
+      if 'location' in data and 'out' in data:
+          return jsonify(Predict(data['location'], data['out'], data['reps'] or None)), 200
       else:
           return jsonify({'error': 'Invalid JSON structure', 'data': data}), 400
   else:

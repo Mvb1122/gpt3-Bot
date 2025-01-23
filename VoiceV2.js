@@ -630,6 +630,31 @@ module.exports = {
             });
         })
     },
+
+    /**
+     * Uses Chronos Bolt on a local CSV file.
+     * @param {string} location Where to caption from.
+     * @param {string} out Where to output to.
+     * @param {number} reps How many reps to predict.
+     * @returns {Promise<string>} Resulting values.
+     */
+    Predict(location, out, reps) {
+        return new Promise(async res => {
+            // Starts up the transcribe stuff.
+            if (!Started) await Start();
+
+            const data = {
+                location: location,
+                out: out,
+                reps: reps,
+            };
+
+            postJSON("http://127.0.0.1:4963/predict", data)
+                .then((v) => {
+                    res(v);
+                });
+        })
+    },
 }
 
 // Debug.
