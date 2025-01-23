@@ -18,16 +18,19 @@ module.exports = {
    */
   async execute(parameters, DiscordMessage = null) {
     const files = fs.readdirSync(__dirname)
-    .filter(v => v.includes("js"))
-    .map(v => {
-        const f = require(path.resolve(__dirname + "/" + v));
-        return {
+      .filter(v => v.includes("js"))
+      .map(v => {
+          const f = require(path.resolve(__dirname + "/" + v));
+          return {
             name: f.json.name,
             description: f.json.description,
             keywords: f.keywords,
-        }
-    })
+          }
+      });
 
-    return JSON.stringify(files);
+    // return JSON.stringify(files);
+    return files.map(v => {
+      return `${v.name}: ${v.description}`;
+    }).join("\n")
   }
 }
