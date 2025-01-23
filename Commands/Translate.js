@@ -225,11 +225,11 @@ Zulu	zul_Latn
 
 
 //Ignore ts(80001)
-const { SlashCommandBuilder, CommandInteraction, Message, ChannelType } = require('discord.js');
+const { SlashCommandBuilder, CommandInteraction, Message, ChannelType, GuildMessageManager } = require('discord.js');
 const { Translate } = require('../VoiceV2');
 const { client } = require('..');
 const fs = require('fs'); const fp = require('fs/promises'); const path = require('path');
-const { GetWebhook } = require('./Say');
+const { GetWebhook, EditWebhookMessageInChannel } = require('./Say');
 
 let TranslatingLists = [
     {
@@ -248,8 +248,42 @@ if (fs.existsSync(ListsFile)) {
     })
 }
 
+function AddList(l) {
+    TranslatingLists.push(l);
+}
+
+// Do not export TranslatingLists. Instead use this to avoid creating out-of-date references.
+function GetLists() {
+    return TranslatingLists
+}
+
 function WriteLists() {
     return fp.writeFile(ListsFile, JSON.stringify(TranslatingLists));
+}
+
+/**
+ * @type {[{author: string, outputId: string, inputId: string, messageOutId: string, messageInId: string}]}
+ */
+let lastMessages = [];
+function FetchLastMessage(inId) {
+    return lastMessages.find(v => v.messageInId == inId);
+}
+
+function AddMessage(author, outputId, inputId, messageOut, messageIn) {
+    // Filter out old ones.
+    lastMessages = lastMessages.filter(v => {
+        // Remove entires with same author and channelId.
+        return !(v.author == author && v.inputId == inputId)
+    });
+
+    lastMessages.push({
+        author: author,
+        outputId: outputId,
+        inputId: inputId,
+        messageOutId: messageOut,
+        messageInId: messageIn
+    });
+    return;
 }
 
 module.exports = {
@@ -304,6 +338,12 @@ module.exports = {
                         .setRequired(false)
                         .addChannelTypes(ChannelType.GuildText, ChannelType.PublicThread, ChannelType.PrivateThread, ChannelType.AnnouncementThread, ChannelType.GuildAnnouncement);
                 })
+                /*
+                .addBooleanOption(o => {
+                    return o.setName("filter")
+                        .setDescription("Whether to filter to only messages written in the input language.")
+                })
+                */
         })
         .addSubcommand(o => {
             return o.setName("stopconvo")
@@ -315,6 +355,8 @@ module.exports = {
                         .addChannelTypes(ChannelType.GuildText, ChannelType.PublicThread, ChannelType.PrivateThread, ChannelType.AnnouncementThread, ChannelType.GuildAnnouncement);
                 })
         }),
+
+    WriteLists, AddList, GetLists,
 
     /**
      * Generates the message with the specified count.
@@ -353,7 +395,8 @@ module.exports = {
                 inputId: input.id,
                 outputId: output.id,
                 to: to,
-                from: from
+                from: from,
+                // filter: interaction.options.getBoolean("filter")
             }
 
             TranslatingLists.push(data);
@@ -382,20 +425,75 @@ module.exports = {
         // Ignore bots and empty messages
         if (message.author.bot || (message.content ?? "").trim().length == 0) return;
 
+        const inputId = /* message.thread != null ? message.thread.id :  */ message.channelId;
+
         for (let i = 0; i < TranslatingLists.length; i++) {
-            const CurrentList = TranslatingLists[i];
-            if (message.channelId == CurrentList.inputId) {
+            const currentList = TranslatingLists[i];
+            if (inputId == currentList.inputId) {
+                // const lang = DetermineLanguage(message.content);
+
+                // If filtering, only show messages that are from the source language.
+                // if (CurrentList.filter && lang != CurrentList.from) return; 
+
                 // Translate it to the list's langauge and send it.
-                Translate(message.content, CurrentList.to, CurrentList.from).then(async v => {
-                    // Get a WH to send their stuff in.
-                    const channel = await client.channels.fetch(CurrentList.outputId);
-                    const wh = await GetWebhook(channel, message.member.nickname ?? message.member.displayName, () => message.member.displayAvatarURL({size: 4096}))
-                    wh.send({
-                        content: v.translation_text,
+                    // Since it can take time to both get translation and to get webhook, do both at the same time using promises.
+                const translation = Translate(message.content, currentList.to, currentList.from);
+                // Get a WH to send their stuff in.
+                const channel = await client.channels.fetch(currentList.outputId);
+                const name = message.member.nickname ?? message.member.displayName;
+                const wh = GetWebhook(channel, name, () => message.member.displayAvatarURL({size: 4096}))
+
+                
+                // Use Promise.all to avoid waiting synchronously. 
+                await Promise.all([translation, wh]);
+                let whMessage;
+                
+                // If the last message in the thread was by this user, then edit. (Helps avoid ratelimits but creates other problems.)
+                /** @type {GuildMessageManager} */
+                /* const messages = channel.messages;
+                const lastInThread = (await messages.fetch({ limit: 1 })).at(0);
+                if (lastInThread.author.displayName == name && lastInThread.author.bot && lastInThread.content.length + (await translation).translation_text.length <= 1999) {
+                    whMessage = EditWebhookMessageInChannel(await wh, lastInThread.id, channel.isThread() ? channel.id : undefined, {
+                        content: lastInThread.content + "\n" + (await translation).translation_text
+                    });
+                } else */ {
+                    // Otherwise, send a new message.
+                    whMessage = (await wh).send({
+                        content: (await translation).translation_text,
                         threadId: channel.isThread() ? channel.id : undefined
-                    })
-                })
+                    });
+                }
+
+
+                AddMessage(message.author.id, channel.id, message.channelId, (await whMessage).id, message.id);
             }
+        }
+    },
+
+    /**
+     * Runs code when a message is edited.
+     * @param {Message} old 
+     * @param {Message} newMessage 
+     */
+    async OnMessageEdited(old, newMessage) {        
+        // Process edits too.
+        const currentList = TranslatingLists.find(v => v.inputId == newMessage.channelId);
+        const lastMessage = FetchLastMessage(old.id);
+
+        // console.log({old: old.content, new: newMessage.content, cl: currentList, lm: lastMessage});
+        if (currentList && lastMessage) {
+            // Translate and get webhook at the same time.
+            const translation = Translate(newMessage.content, currentList.to, currentList.from);
+            const channel = await client.channels.fetch(currentList.outputId);
+            const wh = GetWebhook(channel, newMessage.member.nickname ?? newMessage.member.displayName, () => newMessage.member.displayAvatarURL({size: 4096}));
+
+            // Use promise.all to avoid making it sequential. 
+            await Promise.all([translation, wh])
+
+            const whMessage = EditWebhookMessageInChannel(await wh, lastMessage.messageOutId, channel.isThread() ? channel.id : undefined, {
+                content: (await translation).translation_text // Preserve edits so that we can see the improvement.
+            });
+            AddMessage(newMessage.author.id, currentList.outputId, currentList.inputId, (await whMessage), lastMessage.messageInId);
         }
     },
 
@@ -424,5 +522,5 @@ module.exports = {
 		
         // Send back our response.
         await interaction.respond(filtered);
-    }
+    },
 }
