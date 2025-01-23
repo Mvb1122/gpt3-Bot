@@ -2,10 +2,24 @@ const SystemMessageString = `(SYSTEM) Returned data from function: %s\nPlease us
 const FunctionFinderRegex = new RegExp(/(<[a-z]*>)?\{\s*\"name\"\s*:\s*\"[^\"]*\"\s*,\s*\"((parameters)|(arguments))\"\s*:\s*\"*\{[^}]*\}\"*\s*\}(<\/[a-z]*>)?/g);
 const TextInGLTSymbolsRegex = new RegExp(/<\/*[a-z]*>/g);
 
-const { DEBUG } = require('./index.js');
+const { DEBUG, LocalServerSettings, NewMessage, AIParameters } = require('./index.js');
+const { Configuration, OpenAIApi } = require("openai");
+const configuration = new Configuration({
+    apiKey: LocalServerSettings.Use ? LocalServerSettings.ApiKey : tokens.GetToken("openai"),
+    basePath: LocalServerSettings.Use ? LocalServerSettings.basePath : undefined
+});
+const openai = new OpenAIApi(configuration);
 
 function IsObject(ob) {
     return typeof ob == 'object'
+}
+
+async function DownloadToBase64String(url) {
+    // Open it in b64.
+    let data = await fetch(url)
+    const blob = await data.arrayBuffer();
+    const output = `data:${data.headers.get("content-type")};base64,${Buffer.from(blob).toString("base64")}`;
+    return output;
 }
 
 const CaptionCache = {};
@@ -20,6 +34,12 @@ module.exports = {
      * @returns {Promise<{role: String, content: String | {type: string, text: string}[], name: String, tool_calls: { id: number; type: string ;function: { name: any; arguments: string; }}[]}>}
      */
     async MessageToLlama(m) {
+        // If the model supports function calls and images, don't do anything. 
+        if (LocalServerSettings.ImageBehavior.state == 'mainsupported' &&  LocalServerSettings.FunctionCalls == 'mainsupported') return m;
+
+        // If we're using a llava model in mainsupport mode, replace system with user.
+        if (LocalServerSettings.ImageBehavior.state == "mainsupported" && m.role.toLowerCase() == "system") m.role = "user"
+
         if (m.role == "tool") {
             // v.role = "ipython"
             m.role = "user"
@@ -36,25 +56,60 @@ module.exports = {
             // This is a image request; caption images.
             m.content = m.content.map(v => {
                 return new Promise(async p => {
+
+                    console.log(LocalServerSettings.ImageBehavior.state)
                     if (v.type == "image_url") {
                         if (DEBUG) console.log(v.image_url.url);
-
-
-                        // Download it.
-                        /*
-                        if (v.image_url.url.endsWith("&")) v.image_url.url = v.image_url.url.substring(0, v.image_url.url.length - 2);
-                        const safeName = v.image_url.url.substring(v.image_url.url.lastIndexOf('/') + 1, v.image_url.url.indexOf('?'));
-                        const path = await Download(v.image_url.url, Path.resolve(`./Temp/${safeName}`));
-                        */
+                        
+                        // Download it if we can support images. Otherwise, caption it.
                         const path = v.image_url.url;
-                        const VoiceV2 = require('./VoiceV2.js');
-                        const caption = CaptionCache[path] ?? await VoiceV2.Caption(path, "<MORE_DETAILED_CAPTION>");
-                        CaptionCache[path] = caption;
+                        if (LocalServerSettings.ImageBehavior.state == "inbuilt") {
+                            const VoiceV2 = require('./VoiceV2.js');
+                            const caption = CaptionCache[path] ?? await VoiceV2.Caption(path, "<MORE_DETAILED_CAPTION>");
+                            CaptionCache[path] = caption;
+                            
+                            p({
+                                type: "text",
+                                text: caption
+                            });
+                        } else if (LocalServerSettings.ImageBehavior.state == "mainsupported") {
+                            // In this case, the cache will be used to hold the base 64 data.
+                            const caption = CaptionCache[path] ?? await DownloadToBase64String(path);
+                            CaptionCache[path] = caption;
+                            
+                            // Set the data to be a data url.                           
+                            v.image_url.url = caption;
 
-                        p({
-                            type: "text",
-                            text: caption
-                        });
+                            p(v)
+                        } else if (LocalServerSettings.ImageBehavior.state == "separate") {
+                            // Caption it with the second LLM. 
+                            const captionSeq = NewMessage("user", "You are an image captioning AI. You will caption images with the most detail you can. You will respond with ONLY the caption. You may provide additional background information if it seems useful.")
+                                .concat([{
+                                    role: "user",
+                                    content: [
+                                        {
+                                            type: "text",
+                                            text: "Please caption this image for me."
+                                        },
+                                        {
+                                            type: "image_url",
+                                            image_url: {
+                                                url: await DownloadToBase64String(path)
+                                            }
+                                        }
+                                    ]
+                                }]);
+
+                            // Ask AI.
+                            const visionParams = JSON.parse(JSON.stringify(AIParameters));
+                            visionParams.model = LocalServerSettings.ImageBehavior.separateModel;
+                            visionParams.messages = captionSeq;
+                            const resp = (await openai.createChatCompletion(visionParams)).data.choices[0].message.content;
+                            p({
+                                type: "text",
+                                text: resp
+                            });
+                        }
                     }
                     p(v);
                 })
@@ -62,11 +117,14 @@ module.exports = {
             m.content = await Promise.all(m.content);
 
             // Put it all down into just one text message.
-            m.content = m.content.map(v => v.text).join('\n');
+            if (!LocalServerSettings.ImageBehavior.state == "inbuilt")
+                m.content = m.content.map(v => v.text).join('\n');
         } else if (m.role == "user") m.content = m.content.trim();
 
         // Tool calls will stay there, we just put the text in so that the AI understands what it did.
-        // delete m.tool_calls;
+            // Under Ollama AI without built-in function support, we have to delete them.
+        if (LocalServerSettings.FunctionCalls == "teach")
+            delete m.tool_calls;
         return m;
     },
 
@@ -77,6 +135,11 @@ module.exports = {
      * @returns {{role: String, content: String | {type: string, image_url: string | undefined, text: string | undefined}[], name: String, tool_calls: { id: number; type: string ;function: { name: any; arguments: string; }}[]}}
      */
     MessageFromLlama(m) {
+        m.role = m.role.toLowerCase();
+
+        // If the model supports function calls and images, don't do anything. 
+        if (LocalServerSettings.ImageBehavior.state == 'mainsupported' &&  LocalServerSettings.FunctionCalls == 'mainsupported') return m;
+
         if (DEBUG) {
             console.log("Before:")
             console.log(m);

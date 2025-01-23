@@ -13,8 +13,35 @@ const LocalServerSettings = {
   Use: true,
   basePath: "http://192.168.68.57:82/v1",
   // Model will be set automatically from API request, but you can override here.
-  // model: "LM Studio Community/Meta-Llama-3-8B-Instruct-GGUF/Meta-Llama-3-8B-Instruct-Q4_K_M.gguf",
+  model: "deepseek-r1:8b", // "llava-1.6-mistral-7b", 
   temperature: 0.8,
+
+  /** 
+   * teach: Teaches the AI how to call functions. 
+   * mainsupported: Uses OpenAI-style calls into it. Does not teach how to use.
+   * 
+   * @type {"teach" | "mainsupported"}
+   * */
+  FunctionCalls: "teach",
+
+  ImageBehavior: {
+    /**
+     * in-built: Uses a florence model internal to this program.
+     * main-supported: The main model can support images on its own.
+     * separate: Uses the seperateModel listed below to caption images.
+     * 
+     * @type {"inbuilt" | "mainsupported" | "separate"}
+     */
+    state: "inbuilt",
+    
+    separateModel: "llava-1.6-mistral-7b"
+  },
+
+  /** 
+   * r1: Bot will put r1 thinking in code blocks when called from chat.
+   * otherwise: Will do nothing.
+   */
+  cosmetic: 'r1'
 }
 //#endregion
 
@@ -26,6 +53,7 @@ const tokens = require('./token');
 const red = '\x1b[31m';
 const green = '\x1b[32m';
 const reset = '\x1b[0m';
+
 module.exports.DEBUG = DEBUG;
 module.exports.LocalServerSettings = LocalServerSettings;
 
@@ -42,8 +70,11 @@ if (LocalServerSettings.Use) {
         console.log(`Model automatically set to ${green}%s${reset}!`, LocalServerSettings.model)
         res(LocalServerSettings.model)
       });})
+  else 
+    LocalServerSettings.model = new Promise(res => res(LocalServerSettings.model));
 }
 
+module.exports.AIParameters = AIParameters;
 const configuration = new Configuration({
   apiKey: LocalServerSettings.Use ? LocalServerSettings.ApiKey : tokens.GetToken("openai"),
   basePath: LocalServerSettings.Use ? LocalServerSettings.basePath : undefined
@@ -279,7 +310,7 @@ fs.readdir(functionPath, (err, paths) => {
 function GetFunctions(messages) {
   // Search only the user's messages.
   let AllContent = messages.filter(v => {
-    return v.role == "user";
+    return v.role == "user" && !v.content.includes("I AM NOT THE USER"); // Don't include tool responses that are masked as the user.
   })
     .map(v => {
       return v.content;
@@ -494,7 +525,7 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
         functions = GetFunctions(messages);
 
         // If we're using a remote model, then handle them correctly for that.
-        if (LocalServerSettings.Use) {
+        if (LocalServerSettings.Use && LocalServerSettings.FunctionCalls == "teach") {
           // Get first system message.
           const SystemMessage = messages[0];
           if (SystemMessage.content && SystemMessage.content.indexOf(FunctionEndMessage) != -1) {
@@ -510,12 +541,12 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
       else
         functions = []
 
-      if (functions.length > 0 && !LocalServerSettings.Use) {
+      if (functions.length > 0 && !LocalServerSettings.Use && LocalServerSettings.FunctionCalls == 'teach') {
         params.tool_choice = "auto";
         params.tools = functions;
       } 
       
-      if (LocalServerSettings.Use) {
+      if (LocalServerSettings.Use && LocalServerSettings.FunctionCalls == 'teach') {
         // Do all necessary processing using the module to make our messages compatible with Llama. 
         messages = await Promise.all(messages.map(async m => {return await LlamaConverter.MessageToLlama(m)}));
       }
@@ -552,6 +583,9 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
         DiscordMessage.channel.send("Request to AI failed, Retrying...")
 
       console.log(e);
+      
+      // If in DEBUG, dump the entire error's data to a file.
+      if (DEBUG && 'config' in e) fp.writeFile("./DEBUG.json", e.config.data)
 
       // Wait for a bit before trying again.
       await new Promise(res => setTimeout(res, 500 * Math.pow(++numReps, 2)));
@@ -892,7 +926,7 @@ const tableRegex = new RegExp(/((\|[^|\r\n]*)+\|(\r?\n|\r)?)+/g);
  */
 function ParseMessage(string) {
   // Before we do anything, to save flops, if we don't have any "|" in the message, just return it like that.
-  if (string.indexOf("|") == -1) return string;
+  if (string.indexOf("|") == -1) return [string];
 
   // Use a regex to detect tables.
   const output = [];
@@ -956,7 +990,7 @@ const DiscordMessageLengthLimit = 1900;
 /**
  * Splits up the response into 1900 character blocks and sends each of them.
  * @param {Discord.Message} Message The message to send in the channel of.
- * @param {String} Content The content to be sent.
+ * @param {String} StringContent The content to be sent.
  * @param {boolean} [Reply=false] Whether to reply to the passed message.
  * @returns {Promise<Message>} A promise which resolves when the message is complete.
  */
@@ -964,6 +998,8 @@ async function SendMessage(Message, StringContent, Reply = false) {
   if (StringContent.trim() == "") {
     return Message.channel.send("[Empty Message]")
   }
+
+  if (LocalServerSettings.cosmetic == 'r1') StringContent = StringContent.replaceAll("<think>", "```<think>").replaceAll("</think>", "</think>```");
 
   async function SendString(part) {
     return new Promise(async resolve => {
@@ -988,27 +1024,25 @@ async function SendMessage(Message, StringContent, Reply = false) {
     })
   }
 
-  // For the moment, just send the message as a string because I need to find time to patch the ParseMessage thing.
+  // Optional: Send as just a string.
   // return SendString(StringContent);
 
-  // TODO: Fix the below functionality.
   return new Promise(async res => {
     // If the input message contains a markdown table, send it as an embed.
     /**
      * @type {[string | Discord.EmbedBuilder]}
      */
     let Content = ParseMessage(StringContent);
+    console.log(Content);
 
     // First, merge all string lines into the one previous to it.
     for (let i = 1; i < Content.length; i++)
-      if ((typeof Content[i]).toString() == "string")
-      {
+      if (typeof Content[i] == 'string' && typeof Content[i - 1] == 'string')
+      {      
         // Merge the text if the previous chunk was also a string.
-        if ((typeof Content[i - 1]).toString() == "string") {
-          Content[i - 1] += "\n" + Content[i];
-          Content.splice(i, 1);
-          i--;
-        }
+        Content[i - 1] += "\n" + Content[i];
+        Content.splice(i, 1);
+        i--;
       }
 
     // Finally, send.
@@ -1036,8 +1070,7 @@ async function SendMessage(Message, StringContent, Reply = false) {
 async function IsMessageInThread(DiscordMessage) {
   try {
     const type = DiscordMessage.channel.type;
-
-    return type == Discord.ChannelType.PublicThread || type == Discord.ChannelType.PrivateThread || type == Discord.ChannelType.AnnouncementThread;
+    return type == Discord.ChannelType.PublicThread || type == Discord.ChannelType.PrivateThread || type == Discord.ChannelType.AnnouncementThread ;
   } catch {
     return false;
   }
@@ -1066,23 +1099,25 @@ client.once('ready', () => {
   UpdatePersonaArray();
   //#endregion
 
-  /* Creepy message sending code for snooping on weird servers.
-  client.guilds.cache.forEach(async guild => {
-    console.log(`${guild.name} | ${guild.id}`);
-    if (guild.id == "1004416383989338185") {
-      console.log("reached!");
-      const channels = guild.channels.cache;
-      for (let i = 0; i < channels.size; i++) {
-        const channel = channels.at(i);
-        if (channel.name == "general") {
-          await channel.send("Heyo, dunno if you'll get this because I'm sending it through a weird way, but JSYK I'm disabling public install beacuse I'm not really intending to provide a service to people. You can keep using this server though, I don't even know if I can even remove this bot from the server on my own lmao.\n-Micah")
-          console.log("Sent!");
-          break;
+  // Creepy message sending code for snooping on weird servers.
+  if (DEBUG) {
+    console.log("List of all installed servers:")
+    client.guilds.cache.forEach(async guild => {
+      console.log(`${guild.name} | ${guild.id} | ${guild.ownerId}`);
+      /* if (guild.id == "1329350392475160636") {
+        console.log("reached!");
+        const channels = guild.channels.cache;
+        for (let i = 0; i < channels.size; i++) {
+          const channel = channels.at(i);
+          if (channel.name == "general") {
+            await channel.send("Heyo, dunno if you'll get this because I'm sending it through a weird way, but JSYK I'm disabling public install beacuse I'm not really intending to provide a service to people. You can keep using this server though, I don't even know if I can even remove this bot from the server on my own lmao.\n-Micah")
+            console.log("Sent!");
+            break;
+          }
         }
-      }
-    }
-  })
-  */
+      } */
+    })
+  }
 })
 
 
@@ -1116,7 +1151,10 @@ module.exports = {
   UpdatePersonaArray,
   LocalServerSettings,
   AIParameters,
-  GetTypingInChannel
+  GetTypingInChannel,
+  colors: {
+    red, green, reset
+  }
 }
 
 const cmt = require('./Commands/CreateMemoryThread.js')
@@ -1246,7 +1284,6 @@ function RefreshSlashCommands(onlyDisallowed = false) {
         }, 12 * 60 * 1000);
       }
     } catch (error) {
-      // And of course, make sure you catch and log any errors!
       console.error(error);
     }
   })();
@@ -1441,7 +1478,6 @@ client.on('messageCreate',
         message.channel.sendTyping();
 
         let result = await RequestChatGPT(Messages, message);
-        console.log(result);
         SendMessage(message, result[result.length - 1].content, true)
       }
     }
@@ -1618,7 +1654,7 @@ client.on("voiceStateUpdate", (old, newState) => {
 })
 
 async function AskChatGPTAndSendResponse(content, message) {
-  let requestOut = RequestChatGPT(content, message)
+  RequestChatGPT(content, message)
     .then(Convo => {
       console.log(Convo);
       // console.log("RequestOut: " + requestOut + "\n~~~");
@@ -1892,20 +1928,25 @@ if (!DEBUG) {
 let lastStatus = "";
 const StatusLoggingChannelID = "1120516346736807968"
 client.on('presenceUpdate', async (o, n) => {
-  if (n.activities.length > 0 && (n.status != 'invisible' || n.status != 'offline') && n.userId == token.GetToken("devDiscordID")) {
-    let thisStatus = ((((n.activities[0] ?? {emoji: ""}).emoji).toString()) + " " + n.activities[0].state).trim();
-    if (thisStatus != lastStatus) {
-      lastStatus = thisStatus;
-
-      const channel = await client.channels.fetch(StatusLoggingChannelID);
-      
-      // Check that it wasn't one that I or the bot already posted.
-      /** @type {Discord.GuildMessageManager} */
-      const messages = channel.messages;
-      const alreadyPosted = (await messages.fetch({limit: 100})).some((v) => v.content == thisStatus)
-
-      if (!alreadyPosted)
-        channel.send(thisStatus);
+  try {
+    if (n.activities.length > 0 && (n.status != 'invisible' || n.status != 'offline') && n.userId == token.GetToken("devDiscordID")) {
+      let thisStatus = ((((n.activities[0] ?? {emoji: ""}).emoji).toString()) + " " + n.activities[0].state).trim();
+      if (thisStatus != lastStatus) {
+        lastStatus = thisStatus;
+  
+        const channel = await client.channels.fetch(StatusLoggingChannelID);
+        
+        // Check that it wasn't one that I or the bot already posted.
+        /** @type {Discord.GuildMessageManager} */
+        const messages = channel.messages;
+        const alreadyPosted = (await messages.fetch({limit: 100})).some((v) => v.content == thisStatus)
+  
+        if (!alreadyPosted)
+          channel.send(thisStatus);
+      }
     }
+  } catch {
+    // Do nothing.
   }
 })
+//#endregion
