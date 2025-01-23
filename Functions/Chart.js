@@ -136,6 +136,39 @@ function compressAndEncodeCode(code) {
     return `pako:${base64String}`;
 }
 
+/**
+ * Creates a chart.
+ * @param {{name: string;alias?: string[];help: string;dimensions: {height: number;width: number;};}} chart 
+ * @param {string} inFile 
+ * @param {string} outFile 
+ * @param {string} content Content to graph. 
+ * @returns {Promise<string>}
+ */
+async function MakeChart(chart, inFile, outFile, content) {
+    const params = ["-H", chart.dimensions.height * ResolutionMultiplier, "-w", chart.dimensions.width * ResolutionMultiplier, "-i", inFile, "-o", outFile, "-t", "dark", "-b", "transparent"];
+    await fp.writeFile(inFile, content);
+
+
+    // Actually call mermaid.
+    // Note: Command is reconcatonated here since I originally wrote this to use spawn but then changed it to use exec.
+    const Command = MMDCLocation + " " + params.map(v => { if (v.toString().includes("gpt3")) return `"${v}"`; else return v; }).join(" ");
+    // Debug call which writes out the command being run.
+    if (DEBUG) console.log(Command);
+
+    return new Promise(res => {
+        const child = exec(Command);
+        // When this process exits, that means that the diagram was completed.
+        child.on('exit', async () => { res(); console.log(`Diagram make complete!\n${(await child.stdout.toArray()).join("\n")}`); });
+        if (DEBUG) {
+            child.on('error', (e) => { console.log(e); });
+
+            child.on("message", (v) => {
+                console.log(v);
+            });
+        }
+    });
+}
+
 module.exports = {
     keywords: "chart, graph, flowchart, " + SupportedChartsList.replaceAll(" | ", ", "),
     json:
@@ -219,28 +252,7 @@ module.exports = {
                 const rand = Math.floor(Math.random() * 1000);
                 const inFile = path.resolve(`./Temp/in_${rand}.mmd`);
                 const outFile = path.resolve(`./Temp/out_${rand}.png`);
-                const params = ["-H", chart.dimensions.height * ResolutionMultiplier, "-w", chart.dimensions.width * ResolutionMultiplier, "-i", inFile, "-o", outFile, "-t", "dark", "-b", "transparent"];
-                await fp.writeFile(inFile, (await LastMessage).data.choices[0].message.content);
-
-
-                // Actually call mermaid.
-                // Note: Command is reconcatonated here since I originally wrote this to use spawn but then changed it to use exec.
-                const Command = MMDCLocation + " " + params.map(v => { if (v.toString().includes("gpt3")) return `"${v}"`; else return v; }).join(" ");
-                // Debug call which writes out the command being run.
-                if (DEBUG) console.log(Command);
-
-                await new Promise(res => {
-                    const child = exec(Command);
-                    // When this process exits, that means that the diagram was completed.
-                    child.on('exit', async () => { res(); console.log(`Diagram make complete!\n${(await child.stdout.toArray()).join("\n")}`); });
-                    if (DEBUG) {
-                        child.on('error', (e) => { console.log(e); });
-
-                        child.on("message", (v) => {
-                            console.log(v);
-                        });
-                    }
-                });
+                await MakeChart(chart, inFile, outFile, (await LastMessage).data.choices[0].message.content);
 
                 // File has been written out, we can now send to the user.
                     // Create a link to view online.
@@ -269,5 +281,7 @@ module.exports = {
                     });
             }
         })
-    }
+    },
+
+    SupportedCharts, MakeChart, compressAndEncodeCode
 }

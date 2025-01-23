@@ -25,9 +25,14 @@ module.exports = {
             return o.setName("visible")
                 .setDescription("Whether to hide the summary or not.")
                 .setRequired(false);
+        })
+        .addBooleanOption(o => {
+            return o.setName("topicfilter")
+                .setDescription("Whether to filter to the channel topic.")
+                .setRequired(false);
         }),
 
-    SummarizeBase: "You are an assistant which is GREAT at summarizing conversations! You will first list the general topic, then provide a detailed description of the conversation.",
+    SummarizeBase: "You are an assistant which is GREAT at summarizing conversations! You will first list the general topic, then provide a detailed description of the conversation. You should use markdown formatting for the general topic, and use plain text and words for the detailed description. You should exactly copy the capitalization and spelling of names.",
 
     /**
      * Generates the message with the specified count.
@@ -40,30 +45,46 @@ module.exports = {
         })
 
         // Defer for safety.
-        const hidden = interaction.options.getBoolean("visible") ?? true;
-        await interaction.deferReply({ ephemeral: hidden });
+        const visible = interaction.options.getBoolean("visible") != undefined ? interaction.options.getBoolean("visible") : true; // Default true.
+        await interaction.deferReply({ ephemeral: !visible });
 
         const numMessages = interaction.options.getNumber("messages") ?? 100;
+        const filter = interaction.options.getBoolean("topicfilter") != undefined ? interaction.options.getBoolean("topicfilter") : false;; // Default false. 
+        let topic; 
+        if (filter) topic = (await interaction.channel.fetch()).name;
 
         // Get the messages.
-        const messages = await interaction.channel.messages.fetch({limit: numMessages});
-            // Sort into GPT format.
-        const Text = messages.reverse().map(v => `${(v.member ?? {nickname: undefined}).nickname ?? v.author.displayName}: ${v.content}`).join("\n");
-        
+        const messages = await interaction.channel.messages.fetch({ limit: numMessages });
+        // Sort into GPT format.
+        const Text = messages.reverse().map(v => `${(v.member ?? { nickname: undefined }).nickname ?? v.author.displayName}: ${v.content}`).join("\n");
+
         // Ask the AI to summarize.
         const Inputs = NewMessage("System", module.exports.SummarizeBase)
-            .concat(NewMessage("User", "Here's the conversation:\n" + Text))
-            .concat(NewMessage("User", "That being said, please summarize the conversation above."));
+            .concat(
+                NewMessage("User", "Here's the conversation:\n" + Text + /* ),
+                NewMessage("User", */ "\nThat being said, please summarize the conversation above." + (filter ? "\nPlease only filter your discussion to the topic of " + topic : ""))
+            );
 
-        const resp = (await GetSafeChatGPTResponse(Inputs, interaction, 0, false)).data.choices[0].message.content;
+        let resp = (await GetSafeChatGPTResponse(Inputs, interaction, 0, false)).data.choices[0].message.content;
+
+        /* console.log({
+            i: interaction.options.getNumber("messages"),
+            i2: numMessages,
+            filter: filter,
+            f2: interaction.options.getBoolean("topicfilter"),
+            h: visible,
+            h2: interaction.options.getBoolean("visible"),
+            // t: Text,
+            t2: Text.length
+        }); */ 
 
         if (resp.length <= 2000) interaction.editReply(resp);
         else do {
-                let sliceLength = resp.length >= 2000 ? 2000 : resp.length;
-                let slice = resp.substring(0, sliceLength);
-                resp = resp.substring(sliceLength);
-                interaction.followUp(slice);
-            } while (resp.length != 0)
+            let sliceLength = resp.length >= 2000 ? 2000 : resp.length;
+            let slice = resp.substring(0, sliceLength);
+            resp = resp.substring(sliceLength);
+            interaction.followUp(slice);
+        } while (resp.length != 0)
     },
 
     /** 
