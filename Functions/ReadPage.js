@@ -3,6 +3,7 @@ const { Download } = require('../Gradio/Helpers.js');
 const fs = require('fs');
 const { convert: GetHTMLText } = require('html-to-text');
 const { encode } = require("gpt-3-encoder");
+const { LocalServerSettings } = require('../index.js');
 
 module.exports = {
     keywords: "http",
@@ -25,10 +26,10 @@ module.exports = {
 
     /**
      * Code run when the module is executed.
-     * @param {{ url: String }} parameters Parameters from AI.
+     * @param {{ url: string; skipLimit: string }} parameters Parameters from AI. Has a hidden parameter skipLimit that skips the limiting. 
      * @param {Discord.Message} DiscordMessage 
      */
-    async execute(parameters, DiscordMessage) {
+    async execute(parameters, DiscordMessage, messages) {
         // return JSON.stringify({ sucessful: false, reason: "No URL." });
         if (parameters.url != undefined) {
           const path = `./temp/${Math.floor(Math.random() * 10000)}.html`;
@@ -45,7 +46,7 @@ module.exports = {
           const page = fs.readFileSync(path).toString();
 
           // Parse to just text.
-          let text = GetHTMLText(page);
+          let text = GetHTMLText(page, {preserveNewlines: true});
 
           // If there's more than 500 tokens, crop it off past that. 
           const StartLength = encode(text).length;
@@ -68,11 +69,11 @@ module.exports = {
 
           // Delete the file.
           fs.unlink(path, (e) => {
-            console.log(e);
+            if (e) console.log(e);
           })
 
           // Send it back.
-          if (StartLength < 10000) {
+          if (StartLength < 10000 || parameters.skipLimit) {
             return JSON.stringify({sucessful: true, text: text});
           } else {
             if (DiscordMessage)
