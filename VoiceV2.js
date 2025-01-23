@@ -2,13 +2,13 @@
 /**
  * A boolean which describes whether to log the internal server process stuff.
  */
-const DoConsoleLog = false;
-const VoiceDir = "/Voice Embeddings/";
-const DefaultEmbedding = `luminary.bin`;
+const DoConsoleLog = true;
+const VoiceDir = "/Speaker Wavs/";
+const DefaultEmbedding = `Girl 1.wav`;
 //#endregion
 
 const { spawn, ChildProcess } = require('child_process');
-const { DEBUG, LocalServerSettings, NewMessage, GetSafeChatGPTResponse } = require('.');
+const { DEBUG, LocalServerSettings, NewMessage, GetSafeChatGPTResponse, AIParameters, colors } = require('.');
 const fp = require('fs/promises');
 const fs = require('fs');
 
@@ -128,15 +128,17 @@ function Start() {
     if (startPromise == null) {
         startPromise = new Promise(async res => {
             if (Started) await Stop();
-    
+            
+            console.log(colors.green + "Starting Python Generation server! Please be patient." + colors.reset);
+            
             // Run the python server.
             pythonProcess = spawn('python', ['voice_server.py']);
-    
+            
             // Handle process exit events to ensure the Python server is killed when Node.js exits
             process.on('exit', () => {
                 pythonProcess.kill();
             });
-    
+            
             pythonProcess.stderr.on('data', (data) => {
                 if (DoConsoleLog)    
                     console.log(data.toString());
@@ -144,6 +146,7 @@ function Start() {
                 if (data.includes("Running on")) {
                     Started = true;
                     startPromise = null;
+                    module.exports.Started = true;
                     res();
                 }
             });
@@ -164,6 +167,8 @@ function Stop() {
     transcribe_loaded = false;
     LastTranscribe = null;
     Started = false; 
+
+    console.log(colors.red + "Stopping Python Generation server! Please be patient." + colors.reset);
 
     return new Promise((res, rej) => {
         if (pythonProcess == undefined) return res();
@@ -225,7 +230,7 @@ function ConvertFFMPEG(AudioFileName, AdditionalSettings = undefined) {
 
         // Special options for dealing with Opus audio.
         if (AudioFileName.includes(".pcm")) options = options.concat(`-f s16le -ar 48k -ac 2 -i ${AudioFileName}`.split(" "))
-        else options = options.concat([`-i`, AudioFileName, `-ar`, `16000`, `-ac`, `1`])
+        else options = options.concat([`-i`, AudioFileName, `-ar`, `24000`, `-ac`, `1`])
 
         // Add any extra options if they're passed.
         if (AdditionalSettings != undefined) options = options.concat(AdditionalSettings)
@@ -289,7 +294,7 @@ module.exports = {
                 model = DefaultEmbedding;
             }
 
-            if (!model.endsWith(".bin")) model += ".bin";
+            if (!model.endsWith(".wav")) model += ".wav";
 
             // Reformat text to replace numbers with words.
             if (MakeAllLetters) {
@@ -362,7 +367,7 @@ module.exports = {
     },
     
     EmbedDirectory: VoiceDir,
-    DefaultEmbedding,
+    DefaultEmbedding, Started,
 
     Embed(AudioFileName, EmbedName, SilenceRemove = true) {
         return new Promise(res => {
@@ -405,7 +410,7 @@ module.exports = {
         const output = [];
         Embeddings.forEach(embedding => {
             let name = embedding.charAt(0).toUpperCase() + embedding.slice(1);
-            name = name.substring(0, name.indexOf(".bin"));
+            name = name.substring(0, name.indexOf(".wav"));
 
             output.push({
                 name: name,
@@ -531,8 +536,8 @@ module.exports = {
                 if (to == "auto") to = "English";
                 if (from == "auto") from = "whatever language text is written in";
     
-                const messages = NewMessage("System", "You are an AI which is really good at translating text from " + from + " to " + to + ". When someone gives you text to translate, you will ONLY write your translation. YOU WILL NOT write anything EXCEPT for the translation. If auto is either language, you must translate it to English.")
-                    .concat(NewMessage("User", "Hi, please translate this text to " + to + " please!\nText:\n" + natural + ""));
+                const messages = NewMessage("system", "You are an AI which is really good at translating text from " + from + " to " + to + ". When someone gives you text to translate, you will ONLY write your translation. YOU WILL NOT write anything EXCEPT for the translation. If auto is either language, you must translate it to English. If the text is already in the requested language, please just rewrite it exactly with no changes.")
+                    .concat(NewMessage("user", "Hi, please translate this text to " + to + " please!\nText:\n" + natural + ""));
                 
                 const response = (await GetSafeChatGPTResponse(messages, null, 0, false)).data.choices[0].message;
                 return res({ 
@@ -540,6 +545,27 @@ module.exports = {
                     from_lang: from
                 });
             }
+        })
+    },
+
+    /**
+     * Determines the language of a text. Quite innacurate on short pieces of text!
+     * @param {string} text 
+     * @returns {Promise<{code: string}>} Language code; eg 'en', 'ja' etc...
+     */
+    DetermineLanguage(text) {
+        return new Promise(async res => {
+            // Starts up the transcribe stuff.
+            if (!Started) await Start();
+
+            const data = {
+                text: text,
+            };
+
+            postJSON("http://127.0.0.1:4963/determineLanguage", data)
+                .then((v) => {
+                    res(v);
+                });
         })
     },
 
@@ -589,6 +615,34 @@ module.exports = {
                     res(v);
                 });
         })
+        /*
+        // If we don't have LLM image support, use the internal model.
+        if (LocalServerSettings.ImageBehavior.state == "inbuilt")
+        else {
+            return new Promise(async p => {
+                // Caption it with the second LLM.
+                const captionSeq = NewMessage("System", "You are an image captioning AI. You will caption images with the most detail you can. You will respond with ONLY the caption. You may provide additional background information if it seems useful.")
+                    .concat({
+                        role: "User",
+                        content: [
+                            {
+                                type: "text",
+                                text: "Please caption this image for me."
+                            },
+                            {
+                                type: "image_url",
+                                image_url: await DownloadToBase64String(path)
+                            }
+                        ]
+                    });
+
+                const model = LocalServerSettings.ImageBehavior.state == "separate" ? LocalServerSettings.ImageBehavior.separateModel : AIParameters.model;
+                // Ask AI.
+                const resp = (await GetSafeChatGPTResponse(captionSeq, null, 0, false, model)).data.choices[0].message.content;
+                p(resp);
+            })
+        }
+        */
     },
 
     /**

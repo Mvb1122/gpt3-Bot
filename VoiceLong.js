@@ -1,6 +1,5 @@
 const fs = require('fs');
 const { GetLastMessageAndOutputChannel, LogTo } = require("./TranscriptionLogger");
-const { AIVoiceBin, AIThinkingMessage } = require("./Commands/Buddy");
 const { Voice } = require("./VoiceV2");
 const PathLib = require('path');
 const { PlayAudioToVC, GetPlayer } = require("./Commands/TTSToVC");

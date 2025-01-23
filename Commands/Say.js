@@ -276,7 +276,7 @@ module.exports = {
      */
     CanExternal: false,
 
-    GetWebhook, ClearUserFace, GetUserFacePlainTags, GetSuggestedTagsFromEmotion,
+    GetWebhook, ClearUserFace, GetUserFacePlainTags, GetSuggestedTagsFromEmotion, EditWebhookMessageInChannel,
 
     /**
      * Executes code when message is recieved.

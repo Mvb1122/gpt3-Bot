@@ -89,15 +89,17 @@ module.exports = {
             
             const conversation = new Conversation(topic);
             
-            // Temporary testing code.
             interaction.editReply("Conversation loading... I'll join VC in a second! Prompt: ```\n" + topic + "```");
-            AddOnLog(interaction.guildId, (t, n, c) => {
-                // Add this to the messages.
-                const ShouldBeListenedTo = alwayslistening ? true : c.includes(AIWakePhrase);
-                console.log(c)
-                if (t == "STT" || t == "TTS" && ShouldBeListenedTo) {
-                    conversation.DistributeMessage(NewMessage("User", c, n)[0], n);
-                    lastMessageTime[input] = performance.now();
+            AddOnLog(interaction.guildId, (type, name, content) => {
+                try {
+                    // Add this to the messages.
+                    const ShouldBeListenedTo = alwayslistening ? true : content.includes(AIWakePhrase);
+                    if (type == "STT" || type == "TTS" && ShouldBeListenedTo) {
+                        conversation.DistributeMessage(NewMessage("User", content, name)[0], name);
+                        lastMessageTime[input] = performance.now();
+                    }
+                } catch {
+                    // This message likely had no content, so we can just kinda ignore it. 
                 }
             })
 

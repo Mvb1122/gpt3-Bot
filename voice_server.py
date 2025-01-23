@@ -15,7 +15,7 @@ import torchaudio
 from audio_denoiser.AudioDenoiser import AudioDenoiser
 
 used_time = time.time()
-embedding_file_name = "./Voice Embeddings/New_Embedding.bin"
+embedding_file_name = "./Speaker Wavs/New_Embedding.wav"
 
 device = "cpu"
 if (torch.cuda.is_available()): device = "cuda:0"
@@ -26,8 +26,13 @@ elif is_torch_sdpa_available(): attn_implementation = "sdpa"
 
 print("Running audio synth on " + device)
 print("Attn mode: " + str(attn_implementation))
-synthesiser = pipeline("text-to-speech", tts_model_id, device=device)
-synthesiser.model.compile() # Compile the model for just an ounce more performance.
+
+# Create TTS model in advance.
+from TTS.api import TTS
+speech_sample_rate = 24000
+synthesiser = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
+# synthesiser = pipeline("text-to-speech", tts_model_id, device=device)
+# synthesiser.model.compile() # Compile the model for just an ounce more performance.
 
 # Also load denoiser.
 denoiser = AudioDenoiser(device=torch.device(device))
@@ -107,34 +112,51 @@ def DetermineLanguage(text):
     
   return LanguageDeterminer(text, top_k=1, truncation=True)[0]['label']
 
+# print("Language: '" + DetermineLanguage("こんにちは皆さん！") + "'")
+
 def GetEmbedding(location):
   with open(location, "rb") as f:
     return torch.load(f).squeeze(1)
 
-def voice(Text, Embedding, File = "./Temp/Whatever.wav"):
+
+def voice(Text, Embedding, File = "./Temp/Whatever.wav", lang=None):
+  global synthesiser
   used_time = time.time()
 
   # Get speaker embeddings.
-  speaker_embedding = GetEmbedding(Embedding)
+  # speaker_embedding = GetEmbedding(Embedding)
 
-  speech = synthesiser(Text, forward_params={"speaker_embeddings": speaker_embedding, "threshold": 0.4})
+  # speech = synthesiser(Text, forward_params={"speaker_embeddings": speaker_embedding, "threshold": 0.4})
   
   # Write to file.
-  sf.write(File, speech["audio"], samplerate=speech["sampling_rate"])
+  # sf.write(File, speech["audio"], samplerate=speech["sampling_rate"])
   
   # prevent memory leaks.
-  del speech
-  del speaker_embedding
+  # del speech
+  # del speaker_embedding
   
+  synthesiser.tts_to_file(text=Text,
+    file_path=File,
+    speaker_wav=Embedding,
+    language=lang, 
+    split_sentences=True
+  )
+
   used_time = time.time() - used_time
   print("Generation Time: " + str(used_time))
   return True
 
 def embed(source, target):
   # First, denoise audio.
-  signal, fs = torchaudio.load(source)
-  auto_scale = True # Recommended for low-volume input audio
-  signal = denoiser.process_waveform(waveform=signal, sample_rate=16000, auto_scale=auto_scale)
+  # signal, fs = torchaudio.load(source)
+  # auto_scale = True # Recommended for low-volume input audio
+  # signal = denoiser.process_waveform(waveform=signal, sample_rate=speech_sample_rate, auto_scale=auto_scale)
+    # In new version, just denoise and save for later. 
+  if not ("Speaker Wavs" in target):
+    target = "./Speaker Wavs/" + target
+
+  denoiser.process_audio_file(source, target, True)
+  return
 
   # Calculate speech embeddings.
   from speechbrain.inference.speaker import EncoderClassifier
@@ -260,10 +282,15 @@ def voice_function():
             emb = ""
             if 'embed' in data: emb = data['embed']
             else: emb = embedding_file_name; 
-            
-            if not ("./Voice Embeddings/" in emb): emb = "./Voice Embeddings/" + data['embed']
 
-            result = voice(Text=data['text'], Embedding=emb, File=data['location'])
+            lang = ''
+            if ('lang' in data): lang = data['lang']
+            # else: lang = DetermineLanguage(data['text'])
+            else: lang = 'en'
+            
+            if not ("./Speaker Wavs/" in emb): emb = "./Speaker Wavs/" + data['embed']
+
+            result = voice(Text=data['text'], Embedding=emb, File=data['location'], lang=lang)
             return jsonify({'message': result}), 200
         else:
             return jsonify({'error': 'Invalid JSON structure', 'data': data}), 400
@@ -317,6 +344,18 @@ def music_function():
       if 'prompt' in data:
           Make_Music(data['prompt'], output, length)
           return jsonify({'message': True}), 200
+      else:
+          return jsonify({'error': 'Invalid JSON structure', 'data': data}), 400
+  else:
+      return jsonify({'error': 'Request must be JSON', 'data': request.form }), 400
+
+@app.route("/determineLanguage", methods=['POST'])
+def DetermineLanguage_function():
+  if request.is_json:
+      data = request.get_json()
+        
+      if ('text' in data):
+          return jsonify({ 'code': DetermineLanguage(data['text']) }), 200
       else:
           return jsonify({'error': 'Invalid JSON structure', 'data': data}), 400
   else:
