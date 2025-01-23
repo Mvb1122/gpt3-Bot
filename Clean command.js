@@ -32,11 +32,20 @@ module.exports = {
 
     // Below here is not required; should be deleted if not needed.
     /**
-     * Executes code when message is recieved.
+     * Executes code when a message is recieved.
      * @param {Message} message The inputted message. 
      */
     async OnMessageRecieved(message) {
         
+    },
+
+    /**
+     * Runs code when a message is edited.
+     * @param {Message} old 
+     * @param {Message} newMessage 
+     */
+    async OnMessageEdited(old, newMessage) {
+
     },
 
     OnConfigureSecurity() {

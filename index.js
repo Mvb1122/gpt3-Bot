@@ -1543,6 +1543,20 @@ client.on('messageCreate',
     }
   });
 
+client.on(Discord.Events.MessageUpdate, (old, newMessage) => {
+  // Send to messages all OnMessageEdited
+  for (let i = 0; i < SlashCommands.length; i++) {
+    const module = SlashCommands[i];
+    if ('OnMessageEdited' in module) {
+      try {
+        module.OnMessageEdited(old, newMessage);
+      } catch (error) {
+        console.log(error);
+      }
+    }
+  }
+})
+
 client.login(DiscordToken);
 
 //#region Ratelimit.
