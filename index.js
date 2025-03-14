@@ -91,8 +91,6 @@ const client = new Discord.Client({
     Discord.GatewayIntentBits.MessageContent,
     Discord.GatewayIntentBits.GuildMembers,
     Discord.GatewayIntentBits.GuildVoiceStates,
-
-    Discord.GatewayIntentBits.GuildPresences
   ],
 });
 const BaseAddress = "./ActiveBases.json";
@@ -1997,30 +1995,3 @@ if (!DEBUG) {
     console.log(err);
   });
 }
-
-//#region Watch for Micah's status updating and save it automatically.
-let lastStatus = "";
-const StatusLoggingChannelID = "1120516346736807968"
-client.on('presenceUpdate', async (o, n) => {
-  try {
-    if (n.activities.length > 0 && (n.status != 'invisible' || n.status != 'offline') && n.userId == token.GetToken("devDiscordID")) {
-      let thisStatus = ((((n.activities[0] ?? {emoji: ""}).emoji).toString()) + " " + n.activities[0].state).trim();
-      if (thisStatus != lastStatus) {
-        lastStatus = thisStatus;
-  
-        const channel = await client.channels.fetch(StatusLoggingChannelID);
-        
-        // Check that it wasn't one that I or the bot already posted.
-        /** @type {Discord.GuildMessageManager} */
-        const messages = channel.messages;
-        const alreadyPosted = (await messages.fetch({limit: 100})).some((v) => v.content == thisStatus)
-  
-        if (!alreadyPosted)
-          channel.send(thisStatus);
-      }
-    }
-  } catch {
-    // Do nothing.
-  }
-})
-//#endregion
