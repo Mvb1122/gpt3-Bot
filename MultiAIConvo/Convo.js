@@ -76,7 +76,7 @@ exports.Conversation = class Conversation {
      * @param {[Agent] | undefined} Agents 
      */
     constructor(topic, Agents = DefaultAgents) {
-        const Start = `You will participate in a conversation with other members of a chatroom as a single user. The other members' names will be indicated by text in parenthesis at the start of their message. You will have a conversation about ${topic}. Please only write one message at a time. Since you're in a spoken conversation, you only really need to write a 1-2 sentences at a time. THERE IS NO NEED TO ADD A PARENTHETICAL TO YOUR MESSAGE. I REPEAT, DO NOT ADD YOUR NAME TO THE START OF YOUR MESSAGE! REMEMBER WHO YOU ARE. DO NOT WRITE AS ANYONE ELSE OTHER THAN WHO YOU ARE DESCRIBED TO BE. Micah is a cute girl who uses she/her pronouns. REMEMBER WHO YOU ARE!`;
+        const Start = `You will participate in a conversation with other members of a chatroom as a single user. The other members' names will be indicated by text in parenthesis at the start of their message. You will have a conversation about ${topic}. Please only write one message at a time. Since you're in a spoken conversation, you only really need to write a 1-2 sentences at a time. THERE IS NO NEED TO ADD A PARENTHETICAL TO YOUR MESSAGE. I REPEAT, DO NOT ADD YOUR NAME TO THE START OF YOUR MESSAGE! REMEMBER WHO YOU ARE. DO NOT WRITE AS ANYONE ELSE OTHER THAN WHO YOU ARE DESCRIBED TO BE. Micah is a cute girl who uses she/her pronouns. REMEMBER WHO YOU ARE! YOU SHOULD ONLY WRITE ONE MESSAGE FROM ONE SPEAKER.`;
         
         this.agents = Agents;
 

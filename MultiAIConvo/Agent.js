@@ -26,7 +26,8 @@ exports.Agent = class Agent {
         }
 
         if (SourceName != this.name)
-            return this.messages.push(message);
+            // Make a new message to avoid transferring any reasoning content.
+            return this.messages.push(NewMessage(message.role, `(${SourceName}) ${message.content}`)[0]);
         else return this.messages.length;
     }
 
