@@ -38,8 +38,10 @@ const LocalServerSettings = {
   },
 
   /** 
-   * r1: Bot will put r1 thinking in code blocks when called from chat.
+   * r1: Bot will put r1 thinking in modal blocks when called from chat.
    * otherwise: Will do nothing.
+   * 
+   * @type {"r1" | null}
    */
   cosmetic: 'r1'
 }
@@ -738,8 +740,9 @@ async function SummarizeConvo(messages, DiscordMessage) {
       });
 
 
+      const msg = (await GetSafeChatGPTResponse(MessagesPlusSummaryRequest, DiscordMessage, 0, false)).data.choices[0].message;
       /** @type {string} */
-      const Response = (await GetSafeChatGPTResponse(MessagesPlusSummaryRequest, DiscordMessage, 0, false)).data.choices[0].message.content;
+      const Response = LlamaConverter.StripR1Thinking(msg).content;
       // Set thread title.
       // console.log("Summary: " + Response.content);
       if (Response.length > 100) DiscordMessage.channel.send("Full title: \n# " + Response)
@@ -829,13 +832,26 @@ async function RequestChatGPT(InputMessages, DiscordMessage, AutoRespond = true)
             // If the DiscordMessage is actually a Web Handler, then make a fake message off of it.
             const message = DiscordMessage.CreateMessage ? DiscordMessage.CreateMessage() : DiscordMessage;
 
+            /** @type {GPTMessage[] || String} */
             returnedFromFunction = await (func(params, message, messages));
 
-            messages.push({
-              role: "tool",
-              tool_call_id: call.id,
-              content: returnedFromFunction ?? "Nothing was returned."
-            })
+            if (typeof(returnedFromFunction) == 'string' || returnedFromFunction == null)
+              messages.push({
+                role: "tool",
+                tool_call_id: call.id,
+                content: returnedFromFunction ?? "Nothing was returned."
+              })
+            else {
+              // returnedFromFunction is an array of messages in this situation.
+              const lastUserMessage = messages.findLast(v => v.role.toLowerCase() == 'user') ?? messages[messages.length - 1];
+              messages = messages.slice(0, 1).concat(returnedFromFunction).concat(messages.slice(1)); // Writing in this way ensures that the AI will still remember the question, while still having access to the returned messages.
+
+              messages.push({
+                role: "tool",
+                tool_call_id: call.id,
+                content: "Please use the above messages to answer the user's question: " + lastUserMessage.content
+              });
+            }
           } catch (error) {
             console.log(error);
             if (error.toString() == "func is not a function") error = "You put an invalid function."
@@ -853,14 +869,14 @@ async function RequestChatGPT(InputMessages, DiscordMessage, AutoRespond = true)
           ReturnedMessages += `\n${call.name}: ${returnedFromFunction}`;
         }
 
-        // Push the data to the AI if it's not clearing the memory.
+        // Do a followup message.
         const names = tool_calls.map(x => {
           return x.name;
         })
 
         if (names.indexOf("ClearAll") == -1 && names.indexOf("Recover") == -1) {
           const functionCallResponse = await GetSafeChatGPTResponse(messages, DiscordMessage);
-          const functionMessage = (await functionCallResponse).data.choices[0].message
+          const functionMessage = (functionCallResponse).data.choices[0].message
           // ReturnedMessages += `\nAI: ${functionMessage.content}`;
 
           // Just in case, check if this message is also a function call.
@@ -879,7 +895,8 @@ async function RequestChatGPT(InputMessages, DiscordMessage, AutoRespond = true)
     */
 
     // console.log("Returned Messages: ```" + ReturnedMessages + "```"
-    let wasClearAllCalled = ReturnedMessages.includes("ClearAll: undefined") || ReturnedMessages.includes("Recover: { \"sucessful\": true }") /* false;
+    let wasClearAllCalled = ReturnedMessages.includes("ClearAll") || ReturnedMessages.includes("Recover") 
+    /* false;
     for (let i = 0; i < messages.length; i++) {
       if (messages[i].function_call != null && messages[i].function_call == "ClearAll") {
         wasClearAllCalled = true;
@@ -991,15 +1008,68 @@ const DiscordMessageLengthLimit = 1900;
  * Splits up the response into 1900 character blocks and sends each of them.
  * @param {Discord.Message} Message The message to send in the channel of.
  * @param {String} StringContent The content to be sent.
+ * @param {String | {role: string, content: string | {type: string, image_url: {url: string, detail: "low" | "high"} | undefined, text: string | undefined}[], name: string, tool_calls: { id: number; type: string ;function: { name: any; arguments: string; }}[], reasoning_content : string}} StringContent The content to be sent.
  * @param {boolean} [Reply=false] Whether to reply to the passed message.
  * @returns {Promise<Message>} A promise which resolves when the message is complete.
  */
 async function SendMessage(Message, StringContent, Reply = false) {
+  let aiMessage = null;
+  if (typeof StringContent != 'string') {
+    aiMessage = StringContent;
+    StringContent = StringContent.content;
+  }
+
   if (StringContent.trim() == "") {
     return Message.channel.send("[Empty Message]")
   }
 
-  if (LocalServerSettings.cosmetic == 'r1') StringContent = StringContent.replaceAll("<think>", "```<think>").replaceAll("</think>", "</think>```");
+  let respondThoughts = null;
+  let AddThoughtButton = null;
+  const hasThoughts = LocalServerSettings.cosmetic == 'r1' && aiMessage != null && 'reasoning_content' in aiMessage;
+  if (hasThoughts) {
+    let thoughts = aiMessage.reasoning_content;
+    /**
+     * @param {Discord.ButtonInteraction} interaction
+     */
+    respondThoughts = async (interaction) => {
+      const chunkLength = Math.max(DiscordMessageLengthLimit, thoughts.length);
+
+      let chunk = thoughts.substring(0, chunkLength);
+      thoughts = thoughts.substring(chunkLength);
+
+      let lastMessage = interaction.reply({
+        ephemeral: true,
+        content: chunk
+      });
+
+      // Loop thoughts.
+      if (thoughts.length == 0) 
+        thoughts = aiMessage.reasoning_content;
+
+      AddThoughtButton(lastMessage, "Continue")
+    }
+
+    AddThoughtButton = async (lastMessage, label = "Thoughts") => {
+      let customId = `button_${Math.floor(Math.random() * 10000)}`;
+      const button = new Discord.ButtonBuilder()
+        .setEmoji('🧠')
+        .setStyle(Discord.ButtonStyle.Secondary)
+        .setCustomId(customId)
+        .setLabel(label);
+
+      await (await lastMessage).edit({
+        components: [new Discord.ActionRowBuilder().addComponents(button)]
+      });
+
+      async function listenForThoughtClicks() {
+        (await lastMessage).awaitMessageComponent().then((interaction) => {
+          respondThoughts(interaction);
+          return listenForThoughtClicks();
+        })
+      }
+      listenForThoughtClicks();
+    }
+  } 
 
   async function SendString(part) {
     return new Promise(async resolve => {
@@ -1019,6 +1089,10 @@ async function SendMessage(Message, StringContent, Reply = false) {
             lastMessage = await Message.channel.send(chunk)
         } while (part.length > 0)
       } else lastMessage = Reply ? Message.reply(part) : Message.channel.send(part);
+
+      // If we have thoughts, add a button to show the modal.
+      if (hasThoughts)
+        AddThoughtButton(lastMessage);
 
       resolve(lastMessage);
     })
@@ -1478,7 +1552,7 @@ client.on('messageCreate',
         message.channel.sendTyping();
 
         let result = await RequestChatGPT(Messages, message);
-        SendMessage(message, result[result.length - 1].content, true)
+        SendMessage(message, result[result.length - 1], true)
       }
     }
 
@@ -1658,7 +1732,7 @@ async function AskChatGPTAndSendResponse(content, message) {
     .then(Convo => {
       console.log(Convo);
       // console.log("RequestOut: " + requestOut + "\n~~~");
-      let startIndex = 0; // requestOut.lastIndexOf("AI:");
+      // let startIndex = 0; // requestOut.lastIndexOf("AI:");
       /* Parse commands.
       const Commands = [EVAL];
       const CommandNames = [];
@@ -1711,9 +1785,9 @@ async function AskChatGPTAndSendResponse(content, message) {
       }
       */
       // Only send the last part, the AI's actual response, back to the user.
-      let actualResponse = Convo[Convo.length - 1].content; // requestOut.substring(startIndex + 3);
-      if (actualResponse.trim() != "")
-        SendMessage(message, actualResponse.trim());
+      let actualResponse = Convo[Convo.length - 1]; // requestOut.substring(startIndex + 3);
+      if (actualResponse.content.trim() != "")
+        SendMessage(message, actualResponse);
       // fs.writeFile('./base.json', JSON.stringify({string: requestOut}), () => {console.log("File written.")});
       bases[GetBaseIdFromChannel(message.channel)] = Convo;
 
@@ -1818,7 +1892,7 @@ async function listener(req, res) {
           if (DEBUG)
             console.log(`Response: ${response.data.choices[0].message.content}`)
 
-          res.end(JSON.stringify(response.data.choices[0].message));
+          res.end(JSON.stringify(LlamaConverter.StripR1Thinking(response.data.choices[0].message)));
         })
     })
   } else {

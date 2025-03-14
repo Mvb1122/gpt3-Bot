@@ -1,6 +1,6 @@
 const SystemMessageString = `(SYSTEM) Returned data from function: %s\nPlease use this information to answer the user's last question. An empty response is not appropriate. The user cannot see this message, so you must relay this information to them. Do not add a name in parenthesis to your messages. I AM NOT THE USER, DO NOT THANK ME.`
-const FunctionFinderRegex = new RegExp(/(<[a-z]*>)?\{\s*\"name\"\s*:\s*\"[^\"]*\"\s*,\s*\"((parameters)|(arguments))\"\s*:\s*\"*\{[^}]*\}\"*\s*\}(<\/[a-z]*>)?/g);
-const TextInGLTSymbolsRegex = new RegExp(/<\/*[a-z]*>/g);
+const FunctionFinderRegex = new RegExp(/(<[a-z=]*>)?\{\s*\"name\"\s*:\s*\"[^\"]*\"\s*,\s*\"((parameters)|(arguments))\"\s*:\s*\"*\{[^}]*\}\"*\s*\}(<\/[a-z=]*>)?/g);
+const TextInGLTSymbolsRegex = new RegExp(/<\/*[a-z=]*>/g);
 
 const { DEBUG, LocalServerSettings, NewMessage, AIParameters } = require('./index.js');
 const { Configuration, OpenAIApi } = require("openai");
@@ -9,6 +9,11 @@ const configuration = new Configuration({
     basePath: LocalServerSettings.Use ? LocalServerSettings.basePath : undefined
 });
 const openai = new OpenAIApi(configuration);
+
+const ThinkingMarkers = {
+    start: "<think>",
+    stop: "</think>"
+}
 
 function IsObject(ob) {
     return typeof ob == 'object'
@@ -30,8 +35,8 @@ const CaptionCache = {};
 module.exports = {
     /**
      * Converts a message *to* Llama format.
-     * @param {{role: String, content: String | {type: string, image_url: {url: string, detail: "low" | "high"} | undefined, text: string | undefined}[], name: String, tool_calls: { id: number; type: string ;function: { name: any; arguments: string; }}[]}} m Input singular message.
-     * @returns {Promise<{role: String, content: String | {type: string, text: string}[], name: String, tool_calls: { id: number; type: string ;function: { name: any; arguments: string; }}[]}>}
+     * @param {{role: string, content: string | {type: string, image_url: {url: string, detail: "low" | "high"} | undefined, text: string | undefined}[], name: string, tool_calls: { id: number; type: string ;function: { name: any; arguments: string; }}[]}} m Input singular message.
+     * @returns {Promise<{role: string, content: string | {type: string, text: string}[], name: string, tool_calls: { id: number; type: string ;function: { name: any; arguments: string; }}[]}>}
      */
     async MessageToLlama(m) {
         // If the model supports function calls and images, don't do anything. 
@@ -125,17 +130,26 @@ module.exports = {
             // Under Ollama AI without built-in function support, we have to delete them.
         if (LocalServerSettings.FunctionCalls == "teach")
             delete m.tool_calls;
+
+        // If we have reasoning content, then put it back in. 
+        if ('reasoning_content' in m) {
+            m.content = ThinkingMarkers.start + "\n" + m.reasoning_content + "\n"+ ThinkingMarkers.stop + "\n" + m.content
+            delete m.reasoning_content;
+        }
+
         return m;
     },
 
-    // | {type: string, image_url: string | undefined, text: string | undefined}[]
+    ThinkingMarkers,
+
     /**
      * Converts a message *from* Llama format.
-     * @param {{role: String, tool_call_id?: string, content: String , name: String, tool_calls: { id: number; type: string ;function: { name: any; arguments: string; }}[]}} m Input singular message.
-     * @returns {{role: String, content: String | {type: string, image_url: string | undefined, text: string | undefined}[], name: String, tool_calls: { id: number; type: string ;function: { name: any; arguments: string; }}[]}}
+     * @param {{role: string, tool_call_id?: string, content: string , name: string, tool_calls: { id: number; type: string ;function: { name: any; arguments: string; }}[]}} m Input singular message.
+     * @returns {{role: string, content: string | {type: string, image_url: string | undefined, text: string | undefined}[], name: string, tool_calls: { id: number; type: string ;function: { name: any; arguments: string; }}[]}}
      */
     MessageFromLlama(m) {
         m.role = m.role.toLowerCase();
+        m = module.exports.StripR1Thinking(m);
 
         // If the model supports function calls and images, don't do anything. 
         if (LocalServerSettings.ImageBehavior.state == 'mainsupported' &&  LocalServerSettings.FunctionCalls == 'mainsupported') return m;
@@ -163,18 +177,22 @@ module.exports = {
                     let edges = f.match(TextInGLTSymbolsRegex);
                     if (edges) edges.forEach(v => { f = f.replace(v, "")});
 
-                    const call = JSON.parse(f);
-                    // Ensure that all *new* tool calls get put into the message's tool call array.
-                    if (NewMessage) m.tool_calls.push({
-                        id: Math.floor(Math.random() * 1000000000),
-                        type: "function",
-                        function: {
-                          name: call.name,
-                          arguments: JSON.stringify(call.parameters) // Bit of a wasteful stringify here, but it's just what's gotta be done.
-                        }
-                    });
+                    try {
+                        const call = JSON.parse(f);
+                        // Ensure that all *new* tool calls get put into the message's tool call array.
+                        if (NewMessage) m.tool_calls.push({
+                            id: Math.floor(Math.random() * 1000000000),
+                            type: "function",
+                            function: {
+                                name: call.name,
+                                arguments: JSON.stringify(call.parameters) // Bit of a wasteful stringify here, but it's just what's gotta be done.
+                            }
+                        });
 
-                    m.content = m.content.replace(full, "");
+                        m.content = m.content.replace(full, "");
+                    } catch {
+                        // Unfortunately, sometimes the AI *WILL* generate bad json. Just do nothing in that case.
+                    }
                 });
 
                 if (m.content == "") 
@@ -188,8 +206,34 @@ module.exports = {
             console.log("After:")
             console.log(m);
         }
+
         return m;
-    }
+    },
+
+    /**
+     * @param {{role: string, content: string | {type: string, image_url: {url: string, detail: "low" | "high"} | undefined, text: string | undefined}[], name: string, tool_calls: { id: number; type: string ;function: { name: any; arguments: string; }}[]}} msg 
+     * @returns {{role: string, content: string | {type: string, image_url: {url: string, detail: "low" | "high"} | undefined, text: string | undefined}[], name: string, tool_calls: { id: number; type: string ;function: { name: any; arguments: string; }}[], reasoning_content : string}}
+     */
+    StripR1Thinking(msg) {
+        if (LocalServerSettings.cosmetic == 'r1') {
+            // Look at content.
+            let start = msg.content.indexOf(ThinkingMarkers.start) + ThinkingMarkers.start.length;
+            let end = msg.content.lastIndexOf(ThinkingMarkers.stop);
+            if (start >= 0 && end > 0) {
+                msg.reasoning_content = msg.content.substring(start, end).trim();
+
+                // Exclude the thinking markers from the content.
+                msg.content = msg.content.substring(0, start - ThinkingMarkers.start.length) + msg.content.substring(end + ThinkingMarkers.stop.length);
+                msg.content = msg.content.trim();
+            }
+        }
+        
+        console.log(msg);
+        
+        return msg;
+    },
+
+    DownloadToBase64String
 }
 
 if (false) {
