@@ -1,6 +1,6 @@
 const AIThinkingMessage = ":robot: The AI is thinking of a response...";
 module.exports.AIThinkingMessage = AIThinkingMessage;
-const AIVoiceBin = "Girl 1.wav";
+const AIVoiceBin = "Narrator_Neutral_2.wav";
 module.exports.AIVoiceBin = AIVoiceBin;
 const SpokenInteractionBase = " You will enter a spoken conversation with at least one user. That being said, if you encounter multiple users at once, please look at all messages provided in order to craft your response; don't just look at exactly the last message. Also, the user saying a particular thing will be listed in parenthesis at the start of that specific message."
 
@@ -12,7 +12,7 @@ const { PlayAudioToVC } = require('./TTSToVC');
 const { getVoiceConnection } = require('@discordjs/voice');
 const { GetUserFile } = require('../User');
 const { VoiceLong } = require('../VoiceLong');
-const AIWakePhrase = "computer,chat,fairy"
+const AIWakePhrase = "computer, chat, fairy"
 
 /**
  * @type {[{Messages: [{role: "System" | "User" | "Function" | "Assistant"; content: string;}], LastMessageTime: number, ChannelId: string, GuildId: string, AlwaysListening: boolean, Bypass: boolean, CurrentlySpeaking: boolean}]}
@@ -20,7 +20,7 @@ const AIWakePhrase = "computer,chat,fairy"
 const Conversations = [];
 
 new Promise(async ()=> {
-    // Check every 7 seconds to see if we need to respond to anything.
+    // Check every 2 seconds to see if we need to respond to anything.
     while (true) {
         await new Promise(res => {
             setTimeout(() => {
@@ -132,8 +132,9 @@ module.exports = {
             // Now, add a listener.
             AddOnLog(interaction.guildId, (type, name, content) => {
                 if (type == "STT" || type == "TTS") {
+                    console.log(content);
                     const includesPhrase = AIWakePhrase.split(",").some(v => {
-                        return content.toLowerCase().includes(v.trim());
+                        return content.toLowerCase().includes(v.trim().toLowerCase());
                     })
 
                     if (includesPhrase && !Conversations[inputId].CurrentlySpeaking) {
