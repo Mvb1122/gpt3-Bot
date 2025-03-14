@@ -106,11 +106,11 @@ function GetMessageForGPTTalkingAboutTags(Plain, id = undefined, AllowAddedPerso
 async function GetPromptsFromPlaintextUsingGPT(Plain, id = undefined, AllowAddedPersonas = true) {
     let messages = GetMessageForGPTTalkingAboutTags(Plain, id, AllowAddedPersonas)
 
-    const ResponseFromGPT = (await Index.GetSafeChatGPTResponse(messages, null, null, false)).data.choices[0];
+    const ResponseFromGPT = (await Index.GetSafeChatGPTResponse(messages, null, null, false)).data.choices[0].message;
     /**
      * @type {String}
      */
-    let response = ResponseFromGPT.message.content;
+    let response = ResponseFromGPT.content;
 
     // Charge them.
     if (id)
