@@ -92,7 +92,7 @@ module.exports = {
                     .concat(NewMessage("User", text));
                     
                 RequestChatGPT(messages, message).then(async (v) => {
-                    SendMessage({ channel: (user.dmChannel ?? await user.createDM()) }, v[v.length - 1].content);
+                    SendMessage({ channel: (user.dmChannel ?? await user.createDM()) }, v[v.length - 1]);
                 });
             } else {
                 SendMessage({ channel: (user.dmChannel ?? await user.createDM()) }, text);
