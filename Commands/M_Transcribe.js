@@ -24,7 +24,7 @@ module.exports = {
         const message = interaction.targetMessage;
         let attachments = message.attachments;
 
-        if (attachments.size == 0 || !attachments.some(v => v.contentType.includes("audio"))) interaction.editReply("This message has no audio attachments to transcribe!");
+        if (attachments.size == 0 || !attachments.some(v => v.contentType.includes("video") || v.contentType.includes("audio"))) interaction.editReply("This message has no audio/video attachments to transcribe!");
 
         if (attachments.size > 1) {
             /**
