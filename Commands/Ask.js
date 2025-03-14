@@ -51,14 +51,16 @@ module.exports = {
         
         let firstIndex = NewMessages.findIndex(v => {return v.content != null && v.role == "assistant"});
 
-        const Content = `${username}: ${UserQuestion}\nAI: ${NewMessages[firstIndex].content}`;
+        // Add a prefix for the user onto the content thing.
+        NewMessages[firstIndex].content = `${username}: ${UserQuestion}\nAI: ${NewMessages[firstIndex].content}`;
+        const Content = NewMessages[firstIndex].content;
         if (Content.length <= 2000 && interaction.isRepliable()) {
             await interaction.editReply(Content)
         } else {
-            // If the message is too long, just say, look below for your answer and then SendMessage it.
+            // If the message is too long, just say for the user to look below and then SendMessage it.
             if (interaction.isRepliable())
                 interaction.editReply("See message below.");
-            await Index.SendMessage(interaction, Content)
+            await Index.SendMessage(interaction, NewMessages[firstIndex])
         }
 
         // Send any follow-up messages made by a local AI.
