@@ -252,17 +252,18 @@ module.exports = {
                 const rand = Math.floor(Math.random() * 1000);
                 const inFile = path.resolve(`./Temp/in_${rand}.mmd`);
                 const outFile = path.resolve(`./Temp/out_${rand}.png`);
-                await MakeChart(chart, inFile, outFile, (await LastMessage).data.choices[0].message.content);
+                const chartContent = (await LastMessage).data.choices[0].message.content;
+                await MakeChart(chart, inFile, outFile, chartContent);
 
                 // File has been written out, we can now send to the user.
                     // Create a link to view online.
-                const data = compressAndEncodeCode((await LastMessage).data.choices[0].message.content);
+                const data = compressAndEncodeCode(chartContent);
                 const link = `<https://mermaid.live/edit#${data.toString()}>`;
 
                 DiscordMessage.channel.send({ content: `[View online here](${link})`, files: [outFile] })
                     .then(async () => {
                         // Clean up and respond back to the AI.
-                        res(`Chart sent! The user can see it now.\n\nChart content: ${(await LastMessage).data.choices[0].message.content}`);
+                        res(`Chart sent! The user can see it now.\n\nChart content: ${chartContent}`);
                         if (!DEBUG)
                             [inFile, outFile].forEach(v => fp.unlink(v));
                     })
