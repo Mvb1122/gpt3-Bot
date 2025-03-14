@@ -551,9 +551,6 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
         messages = await Promise.all(messages.map(async m => {return await LlamaConverter.MessageToLlama(m)}));
       }
 
-      // Always log chat messages regardless of whether we're debug or not.
-      console.log(messages);
-
       const data = await openai.createChatCompletion(params);
 
       // For safety, prevent @everyone and @here.
@@ -569,8 +566,6 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
         // Fix AI's response.
         data.data.choices[0].message = LlamaConverter.MessageFromLlama(data.data.choices[0].message);
       }
-
-      console.log(messages);
 
       // Add billing based on input.
       const TokenCount = encode(GetAllMessageText(messages)).length;
@@ -766,18 +761,17 @@ async function RequestChatGPT(InputMessages, DiscordMessage, AutoRespond = true)
   return new Promise(async (resolve) => {
     let messages = ConvertToMessageJSON(InputMessages);
 
-    // First things first, ask the AI for its thaughts.
+    // First, ask the AI for its response.
     const gptResponse = await GetSafeChatGPTResponse(messages, DiscordMessage);
 
     /**
      * @type {{role: String, content: String, name: String}}}
      */
-    let newMessage = (await gptResponse).data.choices[0].message;
+    let newMessage = (gptResponse).data.choices[0].message;
     let ReturnedMessages = InputMessages;
 
     // If the message has a function call, run it.
     async function ProcessFunctionCall(newMessage) {
-      console.log(newMessage)
       if (newMessage.tool_calls != null) {
         if (newMessage.content && DiscordMessage.followUp == null && AutoRespond) // followUp is only on slash commands; don't send extra content for slash commands.
           DiscordMessage.channel.send(newMessage.content);
@@ -1005,7 +999,6 @@ const DiscordMessageLengthLimit = 1900;
 /**
  * Splits up the response into 1900 character blocks and sends each of them.
  * @param {Discord.Message} Message The message to send in the channel of.
- * @param {String} StringContent The content to be sent.
  * @param {String | {role: string, content: string | {type: string, image_url: {url: string, detail: "low" | "high"} | undefined, text: string | undefined}[], name: string, tool_calls: { id: number; type: string ;function: { name: any; arguments: string; }}[], reasoning_content : string}} StringContent The content to be sent.
  * @param {boolean} [Reply=false] Whether to reply to the passed message.
  * @returns {Promise<Message>} A promise which resolves when the message is complete.
@@ -1105,7 +1098,6 @@ async function SendMessage(Message, StringContent, Reply = false) {
      * @type {[string | Discord.EmbedBuilder]}
      */
     let Content = ParseMessage(StringContent);
-    console.log(Content);
 
     // First, merge all string lines into the one previous to it.
     for (let i = 1; i < Content.length; i++)
@@ -1861,7 +1853,7 @@ function GetTypingInChannel(channel) {
 
 //#region Chat AI Microservice for the web.
 const http = require('http');
-const MicroserviceHTML = fs.readFileSync("./Microservice.html");
+// const MicroserviceHTML = fs.readFileSync("./Microservice.html");
 
 /**
  * Parses the request.
