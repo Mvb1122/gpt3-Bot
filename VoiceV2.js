@@ -597,31 +597,46 @@ module.exports = {
     /**
      * Captions an image loaded locally.
      * @param {string} location Where to caption from.
-     * @param {'<CAPTION>' | '<DETAILED_CAPTION>' | '<MORE_DETAILED_CAPTION>' } mode what task to do.
+     * @param {'<CAPTION>' | '<DETAILED_CAPTION>' | '<MORE_DETAILED_CAPTION>' | '<OD>' | '<MANGA_OCR>'} mode what task to do. OD is Object Detection.
      * @returns {Promise<string>} Resulting value.
      */
     Caption(location, mode) {
-        return new Promise(async res => {
-            // Starts up the transcribe stuff.
-            if (!Started) await Start();
+        // If we're doing Manga OCR, then we must use the special model (as LLMs and Florence suck for reading Japanese, as I'm reading this.)
+        if (mode == '<MANGA_OCR>') 
+            return new Promise(async res => {
+                // Starts up the transcribe stuff.
+                if (!Started) await Start();
+    
+                const data = {
+                    location: location
+                };
+    
+                postJSON("http://127.0.0.1:4963/manga_ocr", data)
+                    .then((v) => {
+                        res(v);
+                    });
+            })
 
-            const data = {
-                location: location,
-                mode: mode,
-            };
-
-            postJSON("http://127.0.0.1:4963/caption", data)
-                .then((v) => {
-                    res(v);
-                });
-        })
-        /*
         // If we don't have LLM image support, use the internal model.
         if (LocalServerSettings.ImageBehavior.state == "inbuilt")
+            return new Promise(async res => {
+                // Starts up the transcribe stuff.
+                if (!Started) await Start();
+    
+                const data = {
+                    location: location,
+                    mode: mode,
+                };
+    
+                postJSON("http://127.0.0.1:4963/caption", data)
+                    .then((v) => {
+                        res(v);
+                    });
+            })
         else {
             return new Promise(async p => {
                 // Caption it with the second LLM.
-                const captionSeq = NewMessage("System", "You are an image captioning AI. You will caption images with the most detail you can. You will respond with ONLY the caption. You may provide additional background information if it seems useful.")
+                const captionSeq = NewMessage("System", "You are an image captioning AI. You will caption images with the most detail you can. You will respond with ONLY the caption. You may provide additional background information if it seems useful. In this response you should focus on the following task: " + mode + ". If OCR, only write the text, and please write ALL text in the image.")
                     .concat({
                         role: "User",
                         content: [
@@ -631,7 +646,7 @@ module.exports = {
                             },
                             {
                                 type: "image_url",
-                                image_url: await DownloadToBase64String(path)
+                                image_url: await DownloadToBase64String(location)
                             }
                         ]
                     });
@@ -642,7 +657,6 @@ module.exports = {
                 p(resp);
             })
         }
-        */
     },
 
     /**

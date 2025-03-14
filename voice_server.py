@@ -199,6 +199,13 @@ def Make_Music(prompt, output, length = 5):
 
 from PIL import Image
 import requests
+
+# Read Web URLS properly.
+def load_image(location):
+  if "http" in location:
+    location = requests.get(location, stream=True).raw
+  return Image.open(location).convert("RGB") # Must convert to RGB for safety!
+
 florenceProcessor = None
 florenceModel = None
 def Caption_Image(location, mode):
@@ -206,12 +213,8 @@ def Caption_Image(location, mode):
   if type(florenceModel) is type(None):
     florenceModel = AutoModelForCausalLM.from_pretrained("multimodalart/Florence-2-large-no-flash-attn", torch_dtype=torch_dtype, trust_remote_code=True).to(device)
     florenceProcessor = AutoProcessor.from_pretrained("multimodalart/Florence-2-large-no-flash-attn", trust_remote_code=True)
-  
-  # Read Web URLS properly.
-  if ("http" in location):
-    location = requests.get(location, stream=True).raw
 
-  image = Image.open(location).convert("RGB") # Must convert to RGB for safety!
+  image = load_image(location)
   inputs = florenceProcessor(text=mode, images=image, return_tensors="pt").to(device, torch_dtype)
 
   generated_ids = florenceModel.generate(
@@ -223,7 +226,77 @@ def Caption_Image(location, mode):
   generated_text = florenceProcessor.batch_decode(generated_ids, skip_special_tokens=False)[0]
 
   parsed_answer = florenceProcessor.post_process_generation(generated_text, task=mode, image_size=(image.width, image.height))
+
+  if (mode == "<OD>"):
+    parsed_answer[mode]['image'] = Make_Object_Detection_Image(image, parsed_answer[mode])
+
   return parsed_answer[mode]
+
+
+import matplotlib.pyplot as plt  
+import matplotlib.patches as patches  
+def Make_Object_Detection_Image(image, data):
+  # Create a figure and axes  
+  fig, ax = plt.subplots()  
+    
+  # Display the image  
+  ax.imshow(image)  
+    
+  # Plot each bounding box  
+  for bbox, label in zip(data['bboxes'], data['labels']):  
+      # Unpack the bounding box coordinates  
+      x1, y1, x2, y2 = bbox  
+      # Create a Rectangle patch  
+      rect = patches.Rectangle((x1, y1), x2-x1, y2-y1, linewidth=1, edgecolor='r', facecolor='none')  
+      # Add the rectangle to the Axes  
+      ax.add_patch(rect)  
+      # Annotate the label  
+      plt.text(x1, y1, label, color='white', fontsize=8, bbox=dict(facecolor='red', alpha=0.5))  
+    
+  # Remove the axis ticks and labels  
+  ax.axis('off')  
+    
+  # Save the plot to a file  
+  path = './Temp/OD_Image.png'
+  plt.savefig(path, bbox_inches='tight', pad_inches=0.0)
+  plt.close(fig)
+  return path
+
+# Manga OCR
+mangaOCRFeatureExtractor = None
+mangaOCRModel = None
+mangaOCRTokenizer = None
+
+import re
+from transformers import AutoTokenizer, VisionEncoderDecoderModel, AutoFeatureExtractor
+import jaconv
+
+def Manga_OCR(location):
+  global mangaOCRFeatureExtractor, mangaOCRModel, mangaOCRTokenizer
+  
+  # If we haven't loaded up the Manga OCR model, load it up.
+  if type(mangaOCRFeatureExtractor) is type(None): 
+    mangaOCRTokenizer = AutoTokenizer.from_pretrained("kha-white/manga-ocr-base")
+    mangaOCRModel = VisionEncoderDecoderModel.from_pretrained("kha-white/manga-ocr-base")
+    mangaOCRFeatureExtractor = AutoFeatureExtractor.from_pretrained("kha-white/manga-ocr-base")
+
+  # Now get the image.
+  img = load_image(location)
+  img = img.convert('L').convert('RGB') # Makes it grayscale. Still necessary to manually crop into the text you want!
+  pixel_values = mangaOCRFeatureExtractor(img, return_tensors="pt").pixel_values
+  output = mangaOCRModel.generate(pixel_values)[0]
+  text = mangaOCRTokenizer.decode(output, skip_special_tokens=True)
+
+  # Fix the text so it doesn't have so many spaces.
+  text = ''.join(text.split())
+
+  # Fix dot characters.
+  text = text.replace('…', '...')
+  text = re.sub('[・.]{2,}', lambda x: (x.end() - x.start()) * '.', text)
+
+  # Ensure all JP text is full-width, including numbers and letters.
+  text = jaconv.h2z(text, ascii=True, digit=True)
+  return text
 
 # Diarization stuff.
 from pyannote.audio import Pipeline as PyanPipeline

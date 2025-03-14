@@ -36,7 +36,8 @@ module.exports = {
                     { name: "Detailed Caption", value: "<DETAILED_CAPTION>" },
                     { name: "Most Detailed Caption", value: "<MORE_DETAILED_CAPTION>" },
                     { name: "OCR / Read Text", value: "<OCR>" },
-                    { name: "Object Detection", value: "<OD>" }
+                    { name: "Japanese OCR", value: "<MANGA_OCR>"},
+                    { name: "Object Detection", value: "<OD>" },
                 ]);
         }),
 
@@ -59,8 +60,8 @@ module.exports = {
         const mode = interaction.options.getString("mode") ?? "<CAPTION>";
         let caption = await Caption(path, mode);
 
-        if (typeof caption == 'object') caption = JSON.stringify(caption);
-
-        await interaction.editReply({content: "Caption: ```" + caption + "```", files: [path]});
+        await interaction.editReply({content: "Caption: ```" + JSON.stringify(caption) + "```", files: [caption.image ? caption.image : path]});
+        
+        if (caption.image) fp.unlink(caption.image);
     }
 }
