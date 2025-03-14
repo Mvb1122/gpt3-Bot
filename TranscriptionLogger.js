@@ -115,7 +115,6 @@ module.exports = {
                         return await last.edit(MessageContent + "\n" + TranscriptionMessageContent);
                 } else 
                     // If that didn't match up just send a new message.
-                    // return await SendMessage({channel: output}, TranscriptionMessageContent)
                     return await output.send(TranscriptionMessageContent);
             } catch (e) {
                 // If we error, send a new message.
