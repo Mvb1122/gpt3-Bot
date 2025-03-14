@@ -2,6 +2,7 @@ const fp = require('fs/promises');
 const Discord = require('discord.js');
 const path = require('path');
 const FetchSources = require('./Marp/FetchSources');
+const { NewMessage } = require('..');
 
 module.exports = {
     keywords: "research, look up",
@@ -32,11 +33,17 @@ module.exports = {
         // Wrap in a promise so that file send can be handled asynchronously without blocking the AI.
         return new Promise(async res => {
             const sources = FetchSources(parameters.topic);
-            const sourceText = (await sources).map((v, i) => `## ${i}: ${v.title}:\n${v.text}`).join("\n");
-
+            
             if (DiscordMessage) DiscordMessage.channel.send("## Sources read:\n" + (await sources).map(v => `- [${v.title}](${v.link})`).join("\n"));
-
+            
+            // Old method: return as just the title and then the text.
+            /*
+            const sourceText = (await sources).map((v, i) => `## ${i}: ${v.title}:\n${v.text}`).join("\n");
             res(sourceText);
+            */
+
+            // New method: Each source as its own method; LLMs benefit from having context as past messages.
+            res((await sources).map((v, i) => NewMessage('User', `## ${i}: ${v.title}:\n${v.text}`)[0]));
         });
     }
 }

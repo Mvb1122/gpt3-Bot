@@ -66,7 +66,7 @@ module.exports = {
         let FilesForDeletion = [];
         const startTime = performance.now();
 
-        let messageContent = `Presentation creation queued!\n\`\`\`Topic: ${parameters.topic}\nShow Messages: ${parameters.showmessages}\nVoice Over: ${parameters.voiceover}\nResearch: ${parameters.research}\`\`\``;
+        let messageContent = `Presentation creation queued!\n\`\`\`js\nTopic: ${parameters.topic}\nShow Messages: ${parameters.showmessages}\nVoice Over: ${parameters.voiceover}\nResearch: ${parameters.research}\`\`\``;
         // Tell the client we're making the presentation.
         let ouputMessage = await DiscordMessage.channel.send(messageContent);
         // res("Presentation creation queued.");
@@ -112,17 +112,27 @@ module.exports = {
             // Put the update to the log message.
             ouputMessage.edit(messageContent += "\nSource fetch complete!");
           })
+
+          const srcMessages = (await sources).map(v => {
+            return NewMessage("User", `# ${v.title}:\n${v.text}`)[0]
+          });
           internalMessages = internalMessages.concat(
-            NewMessage("User", "I've done some research for you to have more information. You may mark which source gave what text to you via putting its number in square brakets. Here's the text of the articles:\n\n" + (await sources).map((v, i) => `## ${i}: ${v.title}:\n${v.text}`).join("\n"))
+            srcMessages,
+            NewMessage("User", "I've done some research for you to have more information above. You may mark which source gave what text to you via putting its number in square brakets.")
           )
         }
 
         internalMessages = internalMessages.concat(  
-          NewMessage("User", `Now, let's make that exact presentation output for Marp. As a reminder, please only write the presentation. Please make your presentation as long as is necessary/limited! Make sure to have the number of slides requested. Do not write anything except for the presentation. Do not write a slide showing your sources. Do not include \`\`\` in your answer unless you're creating a code block. Make sure to split your presentation into pages using ---\nAdditionally, make sure to use markdown syntax for images, like ![](URL HERE)\n${await imageText}\n\nMAKE SURE to split your slides with ---`)
+          NewMessage("User", `Here are some images you can use:\n${await imageText}`),
+          NewMessage("User", `Now, let's make that exact presentation output for Marp on the topic of ${parameters.topic}. As a reminder, please only write the presentation. Please make your presentation as long as is necessary/limited! Make sure to have the number of slides requested. Do not write anything except for the presentation. Do not write a slide showing your sources. Do not include \`\`\` in your answer unless you're creating a code block. Make sure to split your presentation into pages using ---\nAdditionally, make sure to use markdown syntax for images, like ![](URL HERE)\nThe images are in the previous message.\n\nMAKE SURE to split your slides with ---\nPlease use your earlier reasoning on the topic of ${parameters.topic} and make the final presentation!`)
         );
         ouputMessage.edit(messageContent += "\nImage fetch complete!");
         const resp2 = await GetSafeChatGPTResponse(internalMessages, null, 0, false);
-        const filteredSlides = resp2.data.choices[0].message.content.split("---").filter(v => v.trim() != "").join("\n---\n");
+        const filteredSlides = resp2.data.choices[0].message
+          .content
+          .split("---")
+          .filter(v => v.trim() != "")
+          .join("\n---\n");
         const outputContent = filteredSlides + (parameters.research ? CreateSourceSlide(await sources) : ""); // By adding the source slide to the AI's output, we can get it to read over and thank viewers during it == easy to skip segment.
 
         // Edit that last message to remove the wikipedia article.
