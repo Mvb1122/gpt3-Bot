@@ -4,7 +4,7 @@
  */
 const DoConsoleLog = true;
 const VoiceDir = "/Speaker Wavs/";
-const DefaultEmbedding = `Girl 1.wav`;
+const DefaultEmbedding = `Narrator_Neutral.wav`;
 //#endregion
 
 const { spawn, ChildProcess } = require('child_process');
@@ -15,6 +15,7 @@ const fs = require('fs');
 // Text formatting reqs.
 const converter = require('number-to-words');
 const path = require('path');
+const { DownloadToBase64String } = require('./LlamaSupport');
 const NumberMatchingRegex = new RegExp(/(\d+,?\.?\d?)+/g);
 const AcronymRegex = new RegExp(/([A-Z]\.?(?![a-z' ]))+/g);
 const SpaceRegex = new RegExp(/ (?=[ ])/g);
@@ -104,9 +105,9 @@ function postJSON(URL, data) {
             }
         }, async (a) => {
             // If something goes wrong, let's restart the server before moving on.
-            rej();
             await Restart();
-            console.log();
+            rej();
+            // console.log();
         });
     });
     LastRequest = thisRequest;
@@ -144,6 +145,8 @@ function Start() {
                     console.log(data.toString());
                 
                 if (data.includes("Running on")) {
+                    console.log(colors.green + "Started Python Generation server!" + colors.reset);
+
                     Started = true;
                     startPromise = null;
                     module.exports.Started = true;
@@ -495,6 +498,27 @@ module.exports = {
         })
     },
 
+    /**
+     * Generates music using the server's music AI.
+     * @param {string} prompt What you want to listen to.
+     * @param {string} output Path to save to.
+     * @param {string} length The length in seconds of the outputted audio.
+     * @returns {Promise<string>} Path to output.
+     */
+    MakeSFX(prompt, output, length = 5) {
+        return new Promise(async res => {
+            if (!Started) await Start();
+
+            postJSON("http://127.0.0.1:4963/gen_sfx", {
+                prompt: prompt,
+                output: output,
+                length: length
+            }).then(() => {
+                res(output);
+            });
+        })
+    },
+
     PreloadTranscribe,
 
     /**
@@ -568,31 +592,6 @@ module.exports = {
                 });
         })
     },
-
-    /**
-     * Generates a sound effect.
-     * @param {string} prompt What to generate.
-     * @param {string} path Where to generate.
-     * @returns {Promise<{path: path}>} Resolves when generation is complete.
-     */
-    /*
-    SFX(prompt) {
-        return new Promise(async res => {
-            // Starts up the transcribe stuff.
-            if (!Started) await Start();
-
-            const data = {
-                prompt: prompt,
-                path: path
-            };
-
-            postJSON("http://127.0.0.1:4963/sfx", data)
-                .then((v) => {
-                    res(v);
-                });
-        })
-    }
-    */
 
     /**
      * Captions an image loaded locally.

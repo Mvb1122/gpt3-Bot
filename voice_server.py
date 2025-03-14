@@ -3,6 +3,7 @@ musicgen_model_id = "facebook/musicgen-small"
 tts_model_id = "microsoft/speecht5_tts"
 language_classifier_model_id = "papluca/xlm-roberta-base-language-detection"
 translation_model_id = "facebook/nllb-200-distilled-600M"
+tango_model = "declare-lab/TangoFlux"
 HF_Token = "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"
 
 from transformers import pipeline, AutoProcessor, AutoModelForCausalLM
@@ -26,18 +27,9 @@ elif is_torch_sdpa_available(): attn_implementation = "sdpa"
 
 print("Running audio synth on " + device)
 print("Attn mode: " + str(attn_implementation))
-
-# Create TTS model in advance.
-from TTS.api import TTS
-speech_sample_rate = 24000
-synthesiser = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
+synthesiser = None
 # synthesiser = pipeline("text-to-speech", tts_model_id, device=device)
 # synthesiser.model.compile() # Compile the model for just an ounce more performance.
-
-# Also load denoiser.
-denoiser = AudioDenoiser(device=torch.device(device))
-used_time = time.time() - used_time
-print("Loading time: " + str(used_time))
 
 # Gets transcription AI stuff.
 def MakeTranscriber():
@@ -119,8 +111,14 @@ def GetEmbedding(location):
     return torch.load(f).squeeze(1)
 
 
+from TTS.api import TTS
+speech_sample_rate = 24000
 def voice(Text, Embedding, File = "./Temp/Whatever.wav", lang=None):
   global synthesiser
+  if type(synthesiser) == type(None):
+     # Create TTS model in advance.
+    synthesiser = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
+
   used_time = time.time()
 
   # Get speaker embeddings.
@@ -146,7 +144,13 @@ def voice(Text, Embedding, File = "./Temp/Whatever.wav", lang=None):
   print("Generation Time: " + str(used_time))
   return True
 
+denoiser = None
 def embed(source, target):
+  global denoiser
+  if type(denoiser) == type(None):
+    # Load Denoiser
+    denoiser = AudioDenoiser(device=torch.device(device))
+
   # First, denoise audio.
   # signal, fs = torchaudio.load(source)
   # auto_scale = True # Recommended for low-volume input audio
@@ -341,6 +345,17 @@ def Predict(location, out, reps = 20):
   # Save out
   predictions.to_csv(out)
 
+sfxMaker = None
+def Make_SFX(prompt, output, length = 5):
+  global sfxMaker
+  if type(sfxMaker) is type(None): 
+     from tangoflux import TangoFluxInference
+     sfxMaker = TangoFluxInference(name=tango_model, device = device)
+  
+  music = sfxMaker.generate(prompt, steps=25, duration=length)
+
+  sf.write(output, music[0].T, 44100)
+
 # Server stuff.
 from flask import Flask, jsonify, request
 app = Flask(__name__)
@@ -421,6 +436,27 @@ def music_function():
           return jsonify({'error': 'Invalid JSON structure', 'data': data}), 400
   else:
       return jsonify({'error': 'Request must be JSON', 'data': request.form }), 400
+  
+@app.route("/gen_sfx", methods=['POST'])
+def sfx_function():
+  if request.is_json:
+      data = request.get_json()
+      
+      output = "./out.wav"
+      if 'output' in data:
+        output = data['output']
+      
+      length = 5
+      if 'length' in data:
+        length = data['length']
+        
+      if 'prompt' in data:
+          Make_SFX(data['prompt'], output, length)
+          return jsonify({'message': True}), 200
+      else:
+          return jsonify({'error': 'Invalid JSON structure', 'data': data}), 400
+  else:
+      return jsonify({'error': 'Request must be JSON', 'data': request.form }), 400
 
 @app.route("/determineLanguage", methods=['POST'])
 def DetermineLanguage_function():
@@ -458,6 +494,18 @@ def caption_function():
   else:
       return jsonify({'error': 'Request must be JSON', 'data': request.form }), 400
   
+@app.route('/manga_ocr', methods=['POST'])
+def manga_ocr_function():
+  if request.is_json:
+    data = request.get_json()
+      
+    if ('location' in data):
+        return jsonify(Manga_OCR(data['location'])), 200
+    else:
+        return jsonify({'error': 'Invalid JSON structure', 'data': data}), 400
+  else:
+      return jsonify({'error': 'Request must be JSON', 'data': request.form }), 400
+
 @app.route("/diarize", methods=['POST'])
 def diarize_function():
   if request.is_json:
@@ -483,3 +531,7 @@ def predict_function():
       return jsonify({'error': 'Request must be JSON', 'data': request.form }), 400
 
 app.run(debug=False, port=4963)
+
+# Log out loading time properly.
+used_time = time.time() - used_time
+print("Loading time: " + str(used_time))
