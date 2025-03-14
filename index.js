@@ -13,7 +13,7 @@ const LocalServerSettings = {
   Use: true,
   basePath: "http://192.168.68.57:82/v1",
   // Model will be set automatically from API request, but you can override here.
-  model: "deepseek-r1:8b", // "llava-1.6-mistral-7b", 
+  model: "gemma3:12b", // phi4:latest // "llama3.1:8b", // "llama3.2-vision", // "deepseek-r1:8b" 
   temperature: 0.8,
 
   /** 
@@ -32,9 +32,9 @@ const LocalServerSettings = {
      * 
      * @type {"inbuilt" | "mainsupported" | "separate"}
      */
-    state: "inbuilt",
+    state: "mainsupported", 
     
-    separateModel: "llava-1.6-mistral-7b"
+    separateModel: "llama3.2-vision"
   },
 
   /** 
