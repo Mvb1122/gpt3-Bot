@@ -1,0 +1,13 @@
+{
+    "models": [
+        {
+            "id": "llama3.2-vision:latest",
+            "object": "model",
+            "created": 1741970469,
+            "owned_by": "library",
+            "thinking": false,
+            "toolSupport": "teach",
+            "imageSupport": true
+        }
+    ]
+}

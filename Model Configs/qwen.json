@@ -1,0 +1,33 @@
+{
+    "models": [
+        {
+            "id": "qwen3:0.6b",
+            "object": "model",
+            "created": 1746995271,
+            "owned_by": "library",
+            "thinking": true,
+            "toolSupport": null,
+            "comment": "This model does not actually support tools. It's only enabled so that it runs better.",
+            "imageSupport": false
+        },
+        {
+            "id": "qwen3:30b-a3b",
+            "object": "model",
+            "created": 1746108528,
+            "owned_by": "library",
+            "thinking": true,
+            "toolSupport": "teach",
+            "imageSupport": false
+        },
+        {
+            "id": "qwen2.5vl:7b",
+            "object": "model",
+            "created": 1746108528,
+            "owned_by": "library",
+            "thinking": false,
+            "toolSupport": null,
+            "comment": "This model does not actually support tools. It's only enabled so that it runs better.",
+            "imageSupport": true
+        }
+    ]
+}
