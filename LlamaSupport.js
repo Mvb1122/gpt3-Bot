@@ -1,6 +1,6 @@
 const SystemMessageString = `(SYSTEM) Returned data from function: %s\nPlease use this information to answer the user's last question. An empty response is not appropriate. The user cannot see this message, so you must relay this information to them. Do not add a name in parenthesis to your messages. I AM NOT THE USER, DO NOT THANK ME.`
-const FunctionFinderRegex = new RegExp(/(<[a-z=]*>)?\{\s*\"name\"\s*:\s*\"[^\"]*\"\s*,\s*\"((parameters)|(arguments))\"\s*:\s*\"*\{[^}]*\}\"*\s*\}(<\/[a-z=]*>)?/g);
-const TextInGLTSymbolsRegex = new RegExp(/<\/*[a-z=]*>/g);
+const FunctionFinderRegex = new RegExp(/(<[a-zA-Z=]*>)?\{\s*\"name\"\s*:\s*\"[^\"]*\"\s*,\s*\"((parameters)|(arguments))\"\s*:\s*\"*\{.*\}\"*\s*\}(<\/[a-zA-Z=]*>)?/g);
+const TextInGLTSymbolsRegex = new RegExp(/<\/*[a-zA-Z=]*>/g);
 
 const { DEBUG, LocalServerSettings, NewMessage, AIParameters } = require('./index.js');
 const { Configuration, OpenAIApi } = require("openai");
