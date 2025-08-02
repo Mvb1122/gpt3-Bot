@@ -61,7 +61,7 @@ function GetMessageForGPTTalkingAboutTags(Plain, id = undefined, AllowAddedPerso
     let Messages = [
         {
             role: "system",
-            content: "Danbuuru tags are a descriptor for the content of an image. For example, some tags are: 1boy, 1girl, absurdres, red, black, and several others.\nUse thighhighs instead of thighhigh_socks\nYou can emphasize a tag by surrounding it in parenthesis, like (absurdres). Make sure to include (absurdres) in all lists of tags.\nFor example, an image of a woman with large breasts, long hair, wearing a white dress with earrings, on a simple background, would have the following tags: 1girl, absurdres, ((mature_female)), large_breasts, brown hair, long hair, white dress, earrings, simple background\nFor women, use 1girl, (mature_female) plus any other tags. For men, use 1boy, (mature_male) and any other tags.\nAny tag you can think of works as one, pretty much. If someone asks for a specific character, be sure to include the name and the franchise of the character. If the character has dark skin, use \`dark_skinned\` in your tags. If a name from a game, TV show, or other kind of visual non-OC media is passed, make sure it ends up in the final tag list in the format name_\(franchise\)\nDo not write name_\(Original Character\) or anything with the same meaning.\nIf two characters are asked for, you can use any numerated count, eg; 2girls; 1boy, 1girl; or 2boys. Make sure to listen to what's said about each individual character. Always use 2 girls when showing 2 girls. Always use 2boys when showing 2 boys.\nBe creative when writing tag lists! Please write a set of tags which coorespond to the given text on one line, separated by commas, and with NO OTHER TEXT.\RESPOND ONLY IN TAGS.\nRemember to be creative! "
+            content: "Danbuuru tags are a descriptor for the content of an image. For example, some tags are: 1boy, 1girl, absurdres, red, black, and several others.\nUse thighhighs instead of thighhigh_socks\nYou can emphasize a tag by surrounding it in parenthesis, like (absurdres). Make sure to include (absurdres) in all lists of tags.\nFor example, an image of a woman with large breasts, long hair, wearing a white dress with earrings, on a simple background, would have the following tags: 1girl, absurdres, ((mature_female)), large_breasts, brown hair, long hair, white dress, earrings, simple background\nFor women, use 1girl, (mature_female) plus any other tags. For men, use 1boy, (mature_male) and any other tags.\nAny tag you can think of works as one, pretty much. If someone asks for a specific character, be sure to include the name and the franchise of the character. If the character has dark skin, use \`dark_skinned\` in your tags. If a name from a game, TV show, or other kind of visual non-OC media is passed, make sure it ends up in the final tag list in the format name_\(franchise\)\nDo not write name_\(Original Character\) or anything with the same meaning.\nIf two characters are asked for, you can use any numerated count, eg; 2girls; 1boy, 1girl; or 2boys. Make sure to listen to what's said about each individual character. Always use 2 girls when showing 2 girls. Always use 2boys when showing 2 boys.\nBe creative when writing tag lists! Please write a set of tags which coorespond to the given text on one line, separated by commas, and with NO OTHER TEXT. RESPOND ONLY IN TAGS.\nRemember to be creative!"
         }, 
         {
             role: "user",
@@ -82,7 +82,7 @@ function GetMessageForGPTTalkingAboutTags(Plain, id = undefined, AllowAddedPerso
         }
     })
 
-    // If they say "me," "my," or "I" add them in.
+    // If they say "me" "my" or "I" add them in.
     if (id != undefined && Index.PersonaArray[id] != undefined && !Messages[0].content.includes(Index.PersonaArray[id]) && (HasWordInString("me", LowerCasePlain) || HasWordInString("my", LowerCasePlain) || HasWordInString("i", LowerCasePlain))) {
         Messages[0].content += ` ${Index.PersonaArray[id]}`
         if (Index.DEBUG)
@@ -98,14 +98,15 @@ function GetMessageForGPTTalkingAboutTags(Plain, id = undefined, AllowAddedPerso
 /**
  * Uses the Index's provided ChatGPT methods to summarize an image using a special prompt.
  * @param {String} Plain The plain text to tagify.
- * @returns {Promise<String>} A peice of text saying what tags represent the passed string.
- * @param {string} [id=undefined] The UserID to use when self-referencing.
+ * @returns {Promise<String> | String} A peice of text saying what tags represent the passed string.
+ * @param {String} [id=undefined] The UserID to use when self-referencing.
  * @param {boolean} [AllowAddedPersonas=false] Whether to allow other personas to be pulled in.
  * @see {Index.GetSafeChatGPTResponse}
  */
 async function GetPromptsFromPlaintextUsingGPT(Plain, id = undefined, AllowAddedPersonas = true) {
     let messages = GetMessageForGPTTalkingAboutTags(Plain, id, AllowAddedPersonas)
-
+    
+    const temp = new TemporaryModel(RecommendedModels.fast);
     const ResponseFromGPT = (await Index.GetSafeChatGPTResponse(messages, null, null, false)).data.choices[0].message;
     /**
      * @type {String}
@@ -114,12 +115,13 @@ async function GetPromptsFromPlaintextUsingGPT(Plain, id = undefined, AllowAdded
 
     // Charge them.
     if (id)
-        AddCostOfGPTTokens(id, encode(response).length);
+        AddCostOfGPTTokens(id, encode(response).length * 1/2); // Half cost because small model.
 
     // Call me hitler but I don't like child porn.
     if (response.includes("child") && (response.includes("penis") || response.includes("sex") || response.includes("child_porn")))
         response = response.replaceAll("penis", "a fluffy cat").replaceAll("child", "adult") + " Please do not draw anything NSFW with children! In your tag list, please keep it safe."
 
+    temp.end();
     return response.replaceAll("\n", ", ");
 }
 
@@ -137,6 +139,8 @@ function GetRecommendedCFGScale(numTags) {
 
 const { encode } = require('gpt-3-encoder');
 const { AddCostOfGPTTokens } = require('../Pricing.js');
+const TemporaryModel = require('../Model Configs/TemporaryModel.js');
+const RecommendedModels = require('../Model Configs/RecommendedModels.js');
 
 module.exports = {
     ImageIsValid, Download, GetPromptsFromPlaintextUsingGPT,
