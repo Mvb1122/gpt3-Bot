@@ -38,12 +38,7 @@ module.exports = {
             DiscordMessage.channel.send(`Fetching <${parameters.url}>!`)
 
           // Download page.
-          try {
-            await Download(parameters.url, path);
-          } catch (e) {
-            fs.writeFileSync(path, `Error: ${e}`)
-          }
-          const page = fs.readFileSync(path).toString();
+          const page = await (await fetch(parameters.url)).text();
 
           // Parse to just text.
           let text = GetHTMLText(page, {preserveNewlines: true});
@@ -67,12 +62,7 @@ module.exports = {
           }
           */
 
-          // Delete the file.
-          fs.unlink(path, (e) => {
-            if (e) console.log(e);
-          })
-
-          // Send it back.
+          // Send it back to the AI. 
           if (StartLength < 10000 || parameters.skipLimit) {
             return JSON.stringify({sucessful: true, text: text});
           } else {
