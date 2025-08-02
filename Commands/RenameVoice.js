@@ -38,7 +38,7 @@ module.exports = {
         const input = interaction.options.getString("in");
         /** @type {string} */
         let out = interaction.options.getString("out");
-        if (!out.endsWith(".bin")) out += ".bin";
+        if (!out.endsWith(".bin")) out += ".wav";
 
         console.log(`Input: ${input}\nOutput: ${out}`);
 
@@ -53,7 +53,7 @@ module.exports = {
 
         // Now rename file.
         fp.rename(EmbedDirectoryFromThisFile + input, EmbedDirectoryFromThisFile + out).then(() => {
-            interaction.editReply(`Renamed ${input} to ${out.replaceAll(".bin", "")}!`);
+            interaction.editReply(`Renamed ${input} to ${out.replaceAll(".wav", "")}!`);
         })
     },
 
