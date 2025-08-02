@@ -1,4 +1,5 @@
 const { NewMessage, RequestChatGPT, DEBUG } = require("..");
+const { GPTMessage } = require('../GPTMessage');
 const { GetRandomVoice } = require("../Commands/TTSToVC");
 const Discord = require('discord.js');
 

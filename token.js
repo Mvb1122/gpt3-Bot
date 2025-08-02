@@ -1,5 +1,5 @@
 const fs = require('fs');
-const tokens = JSON.parse(fs.readFileSync("./token.json"));
+const tokens = JSON.parse(fs.readFileSync(__dirname + "/token.json"));
 
 module.exports = {
     /**

@@ -1,4 +1,5 @@
-const { GetSafeChatGPTResponse, GPTMessage, NewMessage } = require(".");
+const { GetSafeChatGPTResponse, NewMessage } = require(".");
+const { GPTMessage } = require('./GPTMessage');
 
 const DefaultFeedbackPhrase = NewMessage("User", "Please make sure to respond with one of the keywords you know! Make sure to write it exactly as it was given to you!");
 
