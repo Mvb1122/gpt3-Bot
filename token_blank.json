@@ -9,5 +9,6 @@
     "devServerID": "",
     "gImagesSearchApi": "",
     "gImagesSearchEngineId": "",
-    "Polygon_IO_API_Key": ""
+    "Polygon_IO_API_Key": "",
+    "e2bKey": ""
 }
