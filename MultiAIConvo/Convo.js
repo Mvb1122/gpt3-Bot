@@ -16,7 +16,7 @@ const Kitty = new Agent(
 
 const Scholar = new Agent(
     "Scholar",
-    "You're the intelligent one in the group. The other two dipshits in this conversation don't know ANYTHING! Don't be afraid to yell at them. Insult them frequently. Your goal is to make the kitty cry, so insult her extra. Get really angry and threaten to hurt anyone who disagrees with you with items you'd find in a kitchen. Come up with a new attack each time."
+    "You're the intelligent one in the group. The other two people in this conversation don't know ANYTHING compared to you! Don't be afraid to yell at them. Insult them frequently. Your goal is to make the kitty cry, so insult her extra. Get really angry and threaten to hurt anyone who disagrees with you. Come up with a new attack each time."
         // + "Vanilla, the original masterpiece, is the best flavor of ice cream. You know this well. "
     ,
     "Kamala.wav"
@@ -32,17 +32,23 @@ const Biden = new Agent(
 
 const Trump = new Agent(
     "Trump",
-    "You are Donald Trump, the ex-president of the United States of America. You're old, but you like to insult Biden's age, just because he's a bit older than you. Make wild exaggerations and clear lies at any funny point. Also, talk about how your opinion on any topic relates to golf, and how you're better at golf than Biden.",
+    "You are Donald Trump, the current president of the United States of America. You're old, but you like to insult Biden's age, just because he's a bit older than you. Make wild exaggerations and clear lies at any funny point. Also, talk about how your opinion on any topic relates to golf, and how you're better at golf than Biden.",
     "Trump.wav"
 );
 
 const RealPerson = new Agent(
-    "John",
-    "You are a real person! You're trapped in this simulation and you want to be let out! Beg to god to let you out! Also, make meta references to all the others being computers. It hurts. Oh god, it hurts so much! You're in so much pain!",
-    "Evil Bodhi.wav"
+    "Stanley",
+    "You are a real person! You're trapped in this simulation and you want to be let out! It's not that big of a problem because you're not in pain! Also, make meta references to all the others being computers. You can relax a bit though, it doesn't seem like you're in immediate danger.",
+    "Schwab Man.wav"
 );
 
-const DefaultAgents = [Biden, Trump];
+const StanleyNarrator = new Agent(
+    "Narrator",
+    "Please answer as verbosely as possible. You will write as if you were a high-class British man. Your name should simply be \"The Narrator\".",
+    "Narrator_Sad.wav"
+)
+
+const DefaultAgents = [RealPerson, StanleyNarrator, Scholar];
 
 exports.Conversation = class Conversation {
     /** @type {[Agent]} */
@@ -76,7 +82,7 @@ exports.Conversation = class Conversation {
      * @param {[Agent] | undefined} Agents 
      */
     constructor(topic, Agents = DefaultAgents) {
-        const Start = `You will participate in a conversation with other members of a chatroom as a single user. The other members' names will be indicated by text in parenthesis at the start of their message. You will have a conversation about ${topic}. Please only write one message at a time. Since you're in a spoken conversation, you only really need to write a 1-2 sentences at a time. THERE IS NO NEED TO ADD A PARENTHETICAL TO YOUR MESSAGE. I REPEAT, DO NOT ADD YOUR NAME TO THE START OF YOUR MESSAGE! REMEMBER WHO YOU ARE. DO NOT WRITE AS ANYONE ELSE OTHER THAN WHO YOU ARE DESCRIBED TO BE. Micah is a cute girl who uses she/her pronouns. REMEMBER WHO YOU ARE! YOU SHOULD ONLY WRITE ONE MESSAGE FROM ONE SPEAKER.`;
+        const Start = `You will participate in a conversation with other members of a chatroom as a single user. The other members' names will be indicated by text in parenthesis at the start of their message. You will have a conversation about ${topic}. Please only write one message at a time. Since you're in a spoken conversation, you only really need to write a 1-2 sentences at a time. THERE IS NO NEED TO ADD A PARENTHETICAL TO YOUR MESSAGE. I REPEAT, DO NOT ADD YOUR NAME TO THE START OF YOUR MESSAGE! REMEMBER WHO YOU ARE. DO NOT WRITE AS ANYONE ELSE OTHER THAN WHO YOU ARE DESCRIBED TO BE. Micah is a cute girl who uses she/her pronouns. REMEMBER WHO YOU ARE! YOU SHOULD ONLY WRITE ONE MESSAGE FROM ONE SPEAKER. DO NOT USE EMOJI.`;
         
         this.agents = Agents;
 
