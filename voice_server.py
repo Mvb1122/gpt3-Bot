@@ -111,13 +111,15 @@ def GetEmbedding(location):
     return torch.load(f).squeeze(1)
 
 
-from TTS.api import TTS
-speech_sample_rate = 24000
+# from TTS.api import TTS # XTTS stuff
+from chatterbox.tts import ChatterboxTTS
+# speech_sample_rate = 24000
 def voice(Text, Embedding, File = "./Temp/Whatever.wav", lang=None):
   global synthesiser
   if type(synthesiser) == type(None):
-     # Create TTS model in advance.
-    synthesiser = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
+    # Create TTS model in advance.
+    # XTTS version: # synthesiser = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
+    synthesiser = ChatterboxTTS.from_pretrained(device=device)
 
   used_time = time.time()
 
@@ -133,15 +135,23 @@ def voice(Text, Embedding, File = "./Temp/Whatever.wav", lang=None):
   # del speech
   # del speaker_embedding
   
+  # Chatterbox version:
+  wav = synthesiser.generate(Text, audio_prompt_path=Embedding, cfg_weight=0.2, exaggeration=0.8)
+  torchaudio.save(File, wav, synthesiser.sr)
+  
+
+  used_time = time.time() - used_time
+  print("Generation Time: " + str(used_time))
+
+  return True
+  
+  # XTTS version:
   synthesiser.tts_to_file(text=Text,
     file_path=File,
     speaker_wav=Embedding,
     language=lang, 
     split_sentences=True
   )
-
-  used_time = time.time() - used_time
-  print("Generation Time: " + str(used_time))
   return True
 
 denoiser = None
@@ -162,6 +172,7 @@ def embed(source, target):
   denoiser.process_audio_file(source, target, True)
   return
 
+  # OLD METHOD:
   # Calculate speech embeddings.
   from speechbrain.inference.speaker import EncoderClassifier
   classifier = EncoderClassifier.from_hparams(source="speechbrain/spkrec-xvect-voxceleb", savedir="pretrained_models/spkrec-xvect-voxceleb", run_opts={"device":device})
@@ -231,7 +242,7 @@ def Caption_Image(location, mode):
 
   parsed_answer = florenceProcessor.post_process_generation(generated_text, task=mode, image_size=(image.width, image.height))
 
-  if (mode == "<OD>"):
+  if ("<OD>" in mode):
     parsed_answer[mode]['image'] = Make_Object_Detection_Image(image, parsed_answer[mode])
 
   return parsed_answer[mode]
@@ -303,11 +314,11 @@ def Manga_OCR(location):
   return text
 
 # Diarization stuff.
-from pyannote.audio import Pipeline as PyanPipeline
 Diarizer = None
 def Diarize(path, maxSpeakers):
   global Diarizer
   if type(Diarizer) is type(None): 
+    from pyannote.audio import Pipeline as PyanPipeline
     Diarizer = PyanPipeline.from_pretrained("pyannote/speaker-diarization-3.1", use_auth_token=HF_Token)
     Diarizer.to(torch.device(device))
 
