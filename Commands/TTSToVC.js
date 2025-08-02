@@ -374,7 +374,15 @@ module.exports = {
      */
     async OnMessageRecieved(message) {
         // Ignore bots and empty messages
-        if (message.author.bot || (message.content ?? "").trim().length == 0) return;
+        const hasMessageTXTAttachmentOnly = message.attachments.size == 1 && message.attachments.some(v => v.name == "message.txt");
+        if (message.author.bot || ((message.content ?? "").trim().length == 0 && !hasMessageTXTAttachmentOnly)) return;
+        
+        else if (hasMessageTXTAttachmentOnly) {
+            const messageTxt = message.attachments.find(v => v.name == "message.txt");
+            // Just download it and make the given text the message's content. 
+            const fileData = await (await fetch(messageTxt.url)).text();
+            message.content = fileData;
+        }
 
         // Just straight up give up if it has a link in it. 
         if (message.content.includes("http")) return;
@@ -545,3 +553,4 @@ module.exports = {
 
 // This import is moved down in order to prevent a circular dependancy issue.
 const { VoiceLong } = require('../VoiceLong');
+const { Download } = require('../Gradio/Helpers');
