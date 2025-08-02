@@ -617,7 +617,9 @@ module.exports = {
             })
 
         // If we don't have LLM image support, use the internal model.
-        if (LocalServerSettings.ImageBehavior.state == "inbuilt")
+            // It might be tempting to just use the LLM here, but let's remember that the LLM is actual crap at a lot of things.
+        // if (LocalServerSettings.ImageBehavior.state == "inbuilt")
+        else
             return new Promise(async res => {
                 // Starts up the transcribe stuff.
                 if (!Started) await Start();
@@ -632,7 +634,7 @@ module.exports = {
                         res(v);
                     });
             })
-        else {
+        /* else {
             return new Promise(async p => {
                 // Caption it with the second LLM.
                 const captionSeq = NewMessage("System", "You are an image captioning AI. You will caption images with the most detail you can. You will respond with ONLY the caption. You may provide additional background information if it seems useful. In this response you should focus on the following task: " + mode + ". If OCR, only write the text, and please write ALL text in the image.")
@@ -655,7 +657,7 @@ module.exports = {
                 const resp = (await GetSafeChatGPTResponse(captionSeq, null, 0, false, model)).data.choices[0].message.content;
                 p(resp);
             })
-        }
+        } */
     },
 
     /**
