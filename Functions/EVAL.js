@@ -1,36 +1,45 @@
 const {SendMessage, DEBUG} = require('../index')
 const Discord = require('discord.js');
+const e2b = require('@e2b/code-interpreter');
+const token = require('../token.js')
 
-const IllegalCommands = ['fs', 'console.log', 'process.exit']
+const IllegalCommands = ['fs', 'process.exit']
+
 module.exports = {
     keywords: "EVAL, Evaluate, Calculate, Program",
     json: {
         "name": "EVAL",
-        "description": "Evaluates the supplied NodeJS JavaScript code. Console.Log and process.exit() are not allowed. There are no predefined variables. Use a return statement to return a value.",
+        "description": "Evaluates the supplied code. YOU MUST SPECIFY THE LANGUAGE. Console.Log and process.exit() are not allowed. There are no predefined variables. Use a return statement to return a value.",
         "parameters": {
             "type": "object",
             "properties": {
-                "CODE": {
+                "language": {
                     "type": "string",
-                    "description": "Javascript code to be evaluated. Your code must be the body of an async function.",
+                    "description": "The language to use. Must be either: Python JavaScript R Java Bash",
+                },
+                "code": {
+                    "type": "string",
+                    "description": "Javascript code to be evaluated. You may use async-await. You should return the value you need to know.",
                 }
             },
-            "required": ["CODE"],
+            "required": ["code"],
         }
     },
 
     /**
    * Code run when the module is executed.
-   * @param {{CODE: string}} parameters Parameters from AI.
+   * @param {{code: string, language: string}} parameters Parameters from AI.
    * @param {Discord.Message | Discord.CommandInteraction} message 
    */
     async execute(parameters, message) {
+        console.log(parameters);
+
         let response = {
             "response": "sucessful"
         }
 
         for (let i = 0; i < IllegalCommands.length; i++) {
-            if (parameters.CODE.includes(IllegalCommands[i])) {
+            if (parameters.code.includes(IllegalCommands[i])) {
                 response.response = `The AI is not allowed to use ${IllegalCommands[i]}!`;
                 return response.response.toString();
             }
@@ -52,23 +61,26 @@ module.exports = {
                 
             const row = new Discord.ActionRowBuilder()
                 .addComponents(acceptButton, declineButton);
+                
+            // Send with capability for splitting.
+            const permMessage = await SendMessage(message, "Are you sure that you want to run this code?\n```js\n" + parameters.code.replaceAll("\\n", "\n") + "\n```\nCode will be ran in a container! Not connected to previous evaluations!")
             
-
-            const permMessage = await message.channel.send({
-                content: "Are you sure that you want to run this code?\n```js\n" + parameters.CODE + "\n```",
+            // Add the button.
+            permMessage.edit({
                 components: [row]
             });
 
             const resp = await permMessage.awaitMessageComponent();
+            const userIsDev = resp.user.id == token.GetToken("devDiscordID");
 
-            if (resp.customId == "no") {
+            if (resp.customId == "no" || !userIsDev) {
                 response.response = "User declined running code!"
                 await resp.reply({
                     ephemeral: true,
-                    content: "Evaluation cancelled!"
+                    content: "Evaluation cancelled!" + (!userIsDev ? " You do not have permission to run!" : "") 
                 });
                 permMessage.delete();
-            } else 
+            } else
                 try {
                     await resp.reply({
                         ephemeral: true,
@@ -76,15 +88,22 @@ module.exports = {
                     });
                     permMessage.delete();
                     if (DEBUG)
-                        console.log(`\nEvaluating: ${parameters.CODE}\n`);
+                        console.log(`\nEvaluating: ${parameters.code}\n`);
         
                     let ResponseMessage;
                     if (message) 
-                        ResponseMessage = SendMessage(message, "Evaluating: ```js\n" + parameters.CODE + "```")
+                        ResponseMessage = SendMessage(message, "Evaluating: ```js\n" + parameters.code + "```")
         
                     try {
-                        response.response = await eval('(function() {' + parameters.CODE + '}())');
+                        // Create a sandbox and execute there.
+                        const sbx = await e2b.Sandbox.create({
+                            apiKey: token.GetToken("e2bKey")
+                        });
+
+                        response.response = await sbx.runCode(parameters.code, { language: parameters.language.toLowerCase() });
                         console.log(response.response);
+                        
+                        sbx.kill();
                     } catch (e) {
                         console.log(e);
                         response.response = JSON.stringify({
@@ -92,7 +111,9 @@ module.exports = {
                             resason: e.cause
                         })
                     }
+
                     if (typeof response.response === 'object') response.response = JSON.stringify(response.response);
+                    
                     if (message)
                         ResponseMessage.then(v => {
                             if (v.editable) v.edit(v.content + "\nResponse: " + response.response)
