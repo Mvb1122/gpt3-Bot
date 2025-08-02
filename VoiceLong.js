@@ -6,6 +6,11 @@ const { PlayAudioToVC, GetPlayer } = require("./Commands/TTSToVC");
 const { GetPolicy, HasPolicy } = require('./Security');
 const { client } = require('.');
 
+//#region Options
+// Ability to disable/enable splitting sentences. This can improve generation speed, but on some models results in stopy-starty speech.
+const SPLITSENTANCES = true;
+//#endregion
+
 /**
  * An array which maps userIDs to the number of shouts they have left.
  */
@@ -28,7 +33,7 @@ const NormalVolumeHashTags = 4;
 function SplitToSections(text) {
     const lines = text.split("\n");
     let parts = lines.map(v => {
-        return v.split(/(?<=[.!?])/);
+        return SPLITSENTANCES ? v.split(/(?<=[.!?])\s/) : [v]; 
     });
 
     // Now, parts includes an array of lines, where each line is split by sentence. Now, we just need to add the volume calculation.
