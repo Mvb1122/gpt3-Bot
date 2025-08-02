@@ -25,7 +25,7 @@ async function Preload() {
             const sentiment = all[Math.floor(Math.random() * all.length)]
             const answer = sentiment[Math.floor(Math.random() * sentiment.length)];
             const path = "../Temp/test.png";
-            MakeImage(answer, path);
+            Make8BallImage(answer, path);
     
             setTimeout(() => {
                 fs.unlinkSync(path);
@@ -42,7 +42,7 @@ const sharp = require('sharp');
  * @param {String} path Path to save to.
  * @returns {Promise<String>} Promise that resolves to the path when image is saved.
  */
-async function MakeImage(Text, path) {    
+async function Make8BallImage(Text, path) {    
     // Break text into tspans:
     const lines = Text.split(" ");
     Text = ""
@@ -143,7 +143,7 @@ module.exports = {
 
         // Get image.
         const path = `./Temp/${interaction.user.id}_ball.png`;
-        MakeImage(answer, path).then(() => {
+        Make8BallImage(answer, path).then(() => {
             // Save to temp folder and then send it off.
             interaction.editReply({content: `${QuestionStarter}My prediction is... **${answer}**!`, files: [path]}).then(() => {
                 // Delete the image.
@@ -177,5 +177,5 @@ module.exports = {
     },
 
     // Also share bias statement.
-    GetBias
+    GetBias, Make8BallImage
 };
