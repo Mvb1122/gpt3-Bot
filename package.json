@@ -26,7 +26,7 @@
     "color": "^4.2.3",
     "cutlet": "^0.0.0",
     "dictionary-en-us": "^3.0.0",
-    "discord.js": "^14.18.0",
+    "discord.js": "^14.21.0",
     "e2b": "^1.4.0",
     "ffmpeg-static": "^5.2.0",
     "google-search-results-nodejs": "^2.1.0",
