@@ -39,10 +39,7 @@ exports.Agent = class Agent {
      */
     Respond(RelativeMessage) {
         return new Promise(async resolve => {
-            const v = await RequestChatGPT(this.messages, RelativeMessage)
-
-            console.log(this.messages);
-
+            const v = await RequestChatGPT(this.messages, RelativeMessage);
             resolve(v[v.length - 1]);
         })
     }
@@ -59,5 +56,19 @@ exports.Agent = class Agent {
         this.name = name;
         this.base = base + `\nYour name is ${name}!`;
         this.PreferredVoice = PreferredVoice ?? GetRandomVoice();
+    }
+
+    /**
+     * Creates an agent from messages.
+     * @param {string} name 
+     * @param {GPTMessage[]} messages 
+     * @returns {Agent}
+     */
+    static FromMessages(name, messages) {
+        const newAgent = new Agent();
+        newAgent.name = name;
+        newAgent.base = messages[0].content;
+        newAgent.messages = messages.slice(1);
+        return newAgent;
     }
 }
