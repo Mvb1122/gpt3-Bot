@@ -27,6 +27,37 @@ async function DownloadToBase64String(url) {
     return output;
 }
 
+/**
+ * @type {String[]}
+ */
+let contentRecord = [];
+/**
+ * Returns a unique number which will remain constant throughout this conversation.
+ * @param {import('./GPTMessage.js').GPTMessage[]} MessageChain 
+ */
+async function UniqueKey(MessageChain) {
+    // Algoritm: Go through all characters in all messages. Find the first letter where the content differs after the system prompt. Select the index with the most similarity. 
+    const allContent = MessageChain.slice(1).map(v => v.content).join("");
+
+    let maxDist = -1, maxIndex = -1;
+    for (let i = 0; i < contentRecord.length; i++) {
+        const other = contentRecord[i];
+        for (let j = 0; j < other.length; i++)
+            if (other[j] != allContent[j])
+                if (maxDist < j) {
+                    maxDist = j;
+                    maxIndex = i; 
+                }
+
+        // If maxDist is equal to 0 (completely unique) then we can just add a new one.
+        if (maxDist == 0) {
+            return contentRecord.push(allContent);
+        } else {
+            return maxIndex;
+        }
+    }
+}
+
 const CaptionCache = {};
 
 /**
@@ -40,10 +71,10 @@ module.exports = {
      */
     async MessageToLlama(m) {
         // If the model supports function calls and images, don't do anything. 
-        if (LocalServerSettings.ImageBehavior.state == 'mainsupported' &&  LocalServerSettings.FunctionCalls == 'mainsupported') return m;
+        // if (LocalServerSettings.ImageBehavior.state == 'mainsupported' &&  LocalServerSettings.FunctionCalls == 'mainsupported') return m;
 
         // If we're using a llava model in mainsupport mode, replace system with user.
-        if (LocalServerSettings.ImageBehavior.state == "mainsupported" && m.role.toLowerCase() == "system") m.role = "user"
+        // if (LocalServerSettings.ImageBehavior.state == "mainsupported" && m.role.toLowerCase() == "system") m.role = "user"
 
         if (m.role == "tool") {
             // v.role = "ipython"
@@ -51,21 +82,17 @@ module.exports = {
             m.content = SystemMessageString.replace("%s", typeof(m.content) != 'string' ? JSON.stringify(m.content) : m.content);
         }
         else if (m.tool_calls != undefined) m.tool_calls.forEach((f, i) => {
-            if (m.content == undefined) m.content = "";
-            if (f.function.id)
-                delete f.function.id;
-            m.content += `\n<function=${f.function.name}>${JSON.stringify(f.function)}</function>`
-        });
+                if (m.content == undefined) m.content = "";
+                if (f.function.id)
+                    delete f.function.id;
+                m.content += `\n<function=${f.function.name}>${JSON.stringify(f.function)}</function>`
+            });
 
         else if (m.role == "user" && typeof(m.content) == 'object') {
             // This is a image request; caption images.
             m.content = m.content.map(v => {
                 return new Promise(async p => {
-
-                    console.log(LocalServerSettings.ImageBehavior.state)
-                    if (v.type == "image_url") {
-                        if (DEBUG) console.log(v.image_url.url);
-                        
+                    if (v.type == "image_url") {                        
                         // Download it if we can support images. Otherwise, caption it.
                         const path = v.image_url.url;
                         if (LocalServerSettings.ImageBehavior.state == "inbuilt") {
@@ -115,8 +142,7 @@ module.exports = {
                                 text: resp
                             });
                         }
-                    }
-                    p(v);
+                    } else p(v); // Return the same version in all other circumstances (this is a text part and should be fine.)
                 })
             })
             m.content = await Promise.all(m.content);
@@ -195,9 +221,10 @@ module.exports = {
                     }
                 });
 
+                /*
                 if (m.content == "") 
                     m.content = null
-                else m.content = m.content.trim();
+                else */ m.content = m.content.trim();
                 // m.content = "(Function calls were submitted.)"
             }
         }
@@ -227,8 +254,6 @@ module.exports = {
                 msg.content = msg.content.trim();
             }
         }
-        
-        console.log(msg);
         
         return msg;
     },
