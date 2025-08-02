@@ -8,20 +8,16 @@ const rootBase = "You will only call a function with a given value once. The use
 const FunctionEndMessage = "Your current available functions are:"
 let FunctionCallingRootBase = ""
 
-if (LocalServerSettings.Use) {
-    async function SetModel() {
-        const v = await LocalServerSettings.model;
-        if (v.includes("70B"))
-            FunctionCallingRootBase = fs.readFileSync(`${FunctionCallingBasesDir}/Llama70BFunctionCallingRootBase.txt`) + FunctionEndMessage
-        else if (LocalServerSettings.FunctionCalls == 'teach') // Teach non-supported models how to call functions.
-            FunctionCallingRootBase = fs.readFileSync(`${FunctionCallingBasesDir}/FunctionCallingRootBase.txt`) + FunctionEndMessage
-        
-        // If there's no function teaching needed, leave it empty.
-        else 
-            FunctionCallingRootBase = ""
+function UpdateFunctionCallingRootBase() {
+    if (LocalServerSettings.Use && LocalServerSettings.FunctionCalls == "teach") {
+        FunctionCallingRootBase = fs.readFileSync(`${FunctionCallingBasesDir}/FunctionCallingRootBase.txt`).toString() + FunctionEndMessage;
     }
-    SetModel();
+
+    // If there's no function teaching needed, leave it empty.
+    else 
+        FunctionCallingRootBase = ""
 }
+UpdateFunctionCallingRootBase();
 
 async function fetchRootBase(id = null) {
     const now = new Date();
@@ -86,5 +82,6 @@ function GetCurrentDate() {
 }
 
 module.exports = {
-    GetUserFile, GetCurrentDate, fetchRootBase, FunctionEndMessage
+    GetUserFile, GetCurrentDate, fetchRootBase, FunctionEndMessage,
+    UpdateFunctionCallingRootBase
 }
