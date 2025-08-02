@@ -47,7 +47,7 @@ module.exports = {
       parameters.count = 1;
     } else if (parameters.count > 10) parameters.count = 10;
 
-    // Get tags.
+    // Get tags. (This can be made synchronous to make things a little slower.)
     new Promise((resolve) => {
       GetTags(parameters.content, DiscordMessage.user != null ? DiscordMessage.user.id : undefined).then(async tags => {
         if (await GetPolicy(DiscordMessage.guildId, "promptnsfw") && (await JudgeNSFWTags(tags))[0].label == "NSFW") {
