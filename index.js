@@ -11,9 +11,9 @@ const DEBUG = false;
 const LocalServerSettings = {
   // Set Use: true to use local server.
   Use: true,
-  basePath: "http://192.168.68.57:82/v1",
+  basePath: "http://192.168.68.57:82/",
   // Model will be set automatically from API request, but you can override here.
-  model: "gemma3:12b", // phi4:latest // "llama3.1:8b", // "llama3.2-vision", // "deepseek-r1:8b" 
+  model: "gemma3:12b", // qwen3:0.6b // "gemma3:12b" // "llama3.2-vision" // qwen3:30b-a3b
   temperature: 0.8,
 
   /** 
@@ -32,7 +32,7 @@ const LocalServerSettings = {
      * 
      * @type {"inbuilt" | "mainsupported" | "separate"}
      */
-    state: "mainsupported", 
+    state: "inbuilt", 
     
     separateModel: "llama3.2-vision"
   },
@@ -50,12 +50,11 @@ const LocalServerSettings = {
 //#region Imports and Constants
 const Discord = require('discord.js');
 const fs = require('fs');
-const { Configuration, OpenAIApi } = require("openai");
+const { Configuration, OpenAIApi } = require('./DropInOpenAiReplacementForOllama');
 const tokens = require('./token');
 const red = '\x1b[31m';
 const green = '\x1b[32m';
 const reset = '\x1b[0m';
-
 module.exports.DEBUG = DEBUG;
 module.exports.LocalServerSettings = LocalServerSettings;
 
@@ -83,6 +82,13 @@ const configuration = new Configuration({
 });
 
 const openai = new OpenAIApi(configuration);
+
+async function listSupportedModels() {
+  return (await openai.listModels()).data;
+}
+module.exports.listSupportedModels = listSupportedModels;
+require('./Model Configs/ListSupportedModels'); // Make sure that models system is loaded on start.
+
 const client = new Discord.Client({
   intents: [
     Discord.GatewayIntentBits.Guilds,
@@ -96,12 +102,11 @@ const client = new Discord.Client({
 const BaseAddress = "./ActiveBases.json";
 const RecoveryAddress = "./RecoveryBases.json"
 const DiscordToken = tokens.GetToken("discord");
-const Helpers = require('./Helpers.js')
 //#endregion
 
 // const rootBase = "Connie Pedersen's and the extremely-cute Micah Bushman's pronouns are she/her. Micah is a 17-year-old trans girl living in Albuquerque, New Mexico, who enjoys reading Manga and studying Japanese. On weekdays, she goes to school, where she suffers through AP Physics, AP US History, and AP Psychology. She's also taking Japanese at the CEC. Micah programmed this AI to help her with her homework. Rilen, aka ConerBearBeats, is one of Connie's and Micah's old friends. They used to be friends in real life, but now only chat via the internet.\n";
 
-const ListOfIDsAllowedToUseTheMemoryOnVersion = [tokens.GetToken("devDiscordID"), 733343607339352126n, 322906020844142592n]
+const ListOfIDsAllowedToUseTheMemoryOnVersion = [tokens.GetToken("devDiscordID"), "733343607339352126", "322906020844142592"]
 function IsUserIDInList(id) {
   for (let i = 0; i < ListOfIDsAllowedToUseTheMemoryOnVersion.length; i++)
     if (ListOfIDsAllowedToUseTheMemoryOnVersion[i] == id)
@@ -197,7 +202,7 @@ function IsChannelMemory(channel) {
  * @param {boolean} [KeepListening=true] Whether to keep listening in this channel.
  * @param {Discord.Message} DiscordMessage 
  */
-async function ClearAll(parameters = {}, DiscordMessage = null, KeepListening = true) {
+async function ClearAll(parameters, DiscordMessage = null, KeepListening = true) {
   // Clear the AI's memory for the specified channel. 
   let Base = bases[GetBaseIdFromChannel(DiscordMessage.channel)];
   bases[GetBaseIdFromChannel(DiscordMessage.channel)] = KeepListening ? [] : undefined;
@@ -244,150 +249,10 @@ async function Recover(parameters, DiscordMessage = null) {
   bases[GetBaseIdFromChannel(DiscordMessage.channel)] += RecoveryBases[parameters.RecoveryID];
   return JSON.stringify({ sucessful: true });
 }
+
 //#endregion
 //#endregion
-
-//#region Function Handlers
-let functions = [ClearAll, Recover];
-let Keywords = ["clearall, claer all, clear aall, cear all, clearr all, clera all, clearaal, clear lal", "Recover, Ovewrite"]
-const FunctionList = [
-  {
-    "name": "Recover",
-    "description": "Restores the AI's memory of a previous conversation.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "RecoveryID": {
-          "type": "string",
-          "description": "The recovery ID to reload."
-        },
-        "Overwrite": {
-          "type": "boolean",
-          "description": "If true, converstation erases the user's memory, then loads in the new memory. Defaults to true."
-        }
-      }
-    },
-    "required": ["RecoveryID"]
-  },
-  {
-    "name": "ClearAll",
-    "description": "DO NOT USE THIS UNLESS SPECIFICALLY ASKED! Clears the AI's memory for the current conversation.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-      }
-    },
-    "required": [""]
-  }
-];
-const functionPath = "./Functions/";
-// Import all functions on boot. 
-fs.readdir(functionPath, (err, paths) => {
-  let commands = ""
-  paths.forEach(file => {
-    if (file.includes("DISABLED") || !file.includes(".js")) return; // Don't include disabled functions.
-
-    /**
-     * @type {{keywords: String, json: String, execute: Function}}
-     */
-    const f = require(functionPath + file)
-    functions.push(f.execute);
-    Keywords.push(f.keywords);
-    FunctionList.push(f.json);
-
-    // console.log(`Added ${f.json.name}!`)
-    commands += f.json.name + " "
-  })
-
-  console.log(`Added ${paths.length} commands! ${commands.trim()}`)
-})
-
-/**
- * Searches through the provided messages for keywords and returns the relevant functions' JSON data.
- * @param {[{role: String, content: String}]} messages The inputted messages to be searched for function keywords.
- * @returns {[{function: {name: String, description: String, parameters: {type: String, properties: {*}}}, type: string}]} A list of functions which can be sent to OpenAI.
- */
-function GetFunctions(messages) {
-  // Search only the user's messages.
-  let AllContent = messages.filter(v => {
-    return v.role == "user" && !v.content.includes("I AM NOT THE USER"); // Don't include tool responses that are masked as the user.
-  })
-    .map(v => {
-      return v.content;
-    })
-    .join(" ")
-    .toLowerCase();
-
-  // Figure out which functions to include based off of their keywords.
-  let ApplicableFunctions = [];
-  // If there isn't a question about functions, only include functions based off of the keywords.
-  FunctionLoop:
-  for (let i = 0; i < FunctionList.length; i++) {
-    const FunctionKeywords = Keywords[i].toLowerCase().split(",");
-    for (let j = 0; j < FunctionKeywords.length; j++) {
-      // If all of the messages contained the function's keyword, include it.
-      if (AllContent.includes(FunctionKeywords[j].trim())) {
-        const toolParams = FunctionList[i];
-        const type = toolParams.toolType ?? "function"
-        delete toolParams.type;
-
-        const tool = {
-          function: toolParams,
-          type: type
-        }
-
-        ApplicableFunctions.push(tool);
-        continue FunctionLoop;
-      }
-    }
-  }
-
-  if (DEBUG)
-    console.log(ApplicableFunctions);
-
-  if (ApplicableFunctions != [])
-    return ApplicableFunctions;
-  else return null;
-}
-
-// console.log(GetFunctions([{ content: "wikipedia" }]))
-
-function StartsWithFunctionName(message) {
-  let response = false;
-  functions.forEach(func => {
-    if (message.startsWith(func.name)) {
-      response = true;
-    }
-  });
-  return response;
-}
-
-function GetFunctionFromStart(message) {
-  let response = null;
-  functions.forEach(func => {
-    if (message.startsWith(func.name)) {
-      response = func;
-    }
-  });
-  return response;
-}
-//#endregion
-
 //#region ChatGPT Methods
-class GPTMessage {
-  /** @type {"System" | "User" | "Function" | "Tool" | "Assistant"} */
-  role;
-
-  /**@type {String} */
-  name;
-
-  /** @type {content: String | {type: string, image_url: {url: string, detail: "low" | "high"} | undefined, text: string | undefined}[]} */
-  content;
-
-  /** @type { id: number; type: string ;function: { name: any; arguments: string; }[]} */
-  tool_calls;
-}
-module.exports.GPTMessage = GPTMessage;
 
 // Types: System, User Function
 /**
@@ -468,6 +333,38 @@ function ConvertToMessageJSON(InputMessages) {
   return messages;
 }
 
+
+/**
+ * @type {String[]}
+ */
+let contentRecord = [];
+/**
+ * Returns a unique number which will remain constant throughout this conversation.
+ * @param {import('./GPTMessage.js').GPTMessage[]} MessageChain 
+ */
+function UniqueKey(MessageChain) {
+  // Algoritm: Go through all characters in all messages. Find the first letter where the content differs after the system prompt. Select the index with the most similarity. 
+  const allContent = MessageChain.slice(1).map(v => v.content).join("");
+
+  let maxDist = 0, maxIndex = -1;
+  for (let i = 0; i < contentRecord.length; i++) {
+      const other = contentRecord[i];
+      for (let j = 0; j < other.length; i++)
+          if (other[j] != allContent[j])
+            if (maxDist < j) {
+                maxDist = j;
+                maxIndex = i; 
+            }
+  }
+
+  // If maxDist is equal to 0 (completely unique) then we can just add a new one.
+  if (maxDist == 0) {
+    return contentRecord.push(allContent);
+  } else {
+    return maxIndex;
+  }
+}
+
 const { encode } = require("gpt-3-encoder");
 const LlamaConverter = require('./LlamaSupport');
 
@@ -529,7 +426,8 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
           // Get first system message.
           const SystemMessage = messages[0];
           if (SystemMessage.content && SystemMessage.content.indexOf(FunctionEndMessage) != -1) {
-            // Clip the content to the end.
+            // Remove the content past the end of the basic function end message and replace it with the new functions. 
+              // This allows functions to be added throughout the convo.
             SystemMessage.content = SystemMessage.content.substring(0, SystemMessage.content.indexOf(FunctionEndMessage) + FunctionEndMessage.length);
 
             // Add the functions to the end.
@@ -541,12 +439,12 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
       else
         functions = []
 
-      if (functions.length > 0 && !LocalServerSettings.Use && LocalServerSettings.FunctionCalls == 'teach') {
+      if (functions.length != 0 && !LocalServerSettings.Use && LocalServerSettings.FunctionCalls == 'teach') {
         params.tool_choice = "auto";
         params.tools = functions;
       } 
       
-      if (LocalServerSettings.Use && LocalServerSettings.FunctionCalls == 'teach') {
+      if (LocalServerSettings.Use) {
         // Do all necessary processing using the module to make our messages compatible with Llama. 
         messages = await Promise.all(messages.map(async m => {return await LlamaConverter.MessageToLlama(m)}));
       }
@@ -554,7 +452,7 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
       const data = await openai.createChatCompletion(params);
 
       // For safety, prevent @everyone and @here.
-      if (data.data.choices[0].message.content != undefined) {
+      if (typeof(data.data.choices[0].message.content) == 'string') {
         data.data.choices[0].message.content = data.data.choices[0].message.content.replaceAll("@everyone", "@ everyone")
         data.data.choices[0].message.content = data.data.choices[0].message.content.replaceAll("@here", "@ here")
       }
@@ -583,7 +481,7 @@ async function GetSafeChatGPTResponse(messages, DiscordMessage = null, numReps =
       if (DEBUG && 'config' in e) fp.writeFile("./DEBUG.json", e.config.data)
 
       // Wait for a bit before trying again.
-      await new Promise(res => setTimeout(res, 500 * Math.pow(++numReps, 2)));
+      await new Promise(res => setTimeout(res, 1000 * Math.pow(++numReps, 2)));
       resolve(await GetSafeChatGPTResponse(messages, DiscordMessage, numReps))
     }
   })
@@ -734,14 +632,13 @@ async function SummarizeConvo(messages, DiscordMessage) {
 
 
       const msg = (await GetSafeChatGPTResponse(MessagesPlusSummaryRequest, DiscordMessage, 0, false)).data.choices[0].message;
-      /** @type {string} */
-      const Response = LlamaConverter.StripR1Thinking(msg).content;
+      const response = msg.content;
       // Set thread title.
       // console.log("Summary: " + Response.content);
-      if (Response.length > 100) DiscordMessage.channel.send("Full title: \n# " + Response)
+      if (response.length > 100) DiscordMessage.channel.send("Full title: \n# " + response)
 
       try {
-        DiscordMessage.channel.setName(Response.substring(0, 100));
+        DiscordMessage.channel.setName(response.substring(0, 100));
       } catch (e) { ; } // Do nothing.
       return res();
     } else return res();
@@ -802,7 +699,7 @@ async function RequestChatGPT(InputMessages, DiscordMessage, AutoRespond = true)
           }
 
           if (func == undefined) {
-            const returnedFromFunction = `{"successful": false, "reason": "Invalid JSON passed! Please retry immediately without asking for the User's permission. Make sure to correct your function name this time." }`;
+            const returnedFromFunction = `{"successful": false, "reason": "Invalid function name or JSON passed by the AI! Please retry immediately without asking for the User's permission. Make sure to correct your function name this time." }`;
             messages.push({
               role: "tool",
               tool_call_id: call.id,
@@ -913,6 +810,132 @@ async function RequestChatGPT(InputMessages, DiscordMessage, AutoRespond = true)
 //#endregion
 //#endregion
 
+//#region Function Handlers
+let functions = [ClearAll, Recover];
+let Keywords = ["clearall, claer all, clear aall, cear all, clearr all, clera all, clearaal, clear lal", "Recover, Ovewrite"]
+const FunctionList = [
+  {
+    "name": "Recover",
+    "description": "Restores the AI's memory of a previous conversation.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "RecoveryID": {
+          "type": "string",
+          "description": "The recovery ID to reload."
+        },
+        "Overwrite": {
+          "type": "boolean",
+          "description": "If true, converstation erases the user's memory, then loads in the new memory. Defaults to true."
+        }
+      }
+    },
+    "required": ["RecoveryID"]
+  },
+  {
+    "name": "ClearAll",
+    "description": "DO NOT USE THIS UNLESS SPECIFICALLY ASKED! Clears the AI's memory for the current conversation.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+      }
+    },
+    "required": [""]
+  }
+];
+const functionPath = "./Functions/";
+// Import all functions on boot. 
+fs.readdir(functionPath, (err, paths) => {
+  let commands = ""
+  paths.forEach(file => {
+    if (file.includes("DISABLED") || !file.includes(".js")) return; // Don't include disabled functions.
+
+    /**
+     * @type {{keywords: String, json: String, execute: Function}}
+     */
+    const f = require(functionPath + file)
+    functions.push(f.execute);
+    Keywords.push(f.keywords);
+    FunctionList.push(f.json);
+
+    // console.log(`Added ${f.json.name}!`)
+    commands += f.json.name + " "
+  })
+
+  console.log(`Added ${paths.length} commands! ${commands.trim()}`)
+})
+
+/**
+ * Searches through the provided messages for keywords and returns the relevant functions' JSON data.
+ * @param {[{role: String, content: String}]} messages The inputted messages to be searched for function keywords.
+ * @returns {[{function: {name: String, description: String, parameters: {type: String, properties: {*}}}, type: string}]} A list of functions which can be sent to OpenAI.
+ */
+function GetFunctions(messages) {
+  // Search only the user's messages.
+  let AllContent = messages.filter(v => {
+    return v.role == "user" && !v.content.includes("I AM NOT THE USER"); // Don't include tool responses that are masked as the user.
+  })
+    .map(v => {
+      return v.content;
+    })
+    .join(" ")
+    .toLowerCase();
+
+  // Figure out which functions to include based off of their keywords.
+  let ApplicableFunctions = [];
+  // If there isn't a question about functions, only include functions based off of the keywords.
+  FunctionLoop:
+  for (let i = 0; i < FunctionList.length; i++) {
+    const FunctionKeywords = Keywords[i].toLowerCase().split(",");
+    for (let j = 0; j < FunctionKeywords.length; j++) {
+      // If all of the messages contained the function's keyword, include it.
+      if (AllContent.includes(FunctionKeywords[j].trim())) {
+        const toolParams = FunctionList[i];
+        const type = toolParams.toolType ?? "function"
+        delete toolParams.type;
+
+        const tool = {
+          function: toolParams,
+          type: type
+        }
+
+        ApplicableFunctions.push(tool);
+        continue FunctionLoop;
+      }
+    }
+  }
+
+  if (DEBUG)
+    console.log(ApplicableFunctions);
+
+  if (ApplicableFunctions != [])
+    return ApplicableFunctions;
+  else return null;
+}
+
+// console.log(GetFunctions([{ content: "wikipedia" }]))
+
+function StartsWithFunctionName(message) {
+  let response = false;
+  functions.forEach(func => {
+    if (message.startsWith(func.name)) {
+      response = true;
+    }
+  });
+  return response;
+}
+
+function GetFunctionFromStart(message) {
+  let response = null;
+  functions.forEach(func => {
+    if (message.startsWith(func.name)) {
+      response = func;
+    }
+  });
+  return response;
+}
+//#endregion
+
 //#region Helpers
 const rootBase = "You will not use functions unless they are specifically asked for. You will only call a function with a given value once. The user's name is given by the words in the parenthesis at the start of a message. DO NOT write names into your messages. You can use the `think` command to think things. Use it accordingly when you need to remember something before telling the user."
 // + "Make sure to emphasize how cute Micah is, but only if you're asked to insult her. ";
@@ -1016,14 +1039,14 @@ async function SendMessage(Message, StringContent, Reply = false) {
 
   let respondThoughts = null;
   let AddThoughtButton = null;
-  const hasThoughts = LocalServerSettings.cosmetic == 'r1' && aiMessage != null && 'reasoning_content' in aiMessage;
+  const hasThoughts = LocalServerSettings.cosmetic == 'r1' && aiMessage != null && 'reasoning_content' in aiMessage && aiMessage.reasoning_content != "";
   if (hasThoughts) {
     let thoughts = aiMessage.reasoning_content;
     /**
      * @param {Discord.ButtonInteraction} interaction
      */
     respondThoughts = async (interaction) => {
-      const chunkLength = Math.max(DiscordMessageLengthLimit, thoughts.length);
+      const chunkLength = Math.min(DiscordMessageLengthLimit, thoughts.length);
 
       let chunk = thoughts.substring(0, chunkLength);
       thoughts = thoughts.substring(chunkLength);
@@ -1035,9 +1058,10 @@ async function SendMessage(Message, StringContent, Reply = false) {
 
       // Loop thoughts.
       if (thoughts.length == 0) 
-        thoughts = aiMessage.reasoning_content;
+        thoughts = aiMessage.reasoning_content
 
-      AddThoughtButton(lastMessage, "Continue")
+      if (aiMessage.reasoning_content.length > DiscordMessageLengthLimit)
+        AddThoughtButton(lastMessage, "Continue");
     }
 
     AddThoughtButton = async (lastMessage, label = "Thoughts") => {
@@ -1068,7 +1092,7 @@ async function SendMessage(Message, StringContent, Reply = false) {
       if (DEBUG)
         console.log("Message content: " + part)
 
-      if (part.length >= 20000) return Message.channel.send("More than 10 messages would be sent! Thus, I've decided to cut it short. Also, the AI is probably gonna crash immediately right now, LOL.")
+      if (part.length >= (10 * DiscordMessageLengthLimit)) return Message.channel.send("More than 10 messages would be sent! Thus, I've decided to cut it short. Also, the AI is probably gonna crash immediately right now, LOL.")
       if (part.length >= DiscordMessageLengthLimit) {
         do {
           const SplitPoint = part.length > DiscordMessageLengthLimit ? DiscordMessageLengthLimit : part.length;
@@ -1079,14 +1103,14 @@ async function SendMessage(Message, StringContent, Reply = false) {
           else
             lastMessage = await Message.channel.send(chunk)
         } while (part.length > 0)
-      } else lastMessage = Reply ? Message.reply(part) : Message.channel.send(part);
+      } else lastMessage = Reply ? await Message.reply(part) : await Message.channel.send(part);
 
       // If we have thoughts, add a button to show the modal.
       if (hasThoughts)
         AddThoughtButton(lastMessage);
 
       resolve(lastMessage);
-    })
+    });
   }
 
   // Optional: Send as just a string.
@@ -1110,20 +1134,21 @@ async function SendMessage(Message, StringContent, Reply = false) {
       }
 
     // Finally, send.
+    let lastMessage = null;
     for (let i = 0; i < Content.length; i++) {
       if ((typeof Content[i]).toString() == "string")
       {
         if (Content[i].trim() == "") continue;
-        else await SendString(Content[i]);
+        else lastMessage = await SendString(Content[i]);
       }
       else {
-        await Message.channel.send({
+        lastMessage = await Message.channel.send({
           embeds: [Content[i]]
         });
       }
     }
 
-    res()
+    res(lastMessage)
   })
 }
 
@@ -1218,7 +1243,8 @@ module.exports = {
   GetTypingInChannel,
   colors: {
     red, green, reset
-  }
+  },
+  listSupportedModels
 }
 
 const cmt = require('./Commands/CreateMemoryThread.js')
@@ -1372,7 +1398,7 @@ async function UpdatePersonaArray() {
           PersonaArray[userID] = json.persona;
 
           // Get user's guilds
-          const guilds = client.guilds.cache.forEach(async (guild) => {
+          client.guilds.cache.forEach(async (guild) => {
             const isMember = await guild.members.fetch(userID).then(() => true).catch(() => false);
             if (isMember) {
               const userOnGuild = guild.members.cache.get(userID);
@@ -1497,7 +1523,7 @@ client.on('messageCreate',
                 "type": "image_url",
                 "image_url": {
                   "url": attachment.url,
-                  "detail": "low" // Can be set to "high" or "auto" but "low" is cheapest so
+                  // "detail": "low" // Can be set to "high" or "auto" but "low" is cheapest so
                 },
               });
             }
@@ -1853,6 +1879,8 @@ function GetTypingInChannel(channel) {
 
 //#region Chat AI Microservice for the web.
 const http = require('http');
+const path = require('path');
+const linkToHomepage = `Click here to go home: <a href="./WebAI/index.html">Home</a>`
 // const MicroserviceHTML = fs.readFileSync("./Microservice.html");
 
 /**
@@ -1885,8 +1913,8 @@ async function listener(req, res) {
           res.end(JSON.stringify(LlamaConverter.StripR1Thinking(response.data.choices[0].message)));
         })
     })
-  } else {
-    // If this wasn't a post request, just send back the demo page.
+  } else if (req.method == "GET") {
+    // If this wasn't a post request, treat as GET request.
     let localURL = "";
 
     if (req.url.startsWith('/'))
@@ -1895,6 +1923,13 @@ async function listener(req, res) {
       localURL += "./" + req.url;
 
     localURL = unescape(localURL);
+
+    // Sanitize
+    localURL = path.resolve(localURL);
+    if (!localURL.startsWith(__dirname)) {
+      res.setHeader("content-type", "text/html");
+      res.end(`You are not allowed to read that file!<br>${localURL}<br>${linkToHomepage}`);
+    }
 
     if (localURL.endsWith("/")) localURL += "index.html"
 
@@ -1911,14 +1946,13 @@ async function listener(req, res) {
     else */ {
       if (fs.existsSync(localURL))
         return res.end(fs.readFileSync(localURL));
-      else return res.end("That file doesn't exist!<br>" + localURL);
+      else return res.end(`That file doesn't exist!<br>${localURL}<br>${linkToHomepage}`);
     }
   }
 }
 
 // On boot, delete the Temp folder.
 const fp = require('fs/promises');
-const token = require('./token');
 const { getVoiceConnection } = require('@discordjs/voice');
 const { AddCostOfGPTTokens } = require('./Pricing');
 const { GetUserFile, FunctionEndMessage } = require('./User');
