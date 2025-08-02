@@ -28,7 +28,7 @@ module.exports = {
    */
   async execute(parameters, DiscordMessage = null) {
     let text = {
-        0: []
+      0: []
     }
     
     if (fs.existsSync(MemoriesFile))
