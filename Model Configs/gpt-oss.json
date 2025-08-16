@@ -1,0 +1,13 @@
+{
+    "models": [
+        {
+            "id": "gpt-oss:20b",
+            "object": "model",
+            "created": 1741970469,
+            "owned_by": "library",
+            "thinking": true,
+            "toolSupport": "teach",
+            "imageSupport": false
+        }
+    ]
+}
