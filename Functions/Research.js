@@ -30,7 +30,7 @@ module.exports = {
     execute(parameters, DiscordMessage = null) {
         if (!parameters.topic) return "No topic for research!";
 
-        // Wrap in a promise so that file send can be handled asynchronously without blocking the AI.
+        // This is in a promise so that we can use async. We could refactor the whole function also.
         return new Promise(async res => {
             const sources = FetchSources(parameters.topic);
             

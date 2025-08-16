@@ -671,7 +671,7 @@ async function RequestChatGPT(InputMessages, DiscordMessage, AutoRespond = true)
     async function ProcessFunctionCall(newMessage) {
       if (newMessage.tool_calls != null) {
         if (newMessage.content && DiscordMessage.followUp == null && AutoRespond) // followUp is only on slash commands; don't send extra content for slash commands.
-          DiscordMessage.channel.send(newMessage.content);
+          SendMessage(DiscordMessage, newMessage.content);
 
         messages.push(newMessage);
         /**
