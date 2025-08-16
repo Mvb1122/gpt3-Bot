@@ -355,11 +355,22 @@ module.exports = {
                 .addComponents(acceptButton);
             }
 
-            outputMessage = await outputMessage.reply({
-              content: "Finished Presentation! See PDF attached!" + (parameters.voiceover ? " Video will be created shortly." : "") + TimeTakenMessage,
-              files: [outputFile, inputFile],
-              components: row ? [row] : undefined
-            });
+            try {
+              outputMessage = await outputMessage.reply({
+                content: "Finished Presentation! See PDF attached!" + (parameters.voiceover ? " Video will be created shortly." : "") + TimeTakenMessage,
+                files: [outputFile, inputFile],
+                components: row ? [row] : undefined
+              });
+            } catch {
+              // Likely, file was too big. 
+              outputMessage = await outputMessage.reply({
+                content: "Finished Presentation! Unfortunately, the PDF was too big to be sent via Discord! You'll have to ask Micah for it." + (parameters.voiceover ? " Video will be created shortly." : "") + TimeTakenMessage,
+                components: row ? [row] : undefined
+              });
+
+              // Copy the PDF into presentation storage so that it isn't lost.
+              fp.copyFile(outputFile, path.resolve(`./Functions/Marp/Presentations/${id}.pdf`));
+            }
             messageContent = ""; // Reset message content when we're now moving onto the videos.
 
             if (!parameters.voiceover) {
